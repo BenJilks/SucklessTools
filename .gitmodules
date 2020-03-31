@@ -1,0 +1,6 @@
+[submodule "feh"]
+	path = feh
+	url = https://git.finalrewind.org/feh
+[submodule "sxhkd"]
+	path = sxhkd
+	url = https://github.com/baskerville/sxhkd

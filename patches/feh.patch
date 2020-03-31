@@ -1,0 +1,25 @@
++++ config.mk	2020-03-31 23:28:49.624536000 +0100
+@@ -99,7 +99,6 @@
+ #CFLAGS += -DWITH_DMALLOC
+ 
+ CFLAGS += -DPREFIX=\"${PREFIX}\" \
+-	-DPACKAGE=\"${PACKAGE}\" -DVERSION=\"${VERSION}\" \
+-	-I/usr/local/include -L/usr/local/lib
++	-DPACKAGE=\"${PACKAGE}\" -DVERSION=\"${VERSION}\"
+ 
+ LDLIBS += -lm -lpng -lX11 -lImlib2
++++ src/filelist.c	2020-03-31 23:26:53.108658000 +0100
+@@ -405,10 +405,10 @@
+ #ifdef HAVE_VERSCMP
+ static inline int strcmp_or_strverscmp(const char *s1, const char *s2)
+ {
+-//	if (!opt.version_sort)
++	if (!opt.version_sort)
+ 		return(strcmp(s1, s2));
+-//	else
+-//		return(strverscmp(s1, s2));
++	else
++		return(strverscmp(s1, s2));
+ }
+ #else
+ #define strcmp_or_strverscmp strcmp
