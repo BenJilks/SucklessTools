@@ -4,3 +4,9 @@
 [submodule "sxhkd"]
 	path = sxhkd
 	url = https://github.com/baskerville/sxhkd
+[submodule "xclip"]
+	path = xclip
+	url = https://github.com/astrand/xclip
+[submodule "printscreen"]
+	path = printscreen
+	url = https://github.com/roman-neuhauser/printscreen
