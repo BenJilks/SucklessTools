@@ -67,7 +67,7 @@ static const struct arg args[] = {
 	{ netspeed_rx, 	"%sbps | ",		"re0" },
 	{ cpu_freq, 	"%sHzi (",		NULL},
 	{ cpu_perc, 	"%s%%) | ",		NULL},
-	{ vol_perc, 	"%s%% | ", 		"/dev/mixer" },
+	{ vol_perc, 	"🔈 %s%% | ", 		"/dev/mixer" },
 	{ datetime, 	"%s",           "%d of %B %Y | %I:%M %p" },
 };
 

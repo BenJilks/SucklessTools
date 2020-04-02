@@ -6,8 +6,8 @@ static const unsigned int gappx     = 10;        /* gap pixel between windows */
 static const unsigned int snap      = 32;       /* snap pixel */
 static const int showbar            = 1;        /* 0 means no bar */
 static const int topbar             = 1;        /* 0 means bottom bar */
-static const char *fonts[]          = { "monospace:size=10" };
-static const char dmenufont[]       = "monospace:size=10";
+static const char *fonts[]          = { "NotoMono:size=10" };
+static const char dmenufont[]       = "NotoMono:size=10";
 static const char col_gray1[]       = "#222222";
 static const char col_gray2[]       = "#444444";
 static const char col_gray3[]       = "#bbbbbb";
@@ -61,6 +61,7 @@ static const char *dmenucmd[] 			= { "dmenu_run", "-m", dmenumon, "-fn", dmenufo
 static const char *termcmd[]  			= { "st", NULL };
 static const char *browsercmd[] 		= { "firefox", NULL };
 static const char *browserprivatecmd[] 	= { "firefox", "-private-window", NULL };
+//static const char *emojicmd[] 			= { "emoji", NULL };
 
 static Key keys[] = {
 	/* modifier                     key        function        argument */
@@ -68,6 +69,7 @@ static Key keys[] = {
 	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = termcmd } },
 	{ MODKEY,						XK_b,	   spawn,		   {.v = browsercmd } },
 	{ MODKEY|ShiftMask,				XK_b,	   spawn,		   {.v = browserprivatecmd } },
+//	{ MODKEY,						XK_e,	   spawn,		   {.v =  } },
 	{ MODKEY,                       XK_t,      togglebar,      {0} },
 	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } },

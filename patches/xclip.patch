@@ -1,0 +1,10 @@
++++ xclip.c	2020-04-01 12:59:10.749558000 +0100
+@@ -19,8 +19,6 @@
+  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+ 
+-#undef HAVE_ICONV
+-
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
