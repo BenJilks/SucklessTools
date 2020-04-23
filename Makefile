@@ -2,33 +2,37 @@
 SUDO=sudo
 FLAGS=LDFLAGS="-L/usr/local/lib" CFLAGS="-I/usr/local/include"
 
+MAKE=gmake
+
 all:
-	gmake -C dwm
-	gmake -C dmenu
-	gmake -C st
-	gmake -C slstatus
-	gmake -C pamixer
-	gmake -C feh
-	gmake -C printscreen
-	${FLAGS} gmake -C sxhkd
+	${MAKE} -C dwm
+	${MAKE} -C dmenu
+	${MAKE} -C st
+	${MAKE} -C slstatus
+	${MAKE} -C pamixer
+	${MAKE} -C feh
+	${MAKE} -C printscreen
+	${FLAGS} ${MAKE} -C sxhkd
 
 install:
-	${SUDO} gmake -C dwm install
-	${SUDO} gmake -C dmenu install
-	${SUDO} gmake -C st install
-	${SUDO} gmake -C slstatus install
-	${SUDO} gmake -C pamixer install
-	${SUDO} gmake -C feh install
-	${SUDO} gmake -C printscreen install
-	${SUDO} ${FLAGS} gmake -C sxhkd install
+	${SUDO} ${MAKE} -C dwm install
+	${SUDO} ${MAKE} -C dmenu install
+	${SUDO} ${MAKE} -C st install
+	${SUDO} ${MAKE} -C slstatus install
+	${SUDO} ${MAKE} -C pamixer install
+	${SUDO} ${MAKE} -C feh install
+	${SUDO} ${MAKE} -C printscreen install
+	${SUDO} ${FLAGS} ${MAKE} -C sxhkd install
 	cp -r config ~/.config/dwm
+	mkdir ~/backgrounds
+	${SUDO} cp config/update_background /usr/bin/
 
 clean:	
-	gmake -C dwm clean
-	gmake -C dmenu clean
-	gmake -C st clean
-	gmake -C pamixer clean
-	gmake -C slstatus clean
+	${MAKE} -C dwm clean
+	${MAKE} -C dmenu clean
+	${MAKE} -C st clean
+	${MAKE} -C pamixer clean
+	${MAKE} -C slstatus clean
 	${SUDO} rm -rf feh
 	${SUDO} rm -rf sxhkd
 	${SUDO} rm -rf xclip
