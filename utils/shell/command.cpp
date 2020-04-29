@@ -1,5 +1,6 @@
 #include "command.hpp"
 #include "lexer.hpp"
+#include "shell.hpp"
 #include <unistd.h>
 #include <sys/wait.h>
 #include <iostream>
@@ -15,13 +16,25 @@ static std::unique_ptr<Command> parse_exec(Lexer &lexer)
 
 	std::string command = command_token->data;
 	std::vector<std::string> arguments;
-	for (;;)
+	bool has_next = true;
+	while (has_next)
 	{
 		auto peek = lexer.peek();
-		if (!peek || peek->type != Token::Type::Name)
+		if (!peek)
 			break;
 
-		arguments.push_back(lexer.consume(Token::Type::Name)->data);
+		switch (peek->type)
+		{
+			case Token::Type::Variable: 
+				arguments.push_back(Shell::the().get(lexer.consume(Token::Type::Variable)->data));
+				break;
+
+			case Token::Type::Name: 
+				arguments.push_back(lexer.consume(Token::Type::Name)->data);
+				break;
+
+			default: has_next = false; break;
+		}
 	}
 
 	return std::make_unique<CommandExec>(command, arguments);

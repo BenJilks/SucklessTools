@@ -2,6 +2,13 @@
 #include "command.hpp"
 #include <iostream>
 
+Shell shell;
+
+Shell &Shell::the()
+{
+	return shell;
+}
+
 Shell::Shell()
 {
 }
@@ -36,13 +43,18 @@ void Shell::run()
 	}
 }
 
-void Shell::set(std::string name, std::string value)
+void Shell::set(std::string name, const std::string &value)
 {
-	env[name] = value;
+	env_buffer[name] = name + "=" + value;
+	putenv(env_buffer[name].data());
 }
 
 std::string Shell::get(std::string name)
 {
-	return env[name];
+	auto env = getenv(name.data());
+	if (!env)
+		return "";
+	
+	return env;
 }
 

@@ -8,8 +8,8 @@ struct Token
 	enum class Type
 	{
 		Name,
-		Number,
-		Pipe
+		Pipe,
+		Variable
 	};
 
 	std::string data;
@@ -26,6 +26,8 @@ public:
 
 private:
 	std::optional<Token> parse_name();
+	std::optional<Token> parse_single_token(Token::Type type);
+	std::optional<Token> parse_variable();
 	std::optional<Token> next();
 
 	std::vector<Token> peek_queue;

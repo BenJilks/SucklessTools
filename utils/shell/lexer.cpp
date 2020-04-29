@@ -63,6 +63,33 @@ std::optional<Token> Lexer::consume(Token::Type type)
 	return token;
 }
 
+std::optional<Token> Lexer::parse_single_token(Token::Type type)
+{
+	char c = source[pointer];
+	pointer += 1;
+	
+	return Token { std::to_string(c), type };
+}
+
+std::optional<Token> Lexer::parse_variable()
+{
+	// Skip '$'
+	pointer += 1;
+
+	std::string buffer = "";
+	for (;;)
+	{
+		char c = source[pointer];
+		if (!std::isalnum(c) && c != '_')
+			break;
+
+		buffer += c;
+		pointer += 1;
+	}
+
+	return Token { buffer, Token::Type::Variable };
+}
+
 std::optional<Token> Lexer::next()
 {
 	while (pointer < source.length())
@@ -71,7 +98,8 @@ std::optional<Token> Lexer::next()
 
 		switch(c)
 		{
-			case '|': pointer += 1; return Token { std::to_string(c), Token::Type::Pipe };
+			case '|': return parse_single_token(Token::Type::Pipe);
+			case '$': return parse_variable();
 			default: break;
 		}
 
