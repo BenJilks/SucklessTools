@@ -31,7 +31,24 @@ void Shell::prompt()
 
 	std::string line = "";
 	int cursor = 0;
+	int history_index = -1;
 	bool line_end = false;
+
+	auto replace_line = [&](std::string with)
+	{
+		for (int i = 0; i < line.length(); i++)
+			std::cout << "\033[D";
+		std::cout << with;
+		
+		for (int i = with.length(); i < line.length(); i++)
+			std::cout << " ";
+		for (int i = with.length(); i < line.length(); i++)
+			std::cout << "\033[D";
+		
+		line = with;
+		cursor = with.length();
+	};
+
 	while (!line_end)
 	{
 		char c = std::getchar();
@@ -47,8 +64,22 @@ void Shell::prompt()
 				switch(std::getchar())
 				{
 					case 'A': // Up
+						if (history_index < (int)command_history.size() - 1)
+						{
+							history_index += 1;
+							auto command = command_history[command_history.size() - history_index - 1];
+							replace_line(command);
+						}
 						break;
 					case 'B': // Down
+						if (history_index >= 0)
+						{
+							history_index -= 1;
+							auto command = history_index >= 0 
+								? command_history[command_history.size() - history_index - 1] 
+								: "";
+							replace_line(command);
+						}
 						break;
 					case 'C': // Right
 						if (cursor < line.length())
@@ -101,6 +132,7 @@ void Shell::prompt()
 
 	std::cout << std::endl;
 	exec_line(line);
+	command_history.push_back(line);
 }
 
 enum class State

@@ -21,5 +21,6 @@ private:
 	void exec_command(const std::string command, const std::vector<std::string> arguments);
 
 	std::map<std::string, std::string> env_buffer;
+	std::vector<std::string> command_history;
 
 };
