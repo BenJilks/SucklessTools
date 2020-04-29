@@ -1,7 +1,10 @@
 #include "shell.hpp"
 #include "command.hpp"
 #include <iostream>
+#include <filesystem>
+#include <functional>
 #include <termios.h>
+namespace fs = std::filesystem;
 
 Shell shell;
 
@@ -62,7 +65,24 @@ void Shell::prompt()
 			case '\n':
 				line_end = true;
 				break;
+			
+			case '\t':
+			{
+				auto patch = auto_complete(line, cursor);
+				if (patch.empty())
+				{				
+					std::cout << ps1 << line;
+					for (int i = cursor; i < line.length(); i++)
+						std::cout << "\033[D";
+					break;
+				}
 
+				std::cout << patch;
+				line += patch;
+				cursor += patch.length();
+				break;
+			}
+			
 			case '\033':
 			{
 				std::getchar(); // Skip [
@@ -165,11 +185,134 @@ void Shell::prompt()
 	command_history.push_back(line);
 }
 
-enum class State
+std::string Shell::auto_complete(const std::string &line, int cursor)
 {
-	Command,
-	Argument
-};
+	int word_start = cursor;
+	while (word_start > 0)
+	{
+		char c = line[word_start - 1];
+		if (std::isspace(c))
+			break;
+
+		word_start -= 1;
+	}
+
+	std::string_view curr_word(
+		line.data() + word_start, 
+		cursor - word_start);
+
+	// Find all options for word
+	auto options = find_completions(
+		curr_word, word_start == 0);
+
+	std::string patch = "";
+	for (;;)
+	{
+		char next_char = 0;
+		for (const auto &option : options)
+		{
+			int index = curr_word.length() + patch.length();
+			if (index > option.length())
+			{
+				next_char = 0;
+				break;
+			}
+
+			char c = option[index];
+			if (next_char == 0)
+				next_char = c;
+
+			if (c != next_char)
+			{
+				next_char = 0;
+				break;
+			}
+
+			next_char = c;
+		}
+
+		if (!next_char)
+			break;
+
+		patch += next_char;
+	}
+
+	if (patch.empty())
+	{
+		if (options.size() == 1)
+			return " ";
+
+		std::cout << "\n";
+		for (const auto &option : options)
+			std::cout << option << " ";
+		std::cout << "\n";
+	}
+
+	return patch;
+}
+
+std::vector<std::string> Shell::find_completions(
+	const std::string_view &start, bool search_path)
+{
+	std::vector<std::string> options;
+	
+	int last_slash_index = 0;
+	for (int i = start.length() - 1; i >= 0; i--)
+	{
+		if (start[i] == '/')
+		{
+			last_slash_index = i + 1;
+			break;
+		}
+	}
+
+	auto path = std::string(start.substr(0, last_slash_index));
+	auto local_path = "./" + std::string(path);
+
+	// If the path begins with a slash, it's an absolute path
+	if (!path.empty())
+	{
+		if (path[0] == '/')
+			local_path = path;
+	}
+
+	// Look through local paths
+	for (const auto &entry : fs::directory_iterator(local_path))
+	{
+		auto filename = std::string(path) + std::string(entry.path().filename());
+		if (filename.rfind(start, 0) == 0)
+			options.push_back(filename);
+	}
+
+	// If search path is enabled, look through all the paths in the envirement $PATH
+	// variable for options
+	if (search_path)
+	{
+		auto env_path = get("PATH");
+		std::string buffer;
+		
+		for (int i = 0; i < env_path.length(); i++)
+		{
+			char c = env_path[i];
+			if (c == ':')
+			{
+				for (const auto &entry : fs::directory_iterator(buffer))
+				{
+					auto filename = std::string(entry.path().filename());
+					if (filename.rfind(start, 0) == 0)
+						options.push_back(filename);
+				}
+
+				buffer = "";
+				continue;
+			}
+
+			buffer += c;
+		}
+	}
+
+	return options;
+}
 
 void Shell::exec_line(const std::string &line)
 {

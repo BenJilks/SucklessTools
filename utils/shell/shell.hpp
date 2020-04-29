@@ -18,7 +18,8 @@ public:
 
 private:
 	void exec_line(const std::string &line);
-	void exec_command(const std::string command, const std::vector<std::string> arguments);
+	std::string auto_complete(const std::string &line, int cursor);
+	std::vector<std::string> find_completions(const std::string_view &start, bool search_path);
 
 	std::map<std::string, std::string> env_buffer;
 	std::vector<std::string> command_history;
