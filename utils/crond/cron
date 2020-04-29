@@ -256,8 +256,7 @@ def main(log_file=None):
 
 		# Update crons every 15 mins
 		if mins_past % 15 == 0:
-			print("Updating crons")
-			crons = load_crons()
+			crons = load_crons(log_output=False)
 
 parser = ArgumentParser(description='Run cron jobs')
 parser.add_argument('-d', '--deamon', help='Run as deamon', action='store_true')
