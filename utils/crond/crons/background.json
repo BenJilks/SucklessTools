@@ -1,0 +1,10 @@
+{
+	"name": "update_background",
+	"script":
+	{
+		"path": "update_background.py",
+		"type": "python"
+	},
+	"daily": [ "0h" ]
+}
+

@@ -1,0 +1,289 @@
+#!/usr/bin/python
+from argparse import ArgumentParser
+from pathlib import Path
+from time import sleep
+from datetime import datetime
+import daemon, os, time, json, sys
+import subprocess
+
+CRON_DIR = '.crons'
+HOME = str(Path.home())
+CRON_PATH = HOME + '/' + CRON_DIR
+LOG_PATH = CRON_PATH + '/log'
+SCRIPTS_PATH = CRON_PATH + '/scripts'
+WRAPPER_CODE = """
+def _exit(status):
+	global exit_status
+	exit_status = status
+	raise ExecInterrupt
+exit = _exit
+"""		
+
+WEEKEND = [ 'saturday', 'sunday' ]
+
+class ExecInterrupt(Exception):
+	pass
+
+def Exec(source, globals=None, locals=None):
+	global exit_status
+	try:
+		exec(WRAPPER_CODE + source, globals, locals)
+		exit_status = 0
+	except ExecInterrupt:
+		pass
+	return exit_status
+
+def parse_time(time_str):
+	index = 0
+	buf = ''
+	output = {}
+	while index < len(time_str):
+		c = time_str[index]
+		index += 1
+	
+		if c.isdigit() or c.isspace():
+			buf += c
+		else:
+			if c == 'h':
+				output['hour'] = int(buf)
+			elif c == 'm':
+				output['min'] = int(buf)
+			else:
+				print('Parse error: Unkown time unit \'' + c + '\'')
+			buf = ''
+	return output
+
+def is_in_week(week):
+	today = datetime.today().strftime('%A').lower()
+	for day in week:
+		day = day.lower()
+		if day == today:
+			return True
+		if day == 'weekday' and not today in WEEKEND:
+			return True
+		if day == 'weekend' and today in WEEKEND:
+			return True
+	return False
+
+def exec_cron(cron):
+	script = cron['script']
+	script_type = 'shell'
+	if 'type' in script:
+		script_type = script['type']
+	if not 'path' in script:
+		print("Error: The cron '" + cron['name'] + "' does not have a script path")
+		return
+	
+	script_path = script['path']
+	print("Running cron '" + cron['name'] + "':")
+	print('---------Start---------')
+	sys.stdout.flush()
+	exit_status = -1
+	script_code = open(SCRIPTS_PATH + '/' + script_path).read()
+	if script_type == 'shell':
+		exit_status = subprocess.call(script_code, 
+			stdout=sys.stdout, stderr=sys.stderr, 
+			shell=True)
+	elif script_type == 'python':
+		exit_status = Exec(script_code)
+	else:
+		print("Error: Unkown script type '" + script_type + "'\n")
+	
+	print('----------End----------')
+	print('Finished with status: ' + str(exit_status), end='\n\n')
+	if exit_status != 0:
+		cron['try_again'] = True
+
+def load_exec_history():
+	path = LOG_PATH + '/exec_history.json'
+	if os.path.isfile(path):
+		f = open(path, 'r')
+		data = json.loads(f.read())
+		f.close()
+		return data
+	return {}
+
+def save_exec_history(exec_history):
+	path = LOG_PATH + '/exec_history.json'
+	f = open(path, 'w')
+	f.write(json.dumps(exec_history))
+	f.close()
+
+def load_crons(log_output=True):
+	crons = []
+	for f in os.listdir(CRON_PATH):
+		path = CRON_PATH + '/' + f
+
+		if os.path.isfile(path):
+			if log_output:
+				print('Found cron \'' + f + '\'')
+
+			with open(path, 'r') as cron_file:
+				cron_data = json.loads(cron_file.read())
+
+				# Make the file name it's name if none was given
+				if not 'name' in cron_data:
+					cron_data['name'] = f
+
+				if 'disable' in cron_data and cron_data['disable']:
+					if log_output:
+						print("Cron '" + cron_data['name'] + "' disabled")
+					cron_file.close()
+					continue
+
+				if not 'script' in cron_data:
+					print('Error: Cron file has no script')
+				else:
+					crons.append(cron_data)
+				cron_file.close()	
+
+	if len(crons) == 0:
+		print('No crons found, quiting program')
+		log_file.close()
+		exit(0)
+	return crons
+
+def dump_timestamp(dt):
+	return dt.strftime('%y %m %d %H %M')
+
+def load_timestamp(timestamp):
+	return datetime.strptime(timestamp, '%y %m %d %H %M')
+
+def fetch_exec_list(exec_history, name, when):
+	if not name in exec_history:
+		exec_history[name] = {}
+	
+	history = exec_history[name]
+	if not when in history:
+		history[when] = {}
+	
+	if not 'timestamp' in history[when]:
+		history[when]['timestamp'] = dump_timestamp(datetime.now())
+	if not 'done_list' in history[when]:
+		history[when]['done_list'] = []
+
+	return history[when]
+
+def has_exec_daily(exec_history, cron, time):
+	exec_list = fetch_exec_list(exec_history, cron['name'], 'daily')
+
+	# Check if timestamp is out of date
+	timestamp = load_timestamp(exec_list['timestamp'])
+	now = datetime.now()
+	if str(timestamp.month) + ' ' + str(timestamp.day) != str(now.month) + ' ' + str(now.day):
+		exec_list['timestamp'] = dump_timestamp(now)
+		exec_list['done_list'] = []
+
+	# Check if it's in the done list, if so return true
+	done_list = exec_list['done_list']
+	if time in done_list:
+		save_exec_history(exec_history)
+		return True
+	
+	# Otherwise add it to the done list and return false
+	done_list.append(time)
+	save_exec_history(exec_history)
+	return False
+
+old_print = print
+def _print(msg, end='\n'):
+	timestamp = dump_timestamp(datetime.now())
+	old_print(timestamp + ": " + str(msg), end=end)
+print = _print
+
+if not os.path.isdir(CRON_PATH):
+	os.mkdir(CRON_PATH)
+	os.mkdir(SCRIPTS_PATH)
+	os.mkdir(LOG_PATH)
+
+def main(log_file=None):
+	print('Started cron daemon')
+	
+	mins_past = 0
+	exec_history = load_exec_history()
+	crons = load_crons()
+
+	if log_file:
+		log_file.flush()
+	
+	while True:
+		curr_datetime = datetime.now()
+
+		for cron in crons:
+			if 'try_again' in cron:
+				print("Trying '" + cron['name'] + "' again")
+				del cron['try_again']
+				exec_cron(cron)
+				continue
+
+			if 'weekly' in cron:
+				are_we_in_week = is_in_week(cron['weekly'])
+				if not are_we_in_week:
+					break
+
+				# If we don't have a daily, then execute once per day
+				if not 'daily' in cron:
+					if not has_exec_daily(exec_history, cron, '0h'):
+						exec_cron(cron)
+					continue
+
+			if 'daily' in cron:
+				daily = cron['daily']
+				
+				# If it's a list, then exectute on the times specified,
+				# otherwise execute every x
+				if isinstance(daily, list):
+					for time_str in daily:
+						time = parse_time(time_str)
+						hour = time['hour'] if 'hour' in time else 0
+						minute = time['min'] if 'min' in time else 0
+						if curr_datetime.hour >= hour and curr_datetime.minute >= minute:
+							if not has_exec_daily(exec_history, cron, time_str):
+								exec_cron(cron)
+				else:
+					time = parse_time(daily)
+					if 'hour' in time:
+						if mins_past % (60 * time['hour']) == 0:
+							exec_cron(cron)
+					elif 'min' in time:
+						if mins_past & time['min'] == 0:
+							exec_cron(cron)
+				continue
+	
+		sys.stdout.flush()
+		sleep(60)
+		mins_past += 1
+
+		# Update crons every 15 mins
+		if mins_past % 15 == 0:
+			print("Updating crons")
+			crons = load_crons()
+
+parser = ArgumentParser(description='Run cron jobs')
+parser.add_argument('-d', '--deamon', help='Run as deamon', action='store_true')
+parser.add_argument('-l', '--list', help='Show a list of currently loaded jobs', action='store_true')
+parser.add_argument('-o', '--log', help='Open todays log file', action='store_true')
+args = parser.parse_args()
+
+log_file_path = LOG_PATH + '/log ' + datetime.now().strftime('%y %m %d') + '.txt'
+if args.deamon:
+	with daemon.DaemonContext():
+		log_file = open(log_file_path, 'a')
+		sys.stdout = log_file
+		sys.stderr = log_file
+		main(log_file)
+		log_file.close()
+	exit(0)
+
+if args.list:
+	crons = load_crons(log_output=False)
+	for cron in crons:
+		old_print(cron['name'] + ': ' + cron['script']['path'])
+	exit(0)
+
+if args.log:
+	os.system('less "' + log_file_path + '"')
+	exit(0)
+
+main()
+

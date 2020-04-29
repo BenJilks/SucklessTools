@@ -2,8 +2,8 @@ LDLIBS   ?= -L/usr/local/lib -lpulse -lboost_program_options
 CXXFLAGS ?= -std=c++11 -Wall -Wextra -pedantic -I/usr/local/include
 PREFIX   ?= /usr/local
 RM       ?= rm -f
-CC	 = clang
-CXX	 = clang++
+CC	 = gcc
+CXX	 = g++
 
 target   := pamixer
 manpage  := pamixer.1
