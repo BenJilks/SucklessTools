@@ -12,6 +12,7 @@ Shell &Shell::the()
 
 Shell::Shell()
 {
+	// Disable echo so we can use our own custom prompt
 	struct termios config;
 	if (tcgetattr(0, &config) < 0)
 		perror("tcgetattr()");
@@ -36,13 +37,16 @@ void Shell::prompt()
 
 	auto replace_line = [&](std::string with)
 	{
-		for (int i = 0; i < line.length(); i++)
+		// Move the the start of the current line
+		for (int i = 0; i < cursor; i++)
 			std::cout << "\033[D";
+
+		// Replace the current line with the new one
 		std::cout << with;
 		
-		for (int i = with.length(); i < line.length(); i++)
+		for (int i = with.length(); i < (int)line.length(); i++)
 			std::cout << " ";
-		for (int i = with.length(); i < line.length(); i++)
+		for (int i = with.length(); i < (int)line.length(); i++)
 			std::cout << "\033[D";
 		
 		line = with;
@@ -60,9 +64,12 @@ void Shell::prompt()
 				break;
 
 			case '\033':
+			{
 				std::getchar(); // Skip [
-				switch(std::getchar())
+				char action_char = std::getchar();
+				switch(action_char)
 				{
+					// History
 					case 'A': // Up
 						if (history_index < (int)command_history.size() - 1)
 						{
@@ -81,6 +88,8 @@ void Shell::prompt()
 							replace_line(command);
 						}
 						break;
+
+					// Navigation
 					case 'C': // Right
 						if (cursor < line.length())
 						{
@@ -95,8 +104,29 @@ void Shell::prompt()
 							std::cout << "\033[D";
 						}
 						break;
+					
+					case '1': // Home
+						std::getchar(); // Skip ~
+					case 'H': // Xterm Home
+						for (int i = cursor - 1; i >= 0; --i)
+							std::cout << "\033[D";
+						cursor = 0;
+						break;
+
+					case '4': // End
+						std::getchar(); // Skip ~
+					case 'F': // Xterm end
+						for (int i = cursor; i < line.length(); i++)
+							std::cout << "\033[C";
+						cursor = line.length();
+						break;
+					defualt:
+						std::cout << "\033[" << action_char;
+						cursor += 3;
+						break;
 				}
 				break;
+			}
 
 			case '\b':
 			case 127:
