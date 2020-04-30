@@ -10,17 +10,25 @@ Lexer::Lexer(const std::string &source)
 std::optional<Token> Lexer::parse_name()
 {
 	std::string buffer = "";
+	auto type = Token::Type::Name;
+
 	for(;;)
 	{
 		char c = source[pointer];
 		if (std::isspace(c))
 			break;
 
+		if (c == '=')
+			type = Token::Type::VariableAssignment;
+
 		buffer += c;
 		pointer += 1;
+
+		if (pointer >= source.length())
+			break;
 	}
 
-	return Token {buffer, Token::Type::Name};
+	return Token {buffer, type};
 }
 
 std::optional<Token> Lexer::peek(int count)

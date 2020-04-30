@@ -8,14 +8,40 @@
 #define READ 		0
 #define WRITE 		1
 
+static std::pair<std::string, std::string> parse_assignment(Lexer &lexer)
+{
+	auto token = lexer.consume(Token::Type::VariableAssignment);
+	if (!token)
+		return std::make_pair("", "");
+
+	auto data = token->data;
+	bool has_name = false;
+	std::string name, value;
+	
+	for (const auto &c : data)
+	{
+		if (c == '=')
+		{
+			has_name = true;
+			continue;
+		}
+
+		if (!has_name)
+			name += c;
+		else
+			value += c;
+	}
+
+	return std::make_pair(name, value);
+}
+
 static std::unique_ptr<Command> parse_exec(Lexer &lexer)
 {
-	auto command_token = lexer.consume(Token::Type::Name);
-	if (!command_token)
-		return nullptr;
-
-	std::string command = command_token->data;
+	std::string command;
 	std::vector<std::string> arguments;
+	std::vector<std::pair<std::string, std::string>> assignments;
+
+	bool has_command = false;
 	bool has_next = true;
 	while (has_next)
 	{
@@ -25,11 +51,32 @@ static std::unique_ptr<Command> parse_exec(Lexer &lexer)
 
 		switch (peek->type)
 		{
-			case Token::Type::Variable: 
-				arguments.push_back(Shell::the().get(lexer.consume(Token::Type::Variable)->data));
+			case Token::Type::Variable:
+			{
+				auto value = Shell::the().get(lexer.consume(Token::Type::Variable)->data);
+				if (!has_command)
+				{
+					command = value;
+					has_command = true;
+					break;
+				}
+				
+				arguments.push_back(value);
+				break;
+			}
+			
+			case Token::Type::VariableAssignment:
+				assignments.push_back(parse_assignment(lexer));
 				break;
 
 			case Token::Type::Name: 
+				if (!has_command)
+				{
+					command = lexer.consume(Token::Type::Name)->data;
+					has_command = true;
+					break;
+				}
+
 				arguments.push_back(lexer.consume(Token::Type::Name)->data);
 				break;
 
@@ -37,7 +84,10 @@ static std::unique_ptr<Command> parse_exec(Lexer &lexer)
 		}
 	}
 
-	return std::make_unique<CommandExec>(command, arguments);
+	if (!has_command)
+		std::cout << "We have a problem\n";
+
+	return std::make_unique<CommandExec>(command, arguments, assignments);
 }
 
 std::unique_ptr<Command> Command::parse(const std::string &source)
@@ -53,6 +103,28 @@ std::unique_ptr<Command> Command::parse(const std::string &source)
 	}
 
 	return left;
+}
+
+CommandExec::CommandExec(std::string program, 
+			std::vector<std::string> arguments, 
+			std::vector<std::pair<std::string, std::string>> assignments)
+	: program(program)
+	, arguments(arguments)
+	, assignments(assignments)
+{
+	// Build argument list
+	raw_arguments.push_back(this->program.data());
+	for (auto &argument : this->arguments)
+		raw_arguments.push_back(argument.data());
+	raw_arguments.push_back(nullptr);
+	
+	// Build envirment list
+	for (auto &assignment : this->assignments)
+	{
+		auto variable = assignment.first + "=" + assignment.second;
+		raw_assignments.push_back(variable.data());
+	}
+	raw_assignments.push_back(nullptr);
 }
 
 int Command::execute_in_process()
@@ -79,17 +151,12 @@ int Command::execute_in_process()
 
 void CommandExec::execute()
 {
-	const char **raw_arguments = new const char*[arguments.size() + 2];
-
-	raw_arguments[0] = program.data();
-	for (int i = 0; i < arguments.size(); i++)
-		raw_arguments[i + 1] = arguments[i].data();
-	raw_arguments[arguments.size() + 1] = nullptr;
-
-	if (execvp(program.data(), (char**)raw_arguments) < 0)
+	if (execvpe(program.data(), 
+		const_cast<char* const*>(raw_arguments.data()),
+		const_cast<char* const*>(raw_assignments.data())) < 0)
+	{
 		perror("Shell");
-
-	delete[] raw_arguments;
+	}
 }
 
 void CommandPipe::execute()

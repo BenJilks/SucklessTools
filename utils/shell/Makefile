@@ -8,6 +8,7 @@ CXXFLAGS=-std=c++17 -pedantic -pedantic-errors -Werror \
 OBJ=shell.o \
 	lexer.o \
 	command.o \
+	modules/autocomplete.o \
 	main.o
 
 %.cpp: %.o

@@ -9,7 +9,8 @@ struct Token
 	{
 		Name,
 		Pipe,
-		Variable
+		Variable,
+		VariableAssignment
 	};
 
 	std::string data;

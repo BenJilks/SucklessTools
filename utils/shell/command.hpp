@@ -19,17 +19,19 @@ private:
 class CommandExec : public Command
 {
 public:
-	CommandExec(std::string program, std::vector<std::string> arguments)
-		: program(program)
-		, arguments(arguments)
-	{
-	}
+	CommandExec(std::string program, 
+		std::vector<std::string> arguments, 
+		std::vector<std::pair<std::string, std::string>> assignments);
 	
 	virtual void execute() override;
 
 private:
 	std::string program;
 	std::vector<std::string> arguments;
+	std::vector<std::pair<std::string, std::string>> assignments;
+
+	std::vector<const char*> raw_arguments;
+	std::vector<const char*> raw_assignments;
 
 };
 
