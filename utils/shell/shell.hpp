@@ -14,6 +14,10 @@ public:
 
 	void prompt();
 	void run();
+	void run_script(const std::string &file_path);
+
+	void disable_echo();
+	void enable_echo();
 
 	void set(std::string env, const std::string &value);
 	std::string get(std::string env);

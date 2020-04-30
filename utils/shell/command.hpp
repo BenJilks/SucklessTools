@@ -16,6 +16,19 @@ public:
 private:
 };
 
+class CommandList : public Command
+{
+public:
+	CommandList() {}
+
+	void add(std::unique_ptr<Command> &command);
+	virtual void execute() override;
+
+private:
+	std::vector<std::unique_ptr<Command>> commands;
+
+};
+
 class CommandExec : public Command
 {
 public:

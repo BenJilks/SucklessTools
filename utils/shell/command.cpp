@@ -85,14 +85,13 @@ static std::unique_ptr<Command> parse_exec(Lexer &lexer)
 	}
 
 	if (!has_command)
-		std::cout << "We have a problem\n";
+		return nullptr;
 
 	return std::make_unique<CommandExec>(command, arguments, assignments);
 }
 
-std::unique_ptr<Command> Command::parse(const std::string &source)
+std::unique_ptr<Command> parse_command(Lexer &lexer)
 {
-	Lexer lexer(source);
 	auto left = parse_exec(lexer);
 
 	while (lexer.consume(Token::Type::Pipe))
@@ -103,6 +102,35 @@ std::unique_ptr<Command> Command::parse(const std::string &source)
 	}
 
 	return left;
+}
+
+std::unique_ptr<Command> Command::parse(const std::string &source)
+{
+	Lexer lexer(source);
+	auto command_list = std::make_unique<CommandList>();
+
+	for (;;)
+	{
+		auto command = parse_command(lexer);
+		if (command)
+			command_list->add(command);
+
+		if (!lexer.consume(Token::Type::EndCommand))
+			break;
+	}
+
+	return command_list;
+}
+
+void CommandList::add(std::unique_ptr<Command> &command)
+{
+	commands.push_back(std::move(command));
+}
+
+void CommandList::execute()
+{
+	for (auto &command : commands)
+		command->execute_in_process();
 }
 
 CommandExec::CommandExec(std::string program, 
@@ -140,7 +168,7 @@ int Command::execute_in_process()
 	if (pid == 0)
 	{
 		execute();
-		exit(0);
+		exit(-1);
 	}
 
 	int status;
@@ -162,58 +190,45 @@ void CommandExec::execute()
 void CommandPipe::execute()
 {
 	if (!left || !right)
-		return;
+		exit(-1);
 
-	auto outer_pid = fork();
-	if (outer_pid == -1)
+	int p[2];
+	if (pipe(p) < 0)
+	{
+		perror("Shell: Pipe failed");
+		exit(-1);
+	}
+
+	auto pid = fork();
+	if (pid == -1)
 	{
 		perror("Shell");
 		return;
-	}	
-
-	if (outer_pid == 0)
-	{	
-		int p[2];
-		if (pipe(p) < 0)
-		{
-			perror("Shell: Pipe failed");
-			exit(-1);
-		}
-		
-		auto pid = fork();
-		if (pid == -1)
-		{
-			perror("Shell");
-			return;
-		}
-	
-		if (pid == 0)
-		{
-			// Output process
-			close(STDOUT_FILENO);
-			dup(p[WRITE]);
-
-			close(p[READ]);
-			close(p[WRITE]);
-			
-			left->execute();
-			exit(0);
-		}
-		else
-		{
-			// Input process
-			close(STDIN_FILENO);
-			dup(p[READ]);
-			
-			close(p[WRITE]);
-			close(p[READ]);
-	
-			right->execute();
-			exit(0);
-		}
 	}
-
-	int status;
-	waitpid(outer_pid, &status, 0);
+	
+	if (pid == 0)
+	{
+		// Output process
+		close(STDOUT_FILENO);
+		dup(p[WRITE]);
+	
+		close(p[READ]);
+		close(p[WRITE]);
+		
+		left->execute();
+		exit(-1);
+	}
+	else
+	{
+		// Input process
+		close(STDIN_FILENO);
+		dup(p[READ]);
+		
+		close(p[WRITE]);
+		close(p[READ]);
+	
+		right->execute();
+		exit(-1);
+	}
 }
 

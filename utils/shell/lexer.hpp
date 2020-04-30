@@ -10,7 +10,8 @@ struct Token
 		Name,
 		Pipe,
 		Variable,
-		VariableAssignment
+		VariableAssignment,
+		EndCommand
 	};
 
 	std::string data;

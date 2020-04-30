@@ -15,7 +15,7 @@ std::optional<Token> Lexer::parse_name()
 	for(;;)
 	{
 		char c = source[pointer];
-		if (std::isspace(c))
+		if (std::isspace(c) || c == ';' || c == '|')
 			break;
 
 		if (c == '=')
@@ -107,6 +107,8 @@ std::optional<Token> Lexer::next()
 		switch(c)
 		{
 			case '|': return parse_single_token(Token::Type::Pipe);
+			case '\n':
+			case ';': return parse_single_token(Token::Type::EndCommand);
 			case '$': return parse_variable();
 			default: break;
 		}

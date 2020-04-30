@@ -2,6 +2,8 @@
 #include "command.hpp"
 #include <iostream>
 #include <functional>
+#include <fstream>
+#include <sstream>
 #include <termios.h>
 
 Shell shell;
@@ -13,15 +15,28 @@ Shell &Shell::the()
 
 Shell::Shell()
 {
-	// Disable echo so we can use our own custom prompt
+}
+
+void Shell::disable_echo()
+{
 	struct termios config;
 	if (tcgetattr(0, &config) < 0)
 		perror("tcgetattr()");
 	
 	config.c_lflag &= ~ICANON;
 	config.c_lflag &= ~ECHO;
-	config.c_cc[VMIN] = 1;
-	config.c_cc[VTIME] = 0;
+	if (tcsetattr(0, TCSANOW, &config) < 0)
+		perror("tcsetattr()");
+}
+
+void Shell::enable_echo()
+{
+	struct termios config;
+	if (tcgetattr(0, &config) < 0)
+		perror("tcgetattr()");
+	
+	config.c_lflag |= ICANON;
+	config.c_lflag |= ECHO;
 	if (tcsetattr(0, TCSANOW, &config) < 0)
 		perror("tcsetattr()");
 }
@@ -206,16 +221,30 @@ void Shell::prompt()
 
 void Shell::exec_line(const std::string &line)
 {
+	enable_echo();
 	auto command = Command::parse(line);
 	command->execute_in_process();
+	disable_echo();
 }
 
 void Shell::run()
 {
+	disable_echo();
 	for (;;)
 	{
 		prompt();
 	}
+	enable_echo();
+}
+
+void Shell::run_script(const std::string &file_path)
+{
+	std::ifstream stream(file_path);
+	std::stringstream str_stream;
+	str_stream << stream.rdbuf();
+	
+	auto script = Command::parse(str_stream.str());
+	script->execute_in_process();
 }
 
 void Shell::set(std::string name, const std::string &value)
