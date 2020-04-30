@@ -15,6 +15,7 @@ public:
 	void prompt();
 	void run();
 	void run_script(const std::string &file_path);
+	void exit();
 
 	void disable_echo();
 	void enable_echo();
@@ -34,6 +35,6 @@ private:
 	std::map<std::string, std::string> env_buffer;
 	std::vector<std::string> command_history;
 	std::vector<std::unique_ptr<Module>> modules;
-
+	bool should_exit;
 };
 

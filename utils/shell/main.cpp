@@ -2,11 +2,13 @@
 #include <iostream>
 
 #include "modules/autocomplete.hpp"
+#include "modules/builtins.hpp"
 
 int main(int argc, char *argv[])
 {
 	Shell::the().set("PS1", "Shell $ ");
 	Shell::the().set("SHELL", argv[0]);
+	Shell::the().add_module<BuiltInsModule>();
 
 	if (argc <= 1)
 	{

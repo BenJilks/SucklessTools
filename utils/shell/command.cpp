@@ -8,7 +8,9 @@
 #define READ 		0
 #define WRITE 		1
 
-static std::pair<std::string, std::string> parse_assignment(Lexer &lexer)
+std::map<std::string, BuiltIn> Command::built_ins;
+
+std::pair<std::string, std::string> Command::parse_assignment(Lexer &lexer)
 {
 	auto token = lexer.consume(Token::Type::VariableAssignment);
 	if (!token)
@@ -35,7 +37,7 @@ static std::pair<std::string, std::string> parse_assignment(Lexer &lexer)
 	return std::make_pair(name, value);
 }
 
-static std::unique_ptr<Command> parse_exec(Lexer &lexer)
+std::unique_ptr<Command> Command::parse_exec(Lexer &lexer)
 {
 	std::string command;
 	std::vector<std::string> arguments;
@@ -87,10 +89,13 @@ static std::unique_ptr<Command> parse_exec(Lexer &lexer)
 	if (!has_command)
 		return nullptr;
 
+	if (built_ins.find(command) != built_ins.end())
+		return std::make_unique<CommandBuiltIn>(built_ins[command], arguments);
+
 	return std::make_unique<CommandExec>(command, arguments, assignments);
 }
 
-std::unique_ptr<Command> parse_command(Lexer &lexer)
+std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 {
 	auto left = parse_exec(lexer);
 
@@ -155,7 +160,7 @@ CommandExec::CommandExec(std::string program,
 	raw_assignments.push_back(nullptr);
 }
 
-int Command::execute_in_process()
+int CommandExec::execute_in_process()
 {
 	pid_t pid = fork();
 	if (pid == -1)
@@ -187,10 +192,29 @@ void CommandExec::execute()
 	}
 }
 
+void CommandBuiltIn::execute()
+{
+	func(args);
+}
+
 void CommandPipe::execute()
 {
 	if (!left || !right)
-		exit(-1);
+		return;
+	
+	auto outer_pid = fork();
+	if (outer_pid == -1)
+	{
+		perror("Shell: fork");
+		return;
+	}
+
+	if (outer_pid != 0)
+	{
+		int status;
+		waitpid(outer_pid, &status, 0);
+		return;
+	}
 
 	int p[2];
 	if (pipe(p) < 0)

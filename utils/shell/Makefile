@@ -9,6 +9,7 @@ OBJ=shell.o \
 	lexer.o \
 	command.o \
 	modules/autocomplete.o \
+	modules/builtins.o \
 	main.o
 
 %.cpp: %.o

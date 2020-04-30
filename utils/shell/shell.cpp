@@ -230,11 +230,19 @@ void Shell::exec_line(const std::string &line)
 void Shell::run()
 {
 	disable_echo();
-	for (;;)
+	should_exit = false;
+
+	while (!should_exit)
 	{
 		prompt();
 	}
+
 	enable_echo();
+}
+
+void Shell::exit()
+{
+	should_exit = true;
 }
 
 void Shell::run_script(const std::string &file_path)
