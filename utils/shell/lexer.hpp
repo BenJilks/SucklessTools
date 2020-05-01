@@ -27,6 +27,7 @@ public:
 	std::optional<Token> consume(Token::Type type);
 
 private:
+	std::string parse_string();
 	std::optional<Token> parse_name();
 	std::optional<Token> parse_single_token(Token::Type type);
 	std::optional<Token> parse_variable();

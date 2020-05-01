@@ -7,7 +7,9 @@
 
 BuiltInsModule::BuiltInsModule()
 {
-	Command::register_built_in("cd", [](const std::vector<std::string> &args)
+	Command::register_built_in("cd", [](
+		const std::vector<std::string> &args,
+		const std::vector<std::pair<std::string, std::string>>&)
 	{
 		if (args.size() == 0)
 		{
@@ -29,9 +31,19 @@ BuiltInsModule::BuiltInsModule()
 		Shell::the().set("PWD", cwd);
 	});
 
-	Command::register_built_in("exit", [](const std::vector<std::string>&)
+	Command::register_built_in("exit", [](
+		const std::vector<std::string>&,
+		const std::vector<std::pair<std::string, std::string>>&)
 	{
 		Shell::the().exit();
+	});
+
+	Command::register_built_in("export", [](
+		const std::vector<std::string>&, 
+		const std::vector<std::pair<std::string, std::string>> &assignments)
+	{
+		for (const auto &assignment : assignments)
+			Shell::the().set(assignment.first, assignment.second);
 	});
 }
 

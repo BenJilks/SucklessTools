@@ -5,7 +5,9 @@
 #include <functional>
 #include <map>
 
-typedef std::function<void(const std::vector<std::string>&)> BuiltIn;
+typedef std::function<void(
+	const std::vector<std::string>&, 
+	const std::vector<std::pair<std::string, std::string>>&)> BuiltIn;
 class Lexer;
 
 class Command
@@ -14,13 +16,16 @@ public:
 	Command() {}
 
 	virtual void execute() = 0;
-	virtual int execute_in_process() { execute(); return 0; }
+	int execute_in_process();
 	
 	static std::unique_ptr<Command> parse(const std::string &source);
 	static void register_built_in(std::string name, BuiltIn func)
 	{
 		built_ins[name] = func;
 	}
+
+protected:
+	virtual bool should_execute_in_process() const { return false; }
 
 private:
 	static std::pair<std::string, std::string> parse_assignment(Lexer &lexer);
@@ -47,9 +52,12 @@ private:
 class CommandBuiltIn : public Command
 {
 public:
-	CommandBuiltIn(BuiltIn func, std::vector<std::string> &args)
+	CommandBuiltIn(BuiltIn func, 
+				   std::vector<std::string> &args, 
+				   std::vector<std::pair<std::string, std::string>> &assignments)
 		: func(func)
 		, args(args)
+		, assignments(assignments)
 	{
 	}
 
@@ -58,6 +66,22 @@ public:
 private:
 	BuiltIn func;
 	std::vector<std::string> args;
+	std::vector<std::pair<std::string, std::string>> assignments;
+
+};
+
+class CommandSetEnv : public Command
+{
+public:
+	CommandSetEnv(std::vector<std::pair<std::string, std::string>> assignments) 
+		: assignments(assignments)
+	{
+	}
+
+	virtual void execute() override;
+
+private:
+	std::vector<std::pair<std::string, std::string>> assignments;
 
 };
 
@@ -69,7 +93,9 @@ public:
 		std::vector<std::pair<std::string, std::string>> assignments);
 	
 	virtual void execute() override;
-	virtual int execute_in_process() override;
+
+protected:
+	virtual bool should_execute_in_process() const { return true; }
 
 private:
 	std::string program;
@@ -91,6 +117,9 @@ public:
 	}
 
 	virtual void execute() override;
+
+protected:
+	virtual bool should_execute_in_process() const { return true; }
 
 private:
 	std::unique_ptr<Command> left;

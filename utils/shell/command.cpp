@@ -87,10 +87,14 @@ std::unique_ptr<Command> Command::parse_exec(Lexer &lexer)
 	}
 
 	if (!has_command)
+	{
+		if (assignments.size() > 0)
+			return std::make_unique<CommandSetEnv>(assignments);
 		return nullptr;
+	}
 
 	if (built_ins.find(command) != built_ins.end())
-		return std::make_unique<CommandBuiltIn>(built_ins[command], arguments);
+		return std::make_unique<CommandBuiltIn>(built_ins[command], arguments, assignments);
 
 	return std::make_unique<CommandExec>(command, arguments, assignments);
 }
@@ -160,8 +164,14 @@ CommandExec::CommandExec(std::string program,
 	raw_assignments.push_back(nullptr);
 }
 
-int CommandExec::execute_in_process()
+int Command::execute_in_process()
 {
+	if (!should_execute_in_process())
+	{
+		execute();
+		return -1;
+	}
+
 	pid_t pid = fork();
 	if (pid == -1)
 	{
@@ -194,7 +204,13 @@ void CommandExec::execute()
 
 void CommandBuiltIn::execute()
 {
-	func(args);
+	func(args, assignments);
+}
+
+void CommandSetEnv::execute()
+{
+	for (const auto &assignment : assignments)
+		Shell::the().set(assignment.first, assignment.second);
 }
 
 void CommandPipe::execute()

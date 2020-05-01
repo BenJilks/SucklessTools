@@ -7,9 +7,27 @@ Lexer::Lexer(const std::string &source)
 {
 }
 
+std::string Lexer::parse_string()
+{
+	std::string buffer;
+	pointer += 1; // Skip '"'
+	while (pointer < source.length())
+	{
+		char c = source[pointer];
+		if (c == '"')
+			break;
+
+		buffer += c;
+		pointer += 1;
+	}
+
+	pointer += 1; // Skip "
+	return buffer;
+}
+
 std::optional<Token> Lexer::parse_name()
 {
-	std::string buffer = "";
+	std::string buffer;
 	auto type = Token::Type::Name;
 
 	for(;;)
@@ -20,6 +38,13 @@ std::optional<Token> Lexer::parse_name()
 
 		if (c == '=')
 			type = Token::Type::VariableAssignment;
+
+		if (c == '"')
+		{
+			auto str = parse_string();
+			buffer += str;
+			break;
+		}
 
 		buffer += c;
 		pointer += 1;
