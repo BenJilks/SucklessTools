@@ -43,7 +43,7 @@ void Shell::enable_echo()
 
 void Shell::prompt()
 {
-	std::string ps1 = get("PS1");
+	std::string ps1 = substitute_variables(get("PS1"));
 	std::cout << ps1;
 
 	std::string line = "";
@@ -225,6 +225,53 @@ void Shell::exec_line(const std::string &line)
 	auto command = Command::parse(line);
 	command->execute_in_process();
 	disable_echo();
+}
+
+enum class State
+{
+	Default,
+	Variable
+};
+
+std::string Shell::substitute_variables(const std::string &str)
+{
+	std::string result, variable;
+	auto state = State::Default;
+
+	for (char c : str)
+	{
+		switch (state)
+		{
+			case State::Default:
+				if (c == '$')
+				{
+					state = State::Variable;
+					break;
+				}
+
+				result += c;
+				break;
+
+			case State::Variable:
+				if (!std::isalnum(c) && c != '_')
+				{
+					if (variable.empty())
+						result += '$';
+					else
+						result += get(variable);
+					
+					variable.clear();
+					state = State::Default;
+					result += c;
+					break;
+				}
+
+				variable += c;
+				break;
+		}
+	}
+
+	return result;
 }
 
 void Shell::run()

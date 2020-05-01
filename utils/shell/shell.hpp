@@ -31,6 +31,7 @@ public:
 
 private:
 	void exec_line(const std::string &line);
+	std::string substitute_variables(const std::string &);
 
 	std::map<std::string, std::string> env_buffer;
 	std::vector<std::string> command_history;
