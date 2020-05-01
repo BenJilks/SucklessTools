@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 #include <termios.h>
+#include <pwd.h>
+#include <unistd.h>
 
 Shell shell;
 
@@ -15,6 +17,8 @@ Shell &Shell::the()
 
 Shell::Shell()
 {
+	auto *pw = getpwuid(getuid());
+	home = std::string(pw->pw_dir);
 }
 
 void Shell::disable_echo()
@@ -258,7 +262,7 @@ std::string Shell::substitute_variables(const std::string &str)
 					if (variable.empty())
 						result += '$';
 					else
-						result += get(variable);
+						result += simplify_path(get(variable));
 					
 					variable.clear();
 					state = State::Default;
@@ -272,6 +276,31 @@ std::string Shell::substitute_variables(const std::string &str)
 	}
 
 	return result;
+}
+
+static std::string replace_all(
+	std::string str, 
+	const std::string &from, 
+	const std::string &to)
+{
+	size_t start_pos = 0;
+	while ((start_pos = str.find(from, start_pos)) != std::string::npos)
+	{
+		str.replace(start_pos, from.length(), to);
+		start_pos += to.length();
+	}
+
+	return str;
+}
+
+std::string Shell::simplify_path(const std::string &path)
+{
+	return replace_all(path, home, "~");
+}
+
+std::string Shell::expand_path(const std::string &path)
+{
+	return replace_all(path, "~", home);
 }
 
 void Shell::run()

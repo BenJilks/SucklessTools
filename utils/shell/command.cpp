@@ -194,9 +194,9 @@ int Command::execute_in_process()
 
 void CommandExec::execute()
 {
-	if (execvpe(program.data(), 
-		const_cast<char* const*>(raw_arguments.data()),
-		const_cast<char* const*>(raw_assignments.data())) < 0)
+	if (execvp(program.data(), 
+		const_cast<char* const*>(raw_arguments.data())))
+//		const_cast<char* const*>(raw_assignments.data())) < 0)
 	{
 		perror("Shell");
 	}

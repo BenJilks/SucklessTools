@@ -13,7 +13,8 @@ BuiltInsModule::BuiltInsModule()
 	{
 		if (args.size() == 0)
 		{
-			std::cout << "FIXME: Go to home\n";
+			chdir(Shell::the().get_home().c_str());
+			Shell::the().set("PWD", Shell::the().get_home());
 			return;
 		}
 
@@ -23,7 +24,7 @@ BuiltInsModule::BuiltInsModule()
 			return;
 		}
 		
-		auto dir = args[0];
+		auto dir = Shell::the().expand_path(args[0]);
 		chdir(dir.c_str());
 
 		char cwd[PATH_MAX];

@@ -90,7 +90,7 @@ std::vector<std::string> AutoCompleteModule::find_completions(
 	int last_slash_index = 0;
 	for (int i = start.length() - 1; i >= 0; i--)
 	{
-		if (start[i] == '/')
+		if (start[i] == '/' || start[i] == '~')
 		{
 			last_slash_index = i + 1;
 			break;
@@ -103,12 +103,12 @@ std::vector<std::string> AutoCompleteModule::find_completions(
 	// If the path begins with a slash, it's an absolute path
 	if (!path.empty())
 	{
-		if (path[0] == '/')
+		if (path[0] == '/' || path[0] == '~')
 			local_path = path;
 	}
 
 	// Look through local paths
-	for (const auto &entry : fs::directory_iterator(local_path))
+	for (const auto &entry : fs::directory_iterator(Shell::the().expand_path(local_path)))
 	{
 		auto filename = std::string(path) + std::string(entry.path().filename());
 		if (filename.rfind(start, 0) == 0)
