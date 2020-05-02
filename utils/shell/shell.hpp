@@ -22,6 +22,7 @@ public:
 
 	std::string simplify_path(const std::string &path);
 	std::string expand_path(const std::string &path);
+	std::string directory_name(const std::string &path);
 	inline const std::string &get_home() const { return home; }
 
 	void set(std::string env, const std::string &value);

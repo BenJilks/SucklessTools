@@ -303,6 +303,24 @@ std::string Shell::expand_path(const std::string &path)
 	return replace_all(path, "~", home);
 }
 
+std::string Shell::directory_name(const std::string &path)
+{
+	int last_slash_index = 0;
+	for (int i = path.length() - 1; i >= 0; --i)
+	{
+		if (path[i] == '/')
+		{
+			last_slash_index = i + 1;
+			break;
+		}
+	}
+
+	if (last_slash_index == 1 && path.length() == 1)
+		return "/";
+
+	return path.substr(last_slash_index, path.length() - last_slash_index);
+}
+
 void Shell::run()
 {
 	disable_echo();
