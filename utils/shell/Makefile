@@ -12,7 +12,7 @@ OBJ=shell.o \
 	modules/builtins.o \
 	main.o
 
-%.cpp: %.o
+%.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
