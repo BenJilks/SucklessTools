@@ -278,7 +278,7 @@ std::string Shell::substitute_variables(const std::string &str)
 	return result;
 }
 
-static std::string replace_all(
+std::string Shell::replace_all(
 	std::string str, 
 	const std::string &from, 
 	const std::string &to)

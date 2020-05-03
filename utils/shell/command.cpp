@@ -9,6 +9,24 @@
 #define WRITE 		1
 
 std::map<std::string, BuiltIn> Command::built_ins;
+std::map<std::string, std::string> Command::aliases;
+
+void Command::log_aliases()
+{
+	for (const auto &entry : aliases)
+		std::cout << "alias " << entry.first << "='" << entry.second << "'\n";
+}
+
+void Command::log_alias(const std::string &name)
+{
+	if (aliases.find(name) == aliases.end())
+	{
+		std::cerr << "alias: " << name << ": not found\n";
+		return;
+	}
+
+	std::cout << "alias " << name << "='" << aliases[name] << "'\n";
+}
 
 std::pair<std::string, std::string> Command::parse_assignment(Lexer &lexer)
 {
@@ -138,7 +156,20 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 
 std::unique_ptr<Command> Command::parse(const std::string &source)
 {
-	Lexer lexer(source);
+	auto aliased_source = source;
+	for (const auto &value : aliases)
+	{
+		auto alias = value.first;
+		auto start = std::string_view(source.c_str(), alias.length());
+		if (start == alias)
+		{
+			aliased_source = value.second + 
+				source.substr(alias.length(), 
+				source.length() - alias.length());
+		}
+	}
+	
+	Lexer lexer(aliased_source);
 	auto command_list = std::make_unique<CommandList>();
 
 	for (;;)

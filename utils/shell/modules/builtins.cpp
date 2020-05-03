@@ -32,7 +32,7 @@ BuiltInsModule::BuiltInsModule()
 
 		if (args.size() > 1)
 		{
-			std::cout << "cd: Too many arguments\n";
+			std::cerr << "cd: Too many arguments\n";
 			return -1;
 		}
 		
@@ -63,5 +63,25 @@ BuiltInsModule::BuiltInsModule()
 
 		return 0;
 	});
+
+	Command::register_built_in("alias", [](
+		const std::vector<std::string>& arguments, 
+		const std::vector<std::pair<std::string, std::string>> &assignments) -> int
+	{
+		if (assignments.size() == 0 && arguments.size() == 0)
+		{
+			Command::log_aliases();
+			return 0;
+		}
+
+		for (const auto &assignment : assignments)
+			Command::register_alias(assignment.first, assignment.second);
+		
+		for (const auto &argument : arguments)
+			Command::log_alias(argument);
+
+		return 0;
+	});
+
 }
 

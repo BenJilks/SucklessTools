@@ -34,6 +34,10 @@ public:
 		modules.push_back(std::make_unique<ModuleType>());
 	}
 
+	static std::string replace_all(std::string str, 
+		const std::string &from, 
+		const std::string &to);
+
 private:
 	void exec_line(const std::string &line);
 	std::string substitute_variables(const std::string &);
