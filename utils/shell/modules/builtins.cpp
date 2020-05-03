@@ -37,7 +37,11 @@ BuiltInsModule::BuiltInsModule()
 		}
 		
 		auto dir = Shell::the().expand_path(args[0]);
-		chdir(dir.c_str());
+		if (chdir(dir.c_str()) < 0)
+		{
+			perror("Shell: cd");
+			return -1;
+		}
 		update_env_variables();
 		return 0;
 	});
