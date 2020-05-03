@@ -33,7 +33,7 @@ private:
 
 };
 
-class CommandList : public Command
+class CommandList final : public Command
 {
 public:
 	CommandList() {}
@@ -46,7 +46,7 @@ private:
 
 };
 
-class CommandBuiltIn : public Command
+class CommandBuiltIn final : public Command
 {
 public:
 	CommandBuiltIn(BuiltIn func, 
@@ -67,7 +67,7 @@ private:
 
 };
 
-class CommandSetEnv : public Command
+class CommandSetEnv final : public Command
 {
 public:
 	CommandSetEnv(std::vector<std::pair<std::string, std::string>> assignments) 
@@ -82,7 +82,7 @@ private:
 
 };
 
-class CommandExec : public Command
+class CommandExec final : public Command
 {
 public:
 	CommandExec(std::string program, 
@@ -91,9 +91,6 @@ public:
 	
 	virtual int execute() override;
 	virtual void execute_and_exit() override;
-
-protected:
-	virtual bool should_execute_in_process() const { return true; }
 
 private:
 	std::string program;
@@ -105,41 +102,53 @@ private:
 
 };
 
-class CommandPipe : public Command
+class CommandOperation : public Command
 {
 public:
-	CommandPipe(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
+	CommandOperation(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
 		: left(std::move(left))
 		, right(std::move(right))
 	{
 	}
 
-	virtual int execute() override;
-	virtual void execute_and_exit() override;
-
 protected:
-	virtual bool should_execute_in_process() const { return true; }
-
-private:
 	std::unique_ptr<Command> left;
 	std::unique_ptr<Command> right;
 
 };
 
-class CommandAnd : public Command
+class CommandPipe final : public CommandOperation
+{
+public:
+	CommandPipe(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
+		: CommandOperation(std::move(left), std::move(right))
+	{
+	}
+
+	virtual int execute() override;
+	virtual void execute_and_exit() override;
+};
+
+class CommandAnd final : public CommandOperation
 {
 public:
 	CommandAnd(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
-		: left(std::move(left))
-		, right(std::move(right))
+		: CommandOperation(std::move(left), std::move(right))
 	{
 	}
 
 	virtual int execute() override;
 
-private:
-	std::unique_ptr<Command> left;
-	std::unique_ptr<Command> right;
+};
 
+class CommandWith final : public CommandOperation
+{
+public:
+	CommandWith(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
+		: CommandOperation(std::move(left), std::move(right))
+	{
+	}
+
+	virtual int execute() override;
 };
 

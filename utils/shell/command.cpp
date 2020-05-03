@@ -106,7 +106,8 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 	auto peek = lexer.peek();
 	while (peek && (
 		peek->type == Token::Type::Pipe || 
-		peek->type == Token::Type::And))
+		peek->type == Token::Type::And ||
+		peek->type == Token::Type::With))
 	{
 		lexer.consume(peek->type);
 		
@@ -120,6 +121,11 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 
 		case Token::Type::And:
 			left = std::make_unique<CommandAnd>(
+				std::move(left), std::move(right));
+			break;
+
+		case Token::Type::With:
+			left = std::make_unique<CommandWith>(
 				std::move(left), std::move(right));
 			break;
 		}
@@ -306,5 +312,30 @@ int CommandAnd::execute()
 		return right->execute();
 	
 	return -1;
+}
+
+int CommandWith::execute()
+{
+	if (!left)
+		return -1;
+
+	auto pid = fork();
+	if (pid == -1)
+	{
+		perror("Shell: fork");
+		return -1;
+	}
+
+	// Child process
+	if (pid == 0)
+	{
+		left->execute_and_exit();
+		exit(-1);
+	}
+
+	if (!right)
+		return 0;
+	
+	return right->execute();
 }
 

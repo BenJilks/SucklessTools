@@ -6,8 +6,8 @@ CXXFLAGS=-std=c++17 -pedantic -pedantic-errors -Werror \
 	-Wno-unused-variable \
 
 OBJ=shell.o \
-	lexer.o \
 	command.o \
+	lexer.o \
 	modules/autocomplete.o \
 	modules/builtins.o \
 	main.o
@@ -16,7 +16,7 @@ OBJ=shell.o \
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
-	$(CC) $^ -o shell
+	$(CC) $^ -o shell $(CXXFLAGS)
 
 clean:
 	$(RM) $(OBJ)
