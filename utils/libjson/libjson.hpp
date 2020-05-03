@@ -81,12 +81,19 @@ namespace Json
 		inline void set(const std::string &name, std::shared_ptr<Value> &value) { data[name] = value; }
 
 		template <typename T>
-		inline std::weak_ptr<T> add(const std::string &name) 
+		inline std::shared_ptr<T> add(const std::string &name) 
 		{ 
 			auto value = std::make_shared<T>();
 			data[name] = value;
 			return value; 
 		}
+
+		void add(const std::string &name, const std::string str);
+		void add(const std::string &name, const char *str);
+		void add(const std::string &name, double number);
+		void add(const std::string &name, bool boolean);
+		void remove(const std::string &name) { data.erase(name); }
+		bool contains(const std::string &name) { return data.find(name) != data.end(); }
 
 		template <typename T>
 		inline T *get_as(const std::string &name) 
@@ -110,8 +117,6 @@ namespace Json
 		std::map<std::string, std::shared_ptr<Value>> data;
 
 	};
-
-	
 
 	class Array : public Value
 	{

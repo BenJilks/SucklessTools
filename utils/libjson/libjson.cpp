@@ -21,7 +21,7 @@ static std::shared_ptr<Value> parse_object(Lexer &lexer)
 		return nullptr;
 	
 	auto object = std::make_shared<Object>();
-	while (!lexer.is_eof())
+	while (lexer.peek() && lexer.peek()->type != Token::TokenType::CloseObject)
 	{
 		auto name = lexer.consume(Token::TokenType::String);
 		if (!name)
@@ -54,7 +54,7 @@ static std::shared_ptr<Value> parse_array(Lexer &lexer)
 		return nullptr;
 	
 	auto array = std::make_shared<Array>();
-	while (!lexer.is_eof())
+	while (lexer.peek() && lexer.peek()->type != Token::TokenType::CloseArray)
 	{
 		auto value = parse_value(lexer);
 		if (!value)
@@ -79,6 +79,7 @@ static std::shared_ptr<Value> parse_string(Lexer &lexer)
 		return error(lexer, "Expected string");
 
 	auto str = lexer.read_string(*token);
+	str = str.substr(1, str.length() - 2);
 	return std::make_shared<String>(str);
 }
 
@@ -136,7 +137,7 @@ static std::string print_indent(int indent)
 static std::string serialize(const Value &value, bool pretty_print, int indent = 0)
 {
 	if (value.is<String>())
-		return value.as<Json::String>()->get(); 
+		return "\"" + value.as<Json::String>()->get() + "\"";
 	
 	if (value.is<Number>())
 	{
@@ -234,6 +235,26 @@ int Value::to_int() const
 bool Value::to_bool() const
 {
 	return as<Json::Boolean>()->get();
+}
+
+void Object::add(const std::string &name, const std::string str) 
+{ 
+	data[name] = std::make_shared<String>(str); 
+}
+
+void Object::add(const std::string &name, const char *str) 
+{ 
+	data[name] = std::make_shared<String>(std::string(str)); 
+}
+
+void Object::add(const std::string &name, double number) 
+{ 
+	data[name] = std::make_shared<Number>(number); 
+}
+
+void Object::add(const std::string &name, bool boolean) 
+{ 
+	data[name] = std::make_shared<Boolean>(boolean); 
 }
 
 std::ostream &Json::operator<< (std::ostream &out, const Value &value)

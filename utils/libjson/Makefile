@@ -15,6 +15,7 @@ endif
 	tinylex -l cpp -o $@ $<
 
 all: lexer.hpp $(OBJ)
+#	$(CC) -o test $(OBJ)
 	$(AR) rs libjson.a $(OBJ)
 
 clean:
