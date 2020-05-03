@@ -227,7 +227,7 @@ void Shell::exec_line(const std::string &line)
 {
 	enable_echo();
 	auto command = Command::parse(line);
-	command->execute_in_process();
+	command->execute();
 	disable_echo();
 }
 
@@ -346,7 +346,7 @@ void Shell::run_script(const std::string &file_path)
 	str_stream << stream.rdbuf();
 	
 	auto script = Command::parse(str_stream.str());
-	script->execute_in_process();
+	script->execute();
 }
 
 void Shell::set(std::string name, const std::string &value)

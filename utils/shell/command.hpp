@@ -5,7 +5,7 @@
 #include <functional>
 #include <map>
 
-typedef std::function<void(
+typedef std::function<int(
 	const std::vector<std::string>&, 
 	const std::vector<std::pair<std::string, std::string>>&)> BuiltIn;
 class Lexer;
@@ -15,17 +15,14 @@ class Command
 public:
 	Command() {}
 
-	virtual void execute() = 0;
-	int execute_in_process();
+	virtual int execute() = 0;
+	virtual void execute_and_exit() { exit(execute()); }
 	
 	static std::unique_ptr<Command> parse(const std::string &source);
 	static void register_built_in(std::string name, BuiltIn func)
 	{
 		built_ins[name] = func;
 	}
-
-protected:
-	virtual bool should_execute_in_process() const { return false; }
 
 private:
 	static std::pair<std::string, std::string> parse_assignment(Lexer &lexer);
@@ -42,7 +39,7 @@ public:
 	CommandList() {}
 
 	void add(std::unique_ptr<Command> &command);
-	virtual void execute() override;
+	virtual int execute() override;
 
 private:
 	std::vector<std::unique_ptr<Command>> commands;
@@ -61,7 +58,7 @@ public:
 	{
 	}
 
-	virtual void execute() override;
+	virtual int execute() override;
 
 private:
 	BuiltIn func;
@@ -78,7 +75,7 @@ public:
 	{
 	}
 
-	virtual void execute() override;
+	virtual int execute() override;
 
 private:
 	std::vector<std::pair<std::string, std::string>> assignments;
@@ -92,7 +89,8 @@ public:
 		std::vector<std::string> arguments, 
 		std::vector<std::pair<std::string, std::string>> assignments);
 	
-	virtual void execute() override;
+	virtual int execute() override;
+	virtual void execute_and_exit() override;
 
 protected:
 	virtual bool should_execute_in_process() const { return true; }
@@ -116,10 +114,28 @@ public:
 	{
 	}
 
-	virtual void execute() override;
+	virtual int execute() override;
+	virtual void execute_and_exit() override;
 
 protected:
 	virtual bool should_execute_in_process() const { return true; }
+
+private:
+	std::unique_ptr<Command> left;
+	std::unique_ptr<Command> right;
+
+};
+
+class CommandAnd : public Command
+{
+public:
+	CommandAnd(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
+		: left(std::move(left))
+		, right(std::move(right))
+	{
+	}
+
+	virtual int execute() override;
 
 private:
 	std::unique_ptr<Command> left;

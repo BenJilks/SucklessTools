@@ -104,6 +104,26 @@ std::optional<Token> Lexer::parse_single_token(Token::Type type)
 	return Token { std::to_string(c), type };
 }
 
+std::optional<Token> Lexer::parse_double_token(
+	Token::Type a, Token::Type b, char b_char)
+{
+	std::string buffer = std::to_string(source[pointer]);
+	pointer += 1;
+
+	if (pointer < source.length())
+	{
+		char other = source[pointer];
+		if (other == b_char)
+		{
+			buffer += other;
+			pointer += 1;
+			return Token { buffer, b };
+		}
+	}
+
+	return Token { buffer, a };
+}
+
 std::optional<Token> Lexer::parse_variable()
 {
 	// Skip '$'
@@ -132,6 +152,7 @@ std::optional<Token> Lexer::next()
 		switch(c)
 		{
 			case '|': return parse_single_token(Token::Type::Pipe);
+			case '&': return parse_double_token(Token::Type::With, Token::Type::And, '&');
 			case '\n':
 			case ';': return parse_single_token(Token::Type::EndCommand);
 			case '$': return parse_variable();

@@ -19,7 +19,7 @@ BuiltInsModule::BuiltInsModule()
 
 	Command::register_built_in("cd", [](
 		const std::vector<std::string> &args,
-		const std::vector<std::pair<std::string, std::string>>&)
+		const std::vector<std::pair<std::string, std::string>>&) -> int
 	{
 		if (args.size() == 0)
 		{
@@ -27,33 +27,37 @@ BuiltInsModule::BuiltInsModule()
 			chdir(home.c_str());
 			Shell::the().set("PWD", home);
 			Shell::the().set("DIRNAME", "~");
-			return;
+			return 0;
 		}
 
 		if (args.size() > 1)
 		{
 			std::cout << "cd: Too many arguments\n";
-			return;
+			return -1;
 		}
 		
 		auto dir = Shell::the().expand_path(args[0]);
 		chdir(dir.c_str());
 		update_env_variables();
+		return 0;
 	});
 
 	Command::register_built_in("exit", [](
 		const std::vector<std::string>&,
-		const std::vector<std::pair<std::string, std::string>>&)
+		const std::vector<std::pair<std::string, std::string>>&) -> int
 	{
 		Shell::the().exit();
+		return 0;
 	});
 
 	Command::register_built_in("export", [](
 		const std::vector<std::string>&, 
-		const std::vector<std::pair<std::string, std::string>> &assignments)
+		const std::vector<std::pair<std::string, std::string>> &assignments) -> int
 	{
 		for (const auto &assignment : assignments)
 			Shell::the().set(assignment.first, assignment.second);
+
+		return 0;
 	});
 }
 

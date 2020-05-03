@@ -103,11 +103,28 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 {
 	auto left = parse_exec(lexer);
 
-	while (lexer.consume(Token::Type::Pipe))
+	auto peek = lexer.peek();
+	while (peek && (
+		peek->type == Token::Type::Pipe || 
+		peek->type == Token::Type::And))
 	{
+		lexer.consume(peek->type);
+		
 		auto right = parse_exec(lexer);
-		left = std::make_unique<CommandPipe>(
-			std::move(left), std::move(right));
+		switch (peek->type)
+		{
+		case Token::Type::Pipe:
+			left = std::make_unique<CommandPipe>(
+				std::move(left), std::move(right));
+			break;
+
+		case Token::Type::And:
+			left = std::make_unique<CommandAnd>(
+				std::move(left), std::move(right));
+			break;
+		}
+
+		peek = lexer.peek();
 	}
 
 	return left;
@@ -136,10 +153,13 @@ void CommandList::add(std::unique_ptr<Command> &command)
 	commands.push_back(std::move(command));
 }
 
-void CommandList::execute()
+int CommandList::execute()
 {
+	int last_status = 0;
 	for (auto &command : commands)
-		command->execute_in_process();
+		last_status = command->execute();
+	
+	return last_status;
 }
 
 CommandExec::CommandExec(std::string program, 
@@ -164,14 +184,8 @@ CommandExec::CommandExec(std::string program,
 	raw_assignments.push_back(nullptr);
 }
 
-int Command::execute_in_process()
+int CommandExec::execute()
 {
-	if (!should_execute_in_process())
-	{
-		execute();
-		return -1;
-	}
-
 	pid_t pid = fork();
 	if (pid == -1)
 	{
@@ -182,7 +196,7 @@ int Command::execute_in_process()
 	// In the child process
 	if (pid == 0)
 	{
-		execute();
+		execute_and_exit();
 		exit(-1);
 	}
 
@@ -192,7 +206,7 @@ int Command::execute_in_process()
 	return status;
 }
 
-void CommandExec::execute()
+void CommandExec::execute_and_exit()
 {
 	if (execvp(program.data(), 
 		const_cast<char* const*>(raw_arguments.data())))
@@ -200,38 +214,48 @@ void CommandExec::execute()
 	{
 		perror("Shell");
 	}
+
+	exit(-1);
 }
 
-void CommandBuiltIn::execute()
+int CommandBuiltIn::execute()
 {
-	func(args, assignments);
+	return func(args, assignments);
 }
 
-void CommandSetEnv::execute()
+int CommandSetEnv::execute()
 {
 	for (const auto &assignment : assignments)
 		Shell::the().set(assignment.first, assignment.second);
+	
+	return 0;
 }
 
-void CommandPipe::execute()
+int CommandPipe::execute()
 {
 	if (!left || !right)
-		return;
+		return - 1;
 	
-	auto outer_pid = fork();
-	if (outer_pid == -1)
+	auto pid = fork();
+	if (pid == -1)
 	{
 		perror("Shell: fork");
-		return;
+		return -1;
 	}
 
-	if (outer_pid != 0)
+	if (pid == 0)
 	{
-		int status;
-		waitpid(outer_pid, &status, 0);
-		return;
+		execute_and_exit();
+		exit(-1);
 	}
 
+	int status;
+	waitpid(pid, &status, 0);
+	return status;
+}
+
+void CommandPipe::execute_and_exit()
+{
 	int p[2];
 	if (pipe(p) < 0)
 	{
@@ -255,7 +279,7 @@ void CommandPipe::execute()
 		close(p[READ]);
 		close(p[WRITE]);
 		
-		left->execute();
+		left->execute_and_exit();
 		exit(-1);
 	}
 	else
@@ -267,8 +291,20 @@ void CommandPipe::execute()
 		close(p[WRITE]);
 		close(p[READ]);
 	
-		right->execute();
+		right->execute_and_exit();
 		exit(-1);
 	}
+}
+
+int CommandAnd::execute()
+{
+	if (!left || !right)
+		return -1;
+	
+	int left_status = left->execute();
+	if (left_status == 0)
+		return right->execute();
+	
+	return -1;
 }
 

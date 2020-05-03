@@ -9,6 +9,8 @@ struct Token
 	{
 		Name,
 		Pipe,
+		And,
+		With,
 		Variable,
 		VariableAssignment,
 		EndCommand
@@ -30,6 +32,7 @@ private:
 	std::string parse_string();
 	std::optional<Token> parse_name();
 	std::optional<Token> parse_single_token(Token::Type type);
+	std::optional<Token> parse_double_token(Token::Type a, Token::Type b, char b_char);
 	std::optional<Token> parse_variable();
 	std::optional<Token> next();
 
