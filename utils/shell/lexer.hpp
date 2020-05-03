@@ -10,6 +10,7 @@ struct Token
 		Name,
 		Pipe,
 		And,
+		Or,
 		With,
 		Variable,
 		VariableAssignment,

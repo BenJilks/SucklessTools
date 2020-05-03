@@ -151,7 +151,7 @@ std::optional<Token> Lexer::next()
 
 		switch(c)
 		{
-			case '|': return parse_single_token(Token::Type::Pipe);
+			case '|': return parse_double_token(Token::Type::Pipe, Token::Type::Or, '|');
 			case '&': return parse_double_token(Token::Type::With, Token::Type::And, '&');
 			case '\n':
 			case ';': return parse_single_token(Token::Type::EndCommand);

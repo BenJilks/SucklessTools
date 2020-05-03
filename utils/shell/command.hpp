@@ -150,6 +150,18 @@ public:
 
 };
 
+class CommandOr final : public CommandOperation
+{
+public:
+	CommandOr(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
+		: CommandOperation(std::move(left), std::move(right))
+	{
+	}
+
+	virtual int execute() override;
+
+};
+
 class CommandWith final : public CommandOperation
 {
 public:

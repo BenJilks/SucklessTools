@@ -125,7 +125,8 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 	while (peek && (
 		peek->type == Token::Type::Pipe || 
 		peek->type == Token::Type::And ||
-		peek->type == Token::Type::With))
+		peek->type == Token::Type::With ||
+		peek->type == Token::Type::Or))
 	{
 		lexer.consume(peek->type);
 		
@@ -144,6 +145,11 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 
 		case Token::Type::With:
 			left = std::make_unique<CommandWith>(
+				std::move(left), std::move(right));
+			break;
+
+		case Token::Type::Or:
+			left = std::make_unique<CommandOr>(
 				std::move(left), std::move(right));
 			break;
 		}
@@ -343,6 +349,18 @@ int CommandAnd::execute()
 		return right->execute();
 	
 	return -1;
+}
+
+int CommandOr::execute()
+{
+	if (!left || !right)
+		return -1;
+	
+	int left_status = left->execute();
+	if (left_status != 0)
+		return right->execute();
+	
+	return 0;
 }
 
 int CommandWith::execute()
