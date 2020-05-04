@@ -219,6 +219,9 @@ void Shell::prompt()
 	}
 
 	std::cout << std::endl;
+
+	for (auto &mod : modules)
+		mod->hook_macro(line);
 	exec_line(line);
 	command_history.push_back(line);
 }

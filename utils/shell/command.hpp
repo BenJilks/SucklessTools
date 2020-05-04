@@ -24,21 +24,12 @@ public:
 		built_ins[name] = func;
 	}
 
-	static void register_alias(std::string name, std::string value)
-	{
-		aliases[name] = value;
-	}
-
-	static void log_aliases();
-	static void log_alias(const std::string &name);
-
 private:
 	static std::pair<std::string, std::string> parse_assignment(Lexer &lexer);
 	static std::unique_ptr<Command> parse_exec(Lexer &lexer);
 	static std::unique_ptr<Command> parse_command(Lexer &lexer);
 
 	static std::map<std::string, BuiltIn> built_ins;
-	static std::map<std::string, std::string> aliases;
 
 };
 

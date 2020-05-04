@@ -1,5 +1,5 @@
 CC=g++
-CXXFLAGS=-std=c++17 -pedantic -pedantic-errors -Werror \
+CXXFLAGS=-std=c++17 -pedantic -pedantic-errors -Werror -g\
     -Wno-unused-label \
 	-Wno-unused-function \
 	-Wno-unused-parameter \
@@ -10,6 +10,7 @@ OBJ=shell.o \
 	lexer.o \
 	modules/autocomplete.o \
 	modules/builtins.o \
+	modules/alias.o \
 	main.o
 
 %.o: %.cpp
