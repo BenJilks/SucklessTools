@@ -168,12 +168,30 @@ std::optional<Token> Lexer::parse_variable()
 	// Skip '$'
 	pointer += 1;
 
+	bool braced = false;
+	if (source[pointer] == '{')
+	{
+		pointer += 1;
+		braced = true;
+	}
+
 	std::string buffer = "";
 	for (;;)
 	{
 		char c = source[pointer];
-		if (!std::isalnum(c) && c != '_')
-			break;
+		if (braced)
+		{
+			if (c == '}')
+			{
+				pointer += 1;
+				break;
+			}
+		}
+		else
+		{
+			if (!std::isalnum(c) && c != '_')
+				break;
+		}
 
 		buffer += c;
 		pointer += 1;

@@ -219,11 +219,11 @@ void Shell::prompt()
 	}
 
 	std::cout << std::endl;
+	command_history.push_back(line);
 
 	for (auto &mod : modules)
 		mod->hook_macro(line);
 	exec_line(line);
-	command_history.push_back(line);
 }
 
 void Shell::exec_line(const std::string &line)
@@ -237,7 +237,8 @@ void Shell::exec_line(const std::string &line)
 enum class State
 {
 	Default,
-	Variable
+	Variable,
+	Braced
 };
 
 std::string Shell::substitute_variables(const std::string &str)
@@ -260,6 +261,12 @@ std::string Shell::substitute_variables(const std::string &str)
 				break;
 
 			case State::Variable:
+				if (c == '{' && variable.empty())
+				{
+					state = State::Braced;
+					break;
+				}
+
 				if (!std::isalnum(c) && c != '_')
 				{
 					if (variable.empty())
@@ -270,6 +277,18 @@ std::string Shell::substitute_variables(const std::string &str)
 					variable.clear();
 					state = State::Default;
 					result += c;
+					break;
+				}
+
+				variable += c;
+				break;
+
+			case State::Braced:
+				if (c == '}')
+				{
+					result += simplify_path(get(variable));
+					variable.clear();
+					state = State::Default;
 					break;
 				}
 
