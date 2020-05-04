@@ -4,6 +4,21 @@
 #include <iostream>
 namespace fs = std::filesystem;
 
+std::string find_name(const std::string &str)
+{
+	int last_slash_index = 0;
+	for (int i = str.length() - 1; i >= 0; i--)
+	{
+		if (str[i] == '/' || str[i] == '~')
+		{
+			last_slash_index = i + 1;
+			break;
+		}
+	}
+
+	return str.substr(last_slash_index, str.length() - last_slash_index);
+}
+
 bool AutoCompleteModule::hook_input(char c, 
 	const std::string &line, int cursor,
 	std::function<void(const std::string &)> insert,
@@ -64,19 +79,23 @@ bool AutoCompleteModule::hook_input(char c,
 	}
 
 	insert(patch);
+	if (options.size() == 1)
+	{
+		if (fs::is_directory(options[0]))
+			insert("/");
+		else
+			insert(" ");
+	}
 
 	if (patch.empty())
 	{
-		if (options.size() == 1)
+		if (options.size() > 0)
 		{
-			insert(" ");
-			return true;
+			std::string suggestions;
+			for (const auto &option : options)
+				suggestions += find_name(option) + " ";
+			message(suggestions);
 		}
-
-		std::string suggestions;
-		for (const auto &option : options)
-			suggestions += option + " ";
-		message(suggestions);
 	}
 	
 	return true;
