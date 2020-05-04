@@ -7,6 +7,45 @@ Lexer::Lexer(const std::string &source)
 {
 }
 
+static std::string parse_escapes(const std::string &str)
+{
+	std::string out;
+
+	for (int i = 0; i < str.length(); i++)
+	{
+		char c = str[i];
+		if (c == '\\')
+		{
+			if (i >= str.length() - 1)
+				continue;
+
+			c = str[++i];
+			switch (c)
+			{
+				case '\\': out += '\\'; break;
+				case 'n': out += '\n'; break;
+				case 'r': out += '\r'; break;
+				case 't': out += '\t'; break;
+				case '0':
+					if (i >= str.length() - 2)
+						break;
+
+					if (str[i+1] == '3' && str[i+2] == '3')
+					{
+						i += 2;
+						out += '\033';
+					}
+					break;
+			}
+
+			continue;
+		}
+		out += c;
+	}
+
+	return out;
+}
+
 std::string Lexer::parse_string()
 {
 	std::string buffer;
@@ -22,7 +61,7 @@ std::string Lexer::parse_string()
 	}
 
 	pointer += 1; // Skip "
-	return buffer;
+	return parse_escapes(buffer);
 }
 
 std::optional<Token> Lexer::parse_name()
@@ -53,7 +92,7 @@ std::optional<Token> Lexer::parse_name()
 			break;
 	}
 
-	return Token {buffer, type};
+	return Token {parse_escapes(buffer), type};
 }
 
 std::optional<Token> Lexer::peek(int count)
