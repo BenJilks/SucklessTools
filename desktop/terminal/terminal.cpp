@@ -89,8 +89,11 @@ void Terminal::run_event_loop()
             auto input = m_output.update();
             if (!input.empty())
             {
-                write(m_master, input.data(), input.length());
-                fsync(m_master);
+                if (write(m_master, input.data(), input.length()) < 0)
+                {
+                    perror("write()");
+                    break;
+                }
             }
         }
     }

@@ -5,7 +5,6 @@
 #include <cstring>
 
 XLibOutput::XLibOutput()
-    : m_cursor(0)
 {
     m_display = XOpenDisplay(nullptr);
     if (!m_display)
@@ -66,7 +65,7 @@ std::string XLibOutput::update()
     switch (event.type)
     {
         case Expose:
-            draw_window();
+            redraw_all();
             break;
         
         case KeyPress:
@@ -74,6 +73,25 @@ std::string XLibOutput::update()
     }
     
     return "";
+}
+
+void XLibOutput::redraw_all()
+{
+    auto gc = DefaultGC(m_display, m_screen);
+    
+    XWindowAttributes attr;
+    XGetWindowAttributes(m_display, m_window, &attr);
+    m_width = attr.width;
+    m_height = attr.height;
+    
+    XSetForeground(m_display, gc, 0x000000);
+    XFillRectangle(m_display, m_window, gc,
+        0, 0, m_width, m_height);
+
+    for (auto &line : m_lines)
+        line.mark_dirty();
+
+    draw_window();
 }
 
 std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
@@ -104,33 +122,26 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
     return std::string(buf, len);
 }
 
-void XLibOutput::draw_window() const
+void XLibOutput::draw_window()
 {
-    auto gc = DefaultGC(m_display, m_screen);
-
     XWindowAttributes attr;
     XGetWindowAttributes(m_display, m_window, &attr);
-    
-    XSetForeground(m_display, gc, 0x000000);
-    XFillRectangle(m_display, m_window,
-        gc, 0, 0, attr.width, attr.height);
-    
+    m_width = attr.width;
+    m_height = attr.height;
+
     draw_buffer();
     XFlush(m_display);
 }
 
-std::vector<std::string> XLibOutput::lines() const
+Line &XLibOutput::line_at(const CursorPosition &position)
 {
-    std::vector<std::string> out;
-    std::stringstream stream(m_buffer);
-    std::string line;
+    while (position.row() >= m_lines.size())
+        m_lines.emplace_back();
     
-    while (std::getline(stream, line, '\n'))
-        out.push_back(line);
-    return out;
+    return m_lines[position.row()];
 }
 
-void XLibOutput::draw_buffer() const
+void XLibOutput::draw_buffer()
 {
     if (!m_font || !m_draw)
     {
@@ -139,35 +150,42 @@ void XLibOutput::draw_buffer() const
     }
     
     auto gc = DefaultGC(m_display, m_screen);
-    auto buffer_lines = lines();
-    int curr_pos = 0;
-    for (int i = 0; i < buffer_lines.size(); i++)
+    int y = m_font->height;
+    for (int row = 0; row < m_lines.size(); row++)
     {
-        auto line = buffer_lines[i];
-        int y = m_font->height * (i + 1);
-        int x = m_font->max_advance_width;
-        
-        for (char c : line)
+        auto &line = m_lines[row];
+        if (line.is_dirty())
         {
-            XftDrawStringUtf8(m_draw, &m_color, m_font, 
-                x, y, 
-                (const FcChar8 *)&c, 1);
+            int x = m_font->max_advance_width;
+            XSetForeground(m_display, gc, 0x000000);
+            XFillRectangle(m_display, m_window,
+                gc, 0, y - m_font->height + 4, m_width, m_font->height);
             
-            XGlyphInfo extents;
-            XftTextExtentsUtf8(m_display, m_font, 
-                (const FcChar8 *)&c, 1, &extents);
-            x += extents.xOff;
-
-            curr_pos += 1;
-            if (m_cursor == curr_pos)
+            for (int column = 0; column < line.data().length(); column++)
             {
-                XSetForeground(m_display, gc, 0xFFFFFF);
-                XFillRectangle(m_display, m_window, gc, 
-                    x, y - m_font->height + m_font->descent, 10, m_font->height - m_font->ascent + m_font->descent);
+                char c = line.data()[column];
+                XftDrawStringUtf8(m_draw, &m_color, m_font, 
+                    x, y, 
+                    (const FcChar8 *)&c, 1);
+                
+                XGlyphInfo extents;
+                XftTextExtentsUtf8(m_display, m_font, 
+                    (const FcChar8 *)&c, 1, &extents);
+                x += extents.xOff;
+
+                if (m_cursor.row() == row && m_cursor.coloumn() - 1 == column)
+                {
+                    XSetForeground(m_display, gc, 0xFFFFFF);
+                    XFillRectangle(m_display, m_window, gc, 
+                        x, y - m_font->height + m_font->descent, 10, 
+                        m_font->height - m_font->ascent + m_font->descent);
+                }
             }
+            
+            line.unmark_dirty();
         }
         
-        curr_pos += 1; // Add the newline
+        y += m_font->height;
     }
 }
 
@@ -181,17 +199,17 @@ void XLibOutput::write(std::string_view buff)
         
         if (!escape_sequence)
         {
-            if ((c >= 33 && c <= 126) || std::isspace(c))
+            if (c == '\n')
             {
-                if (m_cursor >= m_buffer.length())
-                    m_buffer += c;
-                else
-                    m_buffer[m_cursor] = c;
-                
-                m_cursor += 1;
-                continue;
+                m_cursor.move_by(0, 1);
+                m_cursor.move_to_begging_of_line();
             }
-            std::cout << "Uknown char: " << (int)c << "\n";
+            else
+            {
+                line_at(m_cursor).set(m_cursor.coloumn(), c);
+                m_cursor.move_by(1, 0);
+            }
+            
             continue;
         }
         
@@ -204,12 +222,12 @@ void XLibOutput::write(std::string_view buff)
                 switch (cursor.direction())
                 {
                     case EscapeCursor::Right:
-                        m_cursor -= 1;
+                        m_cursor.move_by(-1, 0);
+                        line_at(m_cursor).mark_dirty();
                         break;
                     
                     case EscapeCursor::TopLeft:
-                        std::cout << "FIXME: xlib: write: Do TopLeft move for real\n";
-                        m_cursor = 0;
+                        m_cursor.move_to(0, 0);
                         break;
                     
                     default:
@@ -226,9 +244,10 @@ void XLibOutput::write(std::string_view buff)
                     auto str = std::string_view(
                         buff.data() + i + escape_sequence->char_count() + 1, insert.count());
 
-                    m_buffer.insert(m_cursor, str);
+                    for (char c : str)
+                        line_at(m_cursor).insert(m_cursor.coloumn(), c);
                     i += insert.count();
-                    m_cursor += insert.count();
+                    m_cursor.move_by(insert.count(), 0);
                 }
                 break;
             }
@@ -236,7 +255,7 @@ void XLibOutput::write(std::string_view buff)
             case EscapesSequence::Delete:
             {
                 auto del = static_cast<EscapeInsert&>(*escape_sequence);
-                m_buffer.erase(m_cursor - del.count() + 1, del.count());
+                line_at(m_cursor).erase(m_cursor.coloumn() - del.count() + 1, del.count());
                 break;
             }
             
@@ -248,21 +267,19 @@ void XLibOutput::write(std::string_view buff)
                 {
                     case EscapeClear::CursorToLineEnd: 
                     {
-                        int index = m_cursor;
-                        while (index < m_buffer.length())
+                        auto index = m_cursor.coloumn();
+                        auto &line = m_lines[m_cursor.row()];
+                        while (index < line.data().length())
                         {
-                            char c = m_buffer[index];
-                            if (c == '\n')
-                                break;
-                            
-                            m_buffer[index] = ' ';
+                            line.set(index, ' ');
                             index += 1;
                         }
                         break;
                     }
                     
                     case EscapeClear::Screen:
-                        m_buffer.clear();
+                        m_lines.clear();
+                        redraw_all();
                         break;
                     
                     default:
@@ -275,6 +292,7 @@ void XLibOutput::write(std::string_view buff)
             default:
                 break;
         }
+        
         i += escape_sequence->char_count();
     }
 
