@@ -20,7 +20,10 @@ XLibOutput::XLibOutput()
         RootWindow(m_display, m_screen), 
         10, 10, 100, 100, 1, 
         BlackPixel(m_display, m_screen), WhitePixel(m_display, m_screen));
-
+    
+    XSelectInput (m_display, m_window,
+        ExposureMask | KeyPressMask | StructureNotifyMask | ButtonPress);
+    
     auto im = XOpenIM(m_display, nullptr, nullptr, nullptr);
     m_input_context = XCreateIC(im, XNInputStyle, 
         XIMPreeditNothing | XIMStatusNothing,
@@ -28,6 +31,7 @@ XLibOutput::XLibOutput()
         NULL);
     
     load_font("DejaVu Sans Mono", 16);
+    XMapWindow(m_display, m_window);
 }
 
 void XLibOutput::load_font(const std::string &&name, int size)
@@ -52,24 +56,49 @@ void XLibOutput::load_font(const std::string &&name, int size)
         std::cerr << "terminal: xft: Could not create draw\n";
         return;
     }
-
-    XSelectInput(m_display, m_window, ExposureMask | KeyPressMask);
-    XMapWindow(m_display, m_window);
 }
 
 std::string XLibOutput::update()
 {
     XEvent event;
-    XNextEvent(m_display, &event);
-    
-    switch (event.type)
+    while (XNextEvent(m_display, &event) == 0)
     {
-        case Expose:
-            redraw_all();
-            break;
-        
-        case KeyPress:
-            return decode_key_press(&event.xkey);
+        switch (event.type)
+        {
+            case Expose:
+                redraw_all();
+                break;
+            
+            case KeyPress:
+                return decode_key_press(&event.xkey);
+            
+            case ButtonPress:
+                switch (event.xbutton.button)
+                {
+                    case Button4:
+                        m_curr_frame_index -= 1;
+                        if (m_curr_frame_index < 0)
+                            m_curr_frame_index = 0;
+                        redraw_all();
+                        break;
+
+                    case Button5:
+                        m_curr_frame_index += 1;
+                        redraw_all();
+                        break;
+                }
+                break;
+                
+            case ConfigureNotify:
+                if (m_width != event.xconfigure.width || 
+                    m_height != event.xconfigure.height)
+                {
+                    m_width = event.xconfigure.width;
+                    m_height = event.xconfigure.height;
+                    m_rows = m_height / m_font->height;
+                }
+                break;
+        }
     }
     
     return "";
@@ -78,11 +107,6 @@ std::string XLibOutput::update()
 void XLibOutput::redraw_all()
 {
     auto gc = DefaultGC(m_display, m_screen);
-    
-    XWindowAttributes attr;
-    XGetWindowAttributes(m_display, m_window, &attr);
-    m_width = attr.width;
-    m_height = attr.height;
     
     XSetForeground(m_display, gc, 0x000000);
     XFillRectangle(m_display, m_window, gc,
@@ -124,11 +148,6 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
 
 void XLibOutput::draw_window()
 {
-    XWindowAttributes attr;
-    XGetWindowAttributes(m_display, m_window, &attr);
-    m_width = attr.width;
-    m_height = attr.height;
-
     draw_buffer();
     XFlush(m_display);
 }
@@ -151,8 +170,11 @@ void XLibOutput::draw_buffer()
     
     auto gc = DefaultGC(m_display, m_screen);
     int y = m_font->height;
-    for (int row = 0; row < m_lines.size(); row++)
+    for (int row = m_curr_frame_index; row < m_curr_frame_index + m_rows; row++)
     {
+        if (row >= m_lines.size())
+            break;
+        
         auto &line = m_lines[row];
         if (line.is_dirty())
         {
@@ -208,6 +230,11 @@ void XLibOutput::write(std::string_view buff)
             {
                 line_at(m_cursor).set(m_cursor.coloumn(), c);
                 m_cursor.move_by(1, 0);
+                if (m_cursor.row() >= m_curr_frame_index + m_rows)
+                {
+                    m_curr_frame_index += 1;
+                    redraw_all();
+                }
             }
             
             continue;
@@ -279,6 +306,7 @@ void XLibOutput::write(std::string_view buff)
                     
                     case EscapeClear::Screen:
                         m_lines.clear();
+                        m_curr_frame_index = 0;
                         redraw_all();
                         break;
                     

@@ -100,7 +100,10 @@ private:
 
     std::vector<Line> m_lines;
     CursorPosition m_cursor;
-    int m_width, m_height;
+    int m_curr_frame_index { 0 };
+    int m_width { 0 };
+    int m_height { 0 };
+    int m_rows { 1024 };
     
     // Xft
     XftFont *m_font;
