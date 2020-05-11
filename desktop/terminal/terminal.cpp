@@ -1,4 +1,5 @@
 #include "terminal.hpp"
+#include "escapes.hpp"
 #include <pty.h>
 #include <unistd.h>
 #include <signal.h>
@@ -81,7 +82,7 @@ void Terminal::run_event_loop()
                 break;
             }
             
-            m_output.write(std::string_view(read_buf, ret));
+            m_output.out(std::string_view(read_buf, ret));
         }
         
         if (FD_ISSET(m_output.input_file(), &fds))

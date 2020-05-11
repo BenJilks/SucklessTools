@@ -1,178 +1,152 @@
 #pragma once
+#include "color.hpp"
 #include <string>
 #include <memory>
 
-class EscapesSequence
+namespace Escape
 {
-public:
-    virtual ~EscapesSequence() {}
 
-    static std::unique_ptr<EscapesSequence> parse(std::string_view str);
-    
-    enum Type
+    class Sequence
     {
-        Color,
-        Cursor,
-        Insert,
-        Delete,
-        Clear,
-        Bell
-    };
-    
-    inline Type type() const { return m_type; }
-    inline int char_count() const { return m_char_count; }
+    public:
+        virtual ~Sequence() {}
 
-protected:
-    EscapesSequence(Type type, int char_count) 
-        : m_type(type)
-        , m_char_count(char_count) {}
-    
-private:
-    Type m_type;
-    int m_char_count;
-
-};
-
-std::ostream &operator<<(std::ostream &stream, const EscapesSequence& sequence);
-
-class EscapeColor : public EscapesSequence
-{
-public:
-    enum Color
-    {
-        Black, Red, Green, Yellow,
-        Blue, Magenta, Cyan, White
-    };
-    
-    enum Flags
-    {
-        Bright = 1 << 0,
-        Clear = 1 << 1
-    };
-    
-    EscapeColor(Color color, int char_count, int flags = 0)
-        : EscapesSequence(EscapesSequence::Color, char_count)
-        , m_color(color)
-        , m_flags(flags) {}
-
-    virtual ~EscapeColor() {}
-    
-    inline Color id() const { return m_color; }
-    inline bool is_bright() const { return m_flags & Bright; }
-    inline bool is_clear() const { return m_flags & Clear; }
-
-    inline std::string name() const
-    {
-        switch (m_color)
+        static std::unique_ptr<Sequence> parse(std::string_view str);
+        
+        enum Type
         {
-            case Black: return "Black";
-            case Red: return "Red";
-            case Green: return "Green";
-            case Yellow: return "Yellow";
-            case Blue: return "Blue";
-            case Magenta: return "Magenta";
-            case Cyan: return "Cyan";
-            case White: return "White";
+            Color,
+            Cursor,
+            Insert,
+            Delete,
+            Clear,
+            Bell
+        };
+        
+        inline Type type() const { return m_type; }
+        inline int char_count() const { return m_char_count; }
+
+    protected:
+        Sequence(Type type, int char_count) 
+            : m_type(type)
+            , m_char_count(char_count) {}
+        
+    private:
+        Type m_type;
+        int m_char_count;
+
+    };
+
+    class Color : public Sequence
+    {
+    public:
+        Color(TerminalColor color, int char_count)
+            : Sequence(Sequence::Color, char_count)
+            , m_color(color) {}
+
+        virtual ~Color() {}
+
+        inline std::string name() { return m_color.name(); }
+        inline const TerminalColor &color() { return m_color; }
+        
+    private:
+        TerminalColor m_color;
+
+    };
+
+    class Cursor : public Sequence
+    {
+    public:
+        enum Direction
+        {
+            Left,
+            Right,
+            Up,
+            Down,
+            TopLeft
+        };
+        
+        Cursor(Direction direction, int char_count)
+            : Sequence(Sequence::Cursor, char_count)
+            , m_direction(direction) {}
+        
+        inline Direction direction() const { return m_direction; }
+        inline std::string name() const
+        {
+            switch (m_direction)
+            {
+                case Left: return "Left";
+                case Right: return "Right";
+                case Up: return "Up";
+                case Down: return "Down";
+                case TopLeft: return "TopLeft";
+            }
+            
+            return "Unkown";
         }
         
-        return "Unkown(" + std::to_string(m_color) + ")";
-    }
-    
-private:
-    Color m_color;
-    int m_flags;
+    private:
+        Direction m_direction;
 
-};
-
-class EscapeCursor : public EscapesSequence
-{
-public:
-    enum Direction
-    {
-        Left,
-        Right,
-        Up,
-        Down,
-        TopLeft
     };
-    
-    EscapeCursor(Direction direction, int char_count)
-        : EscapesSequence(Cursor, char_count)
-        , m_direction(direction) {}
-    
-    inline Direction direction() const { return m_direction; }
-    inline std::string name() const
+
+    class Insert : public Sequence
     {
-        switch (m_direction)
+    public:
+        Insert(int count, int char_count)
+            : Sequence(Sequence::Insert, char_count)
+            , m_count(count) {}
+
+        inline int count() const { return m_count; }
+        
+    private:
+        int m_count;
+        
+    };
+
+    class Delete : public Sequence
+    {
+    public:
+        Delete(int count, int char_count)
+            : Sequence(Sequence::Delete, char_count)
+            , m_count(count) {}
+        
+        inline int count() const { return m_count; }
+            
+    private:
+        int m_count;
+        
+    };
+
+    class Clear : public Sequence
+    {
+    public:
+        enum Mode
         {
-            case Left: return "Left";
-            case Right: return "Right";
-            case Up: return "Up";
-            case Down: return "Down";
-            case TopLeft: return "TopLeft";
-        }
+            CursorToLineEnd,
+            LineEndToCursor,
+            Line,
+            Screen
+        };
         
-        return "Unkown";
-    }
-    
-private:
-    Direction m_direction;
+        Clear(Mode mode, int char_count)
+            : Sequence(Sequence::Clear, char_count)
+            , m_mode(mode) {}
 
-};
-
-class EscapeInsert : public EscapesSequence
-{
-public:
-    EscapeInsert(int count, int char_count)
-        : EscapesSequence(Insert, char_count)
-        , m_count(count) {}
-
-    inline int count() const { return m_count; }
-    
-private:
-    int m_count;
-    
-};
-
-class EscapeDelete : public EscapesSequence
-{
-public:
-    EscapeDelete(int count, int char_count)
-        : EscapesSequence(Delete, char_count)
-        , m_count(count) {}
-    
-    inline int count() const { return m_count; }
+        inline Mode mode() const { return m_mode; }
         
-private:
-    int m_count;
-    
-};
+    private:
+        Mode m_mode;
 
-class EscapeClear : public EscapesSequence
-{
-public:
-    enum Mode
-    {
-        CursorToLineEnd,
-        LineEndToCursor,
-        Line,
-        Screen
     };
-    
-    EscapeClear(Mode mode, int char_count)
-        : EscapesSequence(Clear, char_count)
-        , m_mode(mode) {}
 
-    inline Mode mode() const { return m_mode; }
-    
-private:
-    Mode m_mode;
+    class Bell : public Sequence
+    {
+    public:
+        Bell()
+            : Sequence(Sequence::Bell, 0) {}
+    };
 
-};
+}
 
-class EscapeBell : public EscapesSequence
-{
-public:
-    EscapeBell()
-        : EscapesSequence(Bell, 0) {}
-};
+std::ostream &operator<<(std::ostream &stream, const Escape::Sequence& sequence);

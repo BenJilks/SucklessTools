@@ -1,6 +1,7 @@
 #include "escapes.hpp"
 #include <optional>
 #include <iostream>
+using namespace Escape;
 
 static std::optional<int> parse_number(std::string_view str, int &index)
 {
@@ -21,7 +22,7 @@ static std::optional<int> parse_number(std::string_view str, int &index)
     return std::atoi(num.c_str());
 }
 
-std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
+std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
 {
     if (str.length() < 3 || (str[0] != '\033' && str[1] != '['))
     {
@@ -29,8 +30,8 @@ std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
         {
             switch (str[0])
             {
-                case 7: return std::make_unique<EscapeBell>();
-                case 8: return std::make_unique<EscapeCursor>(EscapeCursor::Right, 0);
+                case 7: return std::make_unique<Escape::Bell>();
+                case 8: return std::make_unique<Escape::Cursor>(Escape::Cursor::Right, 0);
                 default: break;
             }
         }
@@ -46,8 +47,8 @@ std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
         
         switch (str[index])
         {
-            case 'K': return std::make_unique<EscapeClear>(EscapeClear::CursorToLineEnd, 2);
-            case 'H': return std::make_unique<EscapeCursor>(EscapeCursor::TopLeft, 2);
+            case 'K': return std::make_unique<Escape::Clear>(Escape::Clear::CursorToLineEnd, 2);
+            case 'H': return std::make_unique<Escape::Cursor>(Escape::Cursor::TopLeft, 2);
             default: break;
         }
         return nullptr;
@@ -59,8 +60,8 @@ std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
         switch (c)
         {
             case 'm': 
-                return std::make_unique<EscapeColor>(
-                    EscapeColor::Black, index);
+                return std::make_unique<Escape::Color>(
+                    TerminalColor(TerminalColor::Green, TerminalColor::Black), index);
             
             case ';':
             {
@@ -71,19 +72,19 @@ std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
                 if (str[index] != 'm')
                     return nullptr;
                 
-                return std::make_unique<EscapeColor>(
-                    EscapeColor::Black, index);
+                return std::make_unique<Escape::Color>(
+                    TerminalColor(TerminalColor::Green, TerminalColor::Black), index);
             }
             
             case '@':
             {
-                return std::make_unique<EscapeInsert>(
+                return std::make_unique<Escape::Insert>(
                     *first_num, index);
             }
             
             case 'P':
             {
-                return std::make_unique<EscapeDelete>(
+                return std::make_unique<Escape::Delete>(
                     *first_num, index);
             }
             
@@ -92,8 +93,8 @@ std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
                 switch (*first_num)
                 {
                     case 2: 
-                        return std::make_unique<EscapeClear>(
-                            EscapeClear::Screen, index);
+                        return std::make_unique<Escape::Clear>(
+                            Escape::Clear::Screen, index);
                         break;
                         
                     default: 
@@ -110,46 +111,46 @@ std::unique_ptr<EscapesSequence> EscapesSequence::parse(std::string_view str)
     return nullptr;
 }
 
-std::ostream &operator<<(std::ostream &stream, const EscapesSequence& sequence)
+std::ostream &operator<<(std::ostream &stream, const Sequence& sequence)
 {
     switch (sequence.type())
     {
-        case EscapesSequence::Color: 
+        case Sequence::Color: 
         {
-            auto color = static_cast<const EscapeColor&>(sequence);
+            auto color = static_cast<const Color&>(sequence);
             stream << "Color(name = " << color.name() << ")";
             break;
         }
 
-        case EscapesSequence::Cursor: 
+        case Sequence::Cursor: 
         {
-            auto cursor = static_cast<const EscapeCursor&>(sequence);
+            auto cursor = static_cast<const Cursor&>(sequence);
             stream << "Cursor(name = " << cursor.name() << ")";
             break;
         }
 
-        case EscapesSequence::Insert: 
+        case Sequence::Insert: 
         {
-            auto insert = static_cast<const EscapeInsert&>(sequence);
+            auto insert = static_cast<const Insert&>(sequence);
             stream << "Insert(count = " << insert.count() << ")";
             break;
         }
 
-        case EscapesSequence::Delete: 
+        case Sequence::Delete: 
         {
-            auto del = static_cast<const EscapeInsert&>(sequence);
+            auto del = static_cast<const Insert&>(sequence);
             stream << "Delete(count = " << del.count() << ")";
             break;
         }
 
-        case EscapesSequence::Clear: 
+        case Sequence::Clear: 
         {
-            auto clear = static_cast<const EscapeClear&>(sequence);
+            auto clear = static_cast<const Clear&>(sequence);
             stream << "Clear";
             break;
         }
 
-        case EscapesSequence::Bell:
+        case Sequence::Bell:
             stream << "Bell";
             break;
     }
