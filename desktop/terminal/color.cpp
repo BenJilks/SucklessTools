@@ -19,7 +19,7 @@ static std::string color_to_string(TerminalColor::Named color)
 
 std::string TerminalColor::name() const
 {
-    return "Color(Foreground = " + color_to_string(m_foreground) + 
+    return "(Foreground = " + color_to_string(m_foreground) + 
         ", Background = " + color_to_string(m_background) + ")";
 }
 

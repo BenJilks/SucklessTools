@@ -10,6 +10,11 @@ public:
         : m_color(color) {}
 
     inline TerminalColor color() const { return m_color; }
+    inline TerminalColor inverted_color() const 
+    { 
+        return TerminalColor(
+            m_color.background(), m_color.foreground(), 0); 
+    }
 
 private:
     TerminalColor m_color;

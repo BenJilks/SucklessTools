@@ -36,16 +36,17 @@ public:
     TerminalColor()
         : m_foreground(White)
         , m_background(Black)
-        , m_flags(Clear) {}
+        , m_flags(0) {}
     
     inline Named foreground() const { return m_foreground; }
     inline Named background() const { return m_background; }
+    inline bool is(Flags flag) const { return m_flags & (int)flag; }
+    inline void set_foreground(Named foreground) { m_foreground = foreground; }
+    inline void set_background(Named background) { m_background = background; }
+    inline void set_flag(Flags flag) { m_flags |= (int)flag; }
     int foreground_int() const;
     int background_int() const;
     std::string name() const;
-    
-    inline bool is_bright() const { return m_flags & Bright; }
-    inline bool is_clear() const { return m_flags & Clear; }
 
 private:
     Named m_foreground, m_background;

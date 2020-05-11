@@ -1,4 +1,5 @@
 #include "line.hpp"
+#include <iostream>
 
 void Line::set(int coloumn, char c)
 {
@@ -31,11 +32,16 @@ void Line::set_attribute(int coloumn, Attribute attr)
 
 const Attribute *Line::curr_attribute(int coloumn)
 {
+    int max = 0;
+    const Attribute *max_attr = nullptr;
     for (const auto &it : m_attributes)
     {
-        if (coloumn >= it.first)
-            return &it.second;
+        if (it.first <= coloumn && it.first >= max)
+        {
+            max = it.first;
+            max_attr = &it.second;
+        }
     }
     
-    return nullptr;
+    return max_attr;
 }

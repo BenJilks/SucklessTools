@@ -188,6 +188,8 @@ std::string XLibOutput::update()
                 }
                 break;
         }
+        
+        break;
     }
     
     return "";
@@ -369,12 +371,14 @@ void XLibOutput::draw_window()
                 if (attr)
                     color = attr->color();
                 
+                static auto default_color = TerminalColor(TerminalColor::Black, TerminalColor::White);
+                static auto default_select = TerminalColor(TerminalColor::White, TerminalColor::Black);
                 if (in_selection)
                 {
                     if (column >= selection_start && column <= selection_end)
-                        color = TerminalColor(TerminalColor::Black, TerminalColor::White);
+                        color = attr ? attr->inverted_color() : default_color;
                     else
-                        color = TerminalColor(TerminalColor::White, TerminalColor::Black);
+                        color = attr ? attr->color() : default_select;
                 }
                 
                 char c = line.data()[column];

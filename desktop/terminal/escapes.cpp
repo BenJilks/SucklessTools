@@ -22,6 +22,72 @@ static std::optional<int> parse_number(std::string_view str, int &index)
     return std::atoi(num.c_str());
 }
 
+enum class ColorTypeFlags
+{
+    Forground = 0x1 << 0,
+    Background = 0x1 << 1,
+    Bright = 0x1 << 2,
+    Clear = 0x1 << 3,
+};
+
+void parser_color_name(int num, TerminalColor &color)
+{
+    enum Type
+    {
+        Foregroud,
+        Background
+    };
+    
+    if (num == 0)
+    {
+        color.set_flag(TerminalColor::Clear);
+        return;
+    }
+    
+    auto type = Foregroud;
+    if (num >= 90)
+    {
+        color.set_flag(TerminalColor::Bright);
+        num -= 60;
+    }
+    
+    num -= 30;
+    if (num >= 10)
+    {
+        type = Background;
+        num -= 10;
+    }
+    
+    auto name = TerminalColor::White;
+    switch (num)
+    {
+        case 0: name = TerminalColor::Black; break;
+        case 1: name = TerminalColor::Red; break;
+        case 2: name = TerminalColor::Green; break;
+        case 3: name = TerminalColor::Yellow; break;
+        case 4: name = TerminalColor::Blue; break;
+        case 5: name = TerminalColor::Magenta; break;
+        case 6: name = TerminalColor::Cyan; break;
+        case 7: name = TerminalColor::White; break;
+        default: break;
+    }
+    
+    switch (type)
+    {
+       case Foregroud: color.set_foreground(name); break;
+       case Background: color.set_background(name); break;
+    }
+}
+
+TerminalColor parse_color(int first_num, int last_num = -1)
+{
+    TerminalColor color;
+    parser_color_name(first_num, color);
+    if (last_num != -1)
+        parser_color_name(last_num, color);
+    return color;
+}
+
 std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
 {
     if (str.length() < 3 || (str[0] != '\033' && str[1] != '['))
@@ -60,8 +126,17 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
         switch (c)
         {
             case 'm': 
+            {
+                if (*first_num == 0)
+                {
+                    return std::make_unique<Escape::Color>(TerminalColor(
+                        TerminalColor::White, TerminalColor::Black, 
+                        TerminalColor::Clear), index);
+                }
+                
                 return std::make_unique<Escape::Color>(
-                    TerminalColor(TerminalColor::Green, TerminalColor::Black), index);
+                    parse_color(*first_num), index);
+            }
             
             case ';':
             {
@@ -73,7 +148,7 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
                     return nullptr;
                 
                 return std::make_unique<Escape::Color>(
-                    TerminalColor(TerminalColor::Green, TerminalColor::Black), index);
+                    parse_color(*first_num, *second_num), index);
             }
             
             case '@':
