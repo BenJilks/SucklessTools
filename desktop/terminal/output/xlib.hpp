@@ -38,17 +38,10 @@ private:
     void load_font(const std::string &&name, int size);
     XftColor &text_color_from_terminal(TerminalColor color);
     void swap_buffers();
-
-    bool line_in_selection(int row);
-    int line_selection_start(int row);
-    int line_selection_end(int row);
     
     int m_width { 0 };
     int m_height { 0 };
-    bool m_in_selection { false };
-    bool m_has_selection { false };
-    CursorPosition m_selection_start;
-    CursorPosition m_selection_end;
+    CursorPosition m_mouse_pos;
     
     // Xft
     XftFont *m_font;

@@ -17,11 +17,18 @@ protected:
     virtual void draw_window() = 0;
     virtual void scroll(int by) = 0;
     Line &line_at(const CursorPosition &position);
+    bool line_in_selection(int row);
+    int line_selection_start(int row);
+    int line_selection_end(int row);
     
     std::vector<Line> m_lines;
     CursorPosition m_cursor;
-    CursorPosition m_mouse_pos;
     int m_rows { 1024 };
     int m_curr_frame_index { 0 };
+
+    bool m_in_selection { false };
+    bool m_has_selection { false };
+    CursorPosition m_selection_start;
+    CursorPosition m_selection_end;
     
 };

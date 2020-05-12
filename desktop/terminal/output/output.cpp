@@ -17,6 +17,51 @@ Line &Output::line_at(const CursorPosition &position)
     return m_lines[position.row()];
 }
 
+int Output::line_selection_start(int row)
+{
+    auto start = m_selection_start;
+    auto end = m_selection_end;
+    if (end.row() < start.row())
+        std::swap(start, end);
+    
+    if (row == start.row() && row == end.row())
+        return std::min(start.coloumn(), end.coloumn());
+    
+    if (row == start.row())
+        return start.coloumn();
+    
+    return 0;
+}
+
+int Output::line_selection_end(int row)
+{
+    auto start = m_selection_start;
+    auto end = m_selection_end;
+    if (end.row() < start.row())
+        std::swap(start, end);
+    
+    if (row == start.row() && row == end.row())
+        return std::max(start.coloumn(), end.coloumn());
+    
+    if (row == end.row())
+        return end.coloumn();
+    
+    return line_at(CursorPosition(0, row)).data().length();
+}
+
+bool Output::line_in_selection(int row)
+{
+    if (!m_has_selection)
+        return false;
+    
+    auto start = m_selection_start.row();
+    auto end = m_selection_end.row();
+    if (end < start)
+        std::swap(start, end);
+    
+    return row >= start && row <= end;
+}
+
 void Output::out(std::string_view buff)
 {
     for (int i = 0; i < buff.length(); i++)
@@ -36,8 +81,9 @@ void Output::out(std::string_view buff)
             {
                 line_at(m_cursor).set(m_cursor.coloumn(), c);
                 m_cursor.move_by(1, 0);
+                
                 if (m_cursor.row() >= m_curr_frame_index + m_rows)
-                    scroll(1);
+                    scroll(m_cursor.row() - (m_curr_frame_index + m_rows - 1));
             }
             
             continue;

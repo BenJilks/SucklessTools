@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstring>
+#include <unistd.h>
 
 XLibOutput::XLibOutput()
 {
@@ -163,7 +164,7 @@ std::string XLibOutput::update()
                 if (m_in_selection)
                 {
                     m_has_selection = true;
-                    m_selection_end = m_mouse_pos;                    
+                    m_selection_end = m_mouse_pos;
                     line_at(m_selection_end).mark_dirty();
                     draw_window();
                 }
@@ -255,7 +256,7 @@ void XLibOutput::scroll(int by)
         XFillRectangle(m_display, m_pixel_buffer, gc, 
             0, m_height - by_pixels, m_width, by_pixels);
         
-        for (int i = m_curr_frame_index - by; i < m_curr_frame_index; i++)
+        for (int i = m_curr_frame_index - by - 1; i < m_curr_frame_index; i++)
         {
             if (i >= 0)
                 m_lines[i].mark_dirty();
@@ -268,7 +269,7 @@ void XLibOutput::scroll(int by)
         XFillRectangle(m_display, m_pixel_buffer, gc, 
             0, 0, m_width, -by_pixels);
 
-        for (int i = m_curr_frame_index + m_rows; i < m_curr_frame_index + m_rows - (by - 1); i++)
+        for (int i = m_curr_frame_index + m_rows - 1; i < m_curr_frame_index + m_rows - by; i++)
         {
             if (i < m_lines.size())
                 m_lines[i].mark_dirty();
@@ -277,38 +278,6 @@ void XLibOutput::scroll(int by)
 
     m_curr_frame_index += by;
     draw_window();
-}
-
-int XLibOutput::line_selection_start(int row)
-{
-    auto start = m_selection_start;
-    auto end = m_selection_end;
-    if (end.row() < start.row())
-        std::swap(start, end);
-    
-    if (row == start.row() && row == end.row())
-        return std::min(start.coloumn(), end.coloumn());
-    
-    if (row == start.row())
-        return start.coloumn();
-    
-    return 0;
-}
-
-int XLibOutput::line_selection_end(int row)
-{
-    auto start = m_selection_start;
-    auto end = m_selection_end;
-    if (end.row() < start.row())
-        std::swap(start, end);
-    
-    if (row == start.row() && row == end.row())
-        return std::max(start.coloumn(), end.coloumn());
-    
-    if (row == end.row())
-        return end.coloumn();
-    
-    return line_at(CursorPosition(0, row)).data().length();
 }
 
 XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
@@ -371,38 +340,38 @@ void XLibOutput::draw_window()
                 if (attr)
                     color = attr->color();
                 
-                static auto default_color = TerminalColor(TerminalColor::Black, TerminalColor::White);
-                static auto default_select = TerminalColor(TerminalColor::White, TerminalColor::Black);
+                auto effective_color = color;
                 if (in_selection)
                 {
                     if (column >= selection_start && column <= selection_end)
-                        color = attr ? attr->inverted_color() : default_color;
-                    else
-                        color = attr ? attr->color() : default_select;
+                        effective_color = color.inverted();
                 }
+                
+                if (m_cursor.row() == row && m_cursor.coloumn() == column)
+                    effective_color = color.inverted();
                 
                 char c = line.data()[column];
                 XGlyphInfo extents;
                 XftTextExtentsUtf8(m_display, m_font, 
                     (const FcChar8 *)&c, 1, &extents);
                 
-                XSetForeground(m_display, gc, color.background_int());
+                XSetForeground(m_display, gc, effective_color.background_int());
                 XFillRectangle(m_display, m_pixel_buffer, gc, 
                     x, y - m_font->height + 4, extents.xOff, m_font->height);
                 
-                XftDrawStringUtf8(m_draw, &text_color_from_terminal(color), 
+                XftDrawStringUtf8(m_draw, &text_color_from_terminal(effective_color), 
                     m_font, x, y, 
                     (const FcChar8 *)&c, 1);
                 
                 x += extents.xOff;
-
-                if (m_cursor.row() == row && m_cursor.coloumn() - 1 == column)
-                {
-                    XSetForeground(m_display, gc, 0xFFFFFF);
-                    XFillRectangle(m_display, m_pixel_buffer, gc, 
-                        x, y - m_font->height + m_font->descent, 10, 
-                        m_font->height - m_font->ascent + m_font->descent);
-                }
+            }
+            
+            if (m_cursor.row() == row && m_cursor.coloumn() == line.data().length())
+            {
+                XSetForeground(m_display, gc, 0xFFFFFF);
+                XFillRectangle(m_display, m_pixel_buffer, gc, 
+                    x, y - m_font->height + 4, 
+                    m_font->max_advance_width, m_font->height);
             }
             
             line.unmark_dirty();
@@ -420,19 +389,6 @@ void XLibOutput::swap_buffers()
     XCopyArea(m_display, m_pixel_buffer, m_window, gc, 
         0, 0, m_width, m_height, 0, 0);
     XFlush(m_display);
-}
- 
-bool XLibOutput::line_in_selection(int row)
-{
-    if (!m_has_selection)
-        return false;
-    
-    auto start = m_selection_start.row();
-    auto end = m_selection_end.row();
-    if (end < start)
-        std::swap(start, end);
-    
-    return row >= start && row <= end;
 }
 
 int XLibOutput::input_file() const

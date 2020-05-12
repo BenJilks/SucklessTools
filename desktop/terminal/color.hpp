@@ -38,6 +38,8 @@ public:
         , m_background(Black)
         , m_flags(0) {}
     
+    TerminalColor inverted() const;
+    
     inline Named foreground() const { return m_foreground; }
     inline Named background() const { return m_background; }
     inline bool is(Flags flag) const { return m_flags & (int)flag; }

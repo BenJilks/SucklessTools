@@ -1,5 +1,10 @@
 #include "color.hpp"
 
+TerminalColor TerminalColor::inverted() const
+{
+    return TerminalColor(m_background, m_foreground, m_flags);
+}
+
 static std::string color_to_string(TerminalColor::Named color)
 {
     switch (color)
