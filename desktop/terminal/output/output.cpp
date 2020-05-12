@@ -104,9 +104,20 @@ void Output::out(std::string_view buff)
                 auto cursor = static_cast<Escape::Cursor&>(*escape_sequence);
                 switch (cursor.direction())
                 {
+                    case Escape::Cursor::Up:
+                        m_cursor.move_by(0, -cursor.amount());
+                        break;
+
+                    case Escape::Cursor::Down:
+                        m_cursor.move_by(0, cursor.amount());
+                        break;
+
                     case Escape::Cursor::Right:
-                        m_cursor.move_by(-1, 0);
-                        line_at(m_cursor).mark_dirty();
+                        m_cursor.move_by(cursor.amount(), 0);
+                        break;
+
+                    case Escape::Cursor::Left:
+                        m_cursor.move_by(-cursor.amount(), 0);
                         break;
                     
                     case Escape::Cursor::TopLeft:
@@ -116,6 +127,7 @@ void Output::out(std::string_view buff)
                     default:
                         break;
                 }
+                line_at(m_cursor).mark_dirty();
                 break;
             }
             

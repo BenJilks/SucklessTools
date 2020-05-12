@@ -63,14 +63,26 @@ namespace Escape
             Right,
             Up,
             Down,
-            TopLeft
+
+            TopLeft,
+            Hide,
+            Show,
+            EnableAutoWrap,
+            DisableAutoWrap
         };
         
         Cursor(Direction direction, int char_count)
             : Sequence(Sequence::Cursor, char_count)
-            , m_direction(direction) {}
-        
+            , m_direction(direction)
+            , m_amount(1) {}
+
+        Cursor(Direction direction, int amount, int char_count)
+            : Sequence(Sequence::Cursor, char_count)
+            , m_direction(direction)
+            , m_amount(amount) {}
+            
         inline Direction direction() const { return m_direction; }
+        inline int amount() const { return m_amount; }
         inline std::string name() const
         {
             switch (m_direction)
@@ -79,7 +91,12 @@ namespace Escape
                 case Right: return "Right";
                 case Up: return "Up";
                 case Down: return "Down";
+                
                 case TopLeft: return "TopLeft";
+                case Hide: return "Hide";
+                case Show: return "Show";
+                case EnableAutoWrap: return "EnableAutoWrap";
+                case DisableAutoWrap: return "DisableAutoWrap";
             }
             
             return "Unkown";
@@ -87,6 +104,7 @@ namespace Escape
         
     private:
         Direction m_direction;
+        int m_amount;
 
     };
 

@@ -1,6 +1,7 @@
 #include "escapes.hpp"
 #include <optional>
 #include <iostream>
+#include <vector>
 using namespace Escape;
 
 static std::optional<int> parse_number(std::string_view str, int &index)
@@ -30,7 +31,7 @@ enum class ColorTypeFlags
     Clear = 0x1 << 3,
 };
 
-void parser_color_name(int num, TerminalColor &color)
+void decode_color_name(int num, TerminalColor &color)
 {
     enum Type
     {
@@ -79,13 +80,44 @@ void parser_color_name(int num, TerminalColor &color)
     }
 }
 
-TerminalColor parse_color(int first_num, int last_num = -1)
+TerminalColor parse_color(std::vector<int> color_nums)
 {
     TerminalColor color;
-    parser_color_name(first_num, color);
-    if (last_num != -1)
-        parser_color_name(last_num, color);
+    
+    for (int num : color_nums)
+        decode_color_name(num, color);
     return color;
+}
+
+std::unique_ptr<Sequence> parse_private(std::string_view str, int &index)
+{
+    index += 1;
+    auto num = parse_number(str, index);
+    if (!num)
+        return nullptr;
+    
+    switch (*num)
+    {
+        case 7:
+            switch (str[index])
+            {
+                case 'h': return std::make_unique<Escape::Cursor>(Escape::Cursor::EnableAutoWrap, index);
+                case 'l': return std::make_unique<Escape::Cursor>(Escape::Cursor::DisableAutoWrap, index);
+                default: break;
+            }
+            break;
+        
+        case 25:
+            switch (str[index])
+            {
+                case 'h': return std::make_unique<Escape::Cursor>(Escape::Cursor::Show, index);
+                case 'l': return std::make_unique<Escape::Cursor>(Escape::Cursor::Hide, index);
+                default: break;
+            }
+            break;
+    }
+    
+    return nullptr;
 }
 
 std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
@@ -97,7 +129,7 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
             switch (str[0])
             {
                 case 7: return std::make_unique<Escape::Bell>();
-                case 8: return std::make_unique<Escape::Cursor>(Escape::Cursor::Right, 0);
+                case 8: return std::make_unique<Escape::Cursor>(Escape::Cursor::Left, 0);
                 default: break;
             }
         }
@@ -115,6 +147,18 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
         {
             case 'K': return std::make_unique<Escape::Clear>(Escape::Clear::CursorToLineEnd, 2);
             case 'H': return std::make_unique<Escape::Cursor>(Escape::Cursor::TopLeft, 2);
+            case 'A': return std::make_unique<Escape::Cursor>(Escape::Cursor::Up, 2);
+            case 'B': return std::make_unique<Escape::Cursor>(Escape::Cursor::Down, 2);
+            case 'C': return std::make_unique<Escape::Cursor>(Escape::Cursor::Left, 2);
+            case 'D': return std::make_unique<Escape::Cursor>(Escape::Cursor::Right, 2);
+            case '?':
+            {
+                auto private_escape = parse_private(str, index);
+                if (private_escape)
+                    return private_escape;
+                
+                break;
+            }
             default: break;
         }
         return nullptr;
@@ -135,20 +179,27 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
                 }
                 
                 return std::make_unique<Escape::Color>(
-                    parse_color(*first_num), index);
+                    parse_color(std::vector<int> { *first_num }), index);
             }
             
             case ';':
             {
-                auto second_num = parse_number(str, ++index);
-                if (!second_num || index > str.length())
-                    break;
+                std::vector<int> color_nums;
+                color_nums.push_back(*first_num);
+                
+                while (str[index] == ';')
+                {
+                    auto num = parse_number(str, ++index);
+                    if (!num || index > str.length())
+                        break;
+                    color_nums.push_back(*num);
+                }
                 
                 if (str[index] != 'm')
                     return nullptr;
                 
                 return std::make_unique<Escape::Color>(
-                    parse_color(*first_num, *second_num), index);
+                    parse_color(color_nums), index);
             }
             
             case '@':
@@ -177,6 +228,30 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
                 }
             }
             
+            case 'A':
+            {
+                return std::make_unique<Escape::Cursor>(
+                    Escape::Cursor::Up, *first_num, index);
+            }
+
+            case 'B':
+            {
+                return std::make_unique<Escape::Cursor>(
+                    Escape::Cursor::Down, *first_num, index);
+            }
+
+            case 'C':
+            {
+                return std::make_unique<Escape::Cursor>(
+                    Escape::Cursor::Right, *first_num, index);
+            }
+
+            case 'D':
+            {
+                return std::make_unique<Escape::Cursor>(
+                    Escape::Cursor::Left, *first_num, index);
+            }
+
             default:
                 break;
         }
@@ -200,7 +275,7 @@ std::ostream &operator<<(std::ostream &stream, const Sequence& sequence)
         case Sequence::Cursor: 
         {
             auto cursor = static_cast<const Cursor&>(sequence);
-            stream << "Cursor(name = " << cursor.name() << ")";
+            stream << "Cursor(name = " << cursor.name() << ", amount = " << cursor.amount() << ")";
             break;
         }
 
