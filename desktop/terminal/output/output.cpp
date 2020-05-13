@@ -92,10 +92,13 @@ void Output::out(std::string_view buff)
         std::cout << "Escape: " << *escape_sequence << "\n";
         switch (escape_sequence->type())
         {
-            case Escape::Sequence::Color:
+            case Escape::Sequence::Attribute:
             {
-                auto color = static_cast<Escape::Color&>(*escape_sequence);
-                line_at(m_cursor).set_attribute(m_cursor.coloumn(), Attribute(color.color()));
+                auto attributes = static_cast<Escape::Attribute&>(*escape_sequence);
+                for (const auto &color : attributes.colors())
+                    line_at(m_cursor).set_attribute(m_cursor.coloumn(), color.first, color.second);
+                for (const auto &flag : attributes.flags())
+                    line_at(m_cursor).set_attribute(m_cursor.coloumn(), flag.first, flag.second);              
                 break;
             }
             

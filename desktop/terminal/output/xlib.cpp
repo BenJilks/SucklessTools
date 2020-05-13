@@ -336,9 +336,9 @@ void XLibOutput::draw_window()
             
             for (int column = 0; column < line.data().length(); column++)
             {
-                const auto *attr = line.curr_attribute(column);
-                if (attr)
-                    color = attr->color();
+                auto attribute = line.curr_attribute(column);
+                if (attribute)
+                    color = *attribute;
                 
                 auto effective_color = color;
                 if (in_selection)

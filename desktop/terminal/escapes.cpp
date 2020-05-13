@@ -31,65 +31,46 @@ enum class ColorTypeFlags
     Clear = 0x1 << 3,
 };
 
-void decode_color_name(int num, TerminalColor &color)
+static void decode_attribute_number(std::unique_ptr<Attribute> &attr, int num)
 {
-    enum Type
-    {
-        Foregroud,
-        Background
-    };
-    
     if (num == 0)
     {
-        color.set_flag(TerminalColor::Clear);
+        attr->add(TerminalColor::Foreground, TerminalColor::White);
+        attr->add(TerminalColor::Background, TerminalColor::Black);
+        attr->add(TerminalColor::Clear, true);
+        attr->add(TerminalColor::Bright, false);
         return;
     }
     
-    auto type = Foregroud;
+    auto type = TerminalColor::Foreground;
     if (num >= 90)
     {
-        color.set_flag(TerminalColor::Bright);
+        attr->add(TerminalColor::Bright, true);
         num -= 60;
     }
     
     num -= 30;
     if (num >= 10)
     {
-        type = Background;
+        type = TerminalColor::Background;
         num -= 10;
     }
     
-    auto name = TerminalColor::White;
     switch (num)
     {
-        case 0: name = TerminalColor::Black; break;
-        case 1: name = TerminalColor::Red; break;
-        case 2: name = TerminalColor::Green; break;
-        case 3: name = TerminalColor::Yellow; break;
-        case 4: name = TerminalColor::Blue; break;
-        case 5: name = TerminalColor::Magenta; break;
-        case 6: name = TerminalColor::Cyan; break;
-        case 7: name = TerminalColor::White; break;
+        case 0: attr->add(type, TerminalColor::Black); break;
+        case 1: attr->add(type, TerminalColor::Red); break;
+        case 2: attr->add(type, TerminalColor::Green); break;
+        case 3: attr->add(type, TerminalColor::Yellow); break;
+        case 4: attr->add(type, TerminalColor::Blue); break;
+        case 5: attr->add(type, TerminalColor::Magenta); break;
+        case 6: attr->add(type, TerminalColor::Cyan); break;
+        case 7: attr->add(type, TerminalColor::White); break;
         default: break;
     }
-    
-    switch (type)
-    {
-       case Foregroud: color.set_foreground(name); break;
-       case Background: color.set_background(name); break;
-    }
 }
 
-TerminalColor parse_color(std::vector<int> color_nums)
-{
-    TerminalColor color;
-    
-    for (int num : color_nums)
-        decode_color_name(num, color);
-    return color;
-}
-
-std::unique_ptr<Sequence> parse_private(std::string_view str, int &index)
+static std::unique_ptr<Sequence> parse_private(std::string_view str, int &index)
 {
     index += 1;
     auto num = parse_number(str, index);
@@ -171,35 +152,30 @@ std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
         {
             case 'm': 
             {
-                if (*first_num == 0)
-                {
-                    return std::make_unique<Escape::Color>(TerminalColor(
-                        TerminalColor::White, TerminalColor::Black, 
-                        TerminalColor::Clear), index);
-                }
-                
-                return std::make_unique<Escape::Color>(
-                    parse_color(std::vector<int> { *first_num }), index);
+                auto attr = std::make_unique<Escape::Attribute>();
+                decode_attribute_number(attr, *first_num);
+                attr->set_char_count(index);
+                return std::move(attr);
             }
             
             case ';':
             {
-                std::vector<int> color_nums;
-                color_nums.push_back(*first_num);
+                auto attr = std::make_unique<Escape::Attribute>();
+                decode_attribute_number(attr, *first_num);
                 
                 while (str[index] == ';')
                 {
                     auto num = parse_number(str, ++index);
                     if (!num || index > str.length())
                         break;
-                    color_nums.push_back(*num);
+                    decode_attribute_number(attr, *num);
                 }
                 
                 if (str[index] != 'm')
                     return nullptr;
                 
-                return std::make_unique<Escape::Color>(
-                    parse_color(color_nums), index);
+                attr->set_char_count(index);
+                return std::move(attr);
             }
             
             case '@':
@@ -265,10 +241,10 @@ std::ostream &operator<<(std::ostream &stream, const Sequence& sequence)
 {
     switch (sequence.type())
     {
-        case Sequence::Color: 
+        case Sequence::Attribute: 
         {
-            auto color = static_cast<const Color&>(sequence);
-            stream << "Color(name = " << color.name() << ")";
+            auto color = static_cast<const Attribute&>(sequence);
+            stream << "Attribute"; //(name = " << color.name() << ")";
             break;
         }
 

@@ -2,6 +2,7 @@
 #include "color.hpp"
 #include <string>
 #include <memory>
+#include <vector>
 
 namespace Escape
 {
@@ -15,7 +16,7 @@ namespace Escape
         
         enum Type
         {
-            Color,
+            Attribute,
             Cursor,
             Insert,
             Delete,
@@ -28,29 +29,40 @@ namespace Escape
 
     protected:
         Sequence(Type type, int char_count) 
-            : m_type(type)
-            , m_char_count(char_count) {}
+            : m_char_count(char_count)
+            , m_type(type) {}
+        
+        int m_char_count;
         
     private:
         Type m_type;
-        int m_char_count;
 
     };
 
-    class Color : public Sequence
+    class Attribute : public Sequence
     {
     public:
-        Color(TerminalColor color, int char_count)
-            : Sequence(Sequence::Color, char_count)
-            , m_color(color) {}
+        Attribute()
+            : Sequence(Sequence::Attribute, 0) {}
 
-        virtual ~Color() {}
-
-        inline std::string name() { return m_color.name(); }
-        inline const TerminalColor &color() { return m_color; }
+        inline void add(TerminalColor::Type type, TerminalColor::Named color) 
+        { 
+            m_colors.push_back(std::make_pair(type, color));
+        }
+        inline void add(TerminalColor::Flags flag, bool enabled) 
+        { 
+            m_flags.push_back(std::make_pair(flag, enabled));
+        }
+        
+        inline const auto &colors() const { return m_colors; }
+        inline const auto &flags() const { return m_flags; }
+        inline void set_char_count(int count) { m_char_count = count; }
+        
+        virtual ~Attribute() {}
         
     private:
-        TerminalColor m_color;
+        std::vector<std::pair<TerminalColor::Type, TerminalColor::Named>> m_colors;
+        std::vector<std::pair<TerminalColor::Flags, bool>> m_flags;
 
     };
 

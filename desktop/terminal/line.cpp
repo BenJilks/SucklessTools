@@ -25,15 +25,40 @@ void Line::erase(int coloumn, int count)
     m_is_dirty = true;
 }
 
-void Line::set_attribute(int coloumn, Attribute attr)
+void Line::set_attribute(int coloumn, TerminalColor::Type type, TerminalColor::Named color)
 {
-    m_attributes.push_back(std::make_pair(coloumn, attr));
+    const auto *current = curr_attribute(coloumn);
+    
+    TerminalColor attribute;
+    if (current)
+        attribute = *current;
+    
+    switch (type)
+    {
+        case TerminalColor::Foreground: attribute.set_foreground(color); break;
+        case TerminalColor::Background: attribute.set_background(color); break;
+        default: break;
+    }
+    
+    m_attributes.push_back(std::make_pair(coloumn, attribute));
 }
 
-const Attribute *Line::curr_attribute(int coloumn)
+void Line::set_attribute(int coloumn, TerminalColor::Flags flag, bool enabled)
+{
+    const auto *current = curr_attribute(coloumn);
+    
+    TerminalColor attribute;
+    if (current)
+        attribute = *current;
+    
+    attribute.set_flag(flag, enabled);
+    m_attributes.push_back(std::make_pair(coloumn, attribute));
+}
+
+const TerminalColor *Line::curr_attribute(int coloumn)
 {
     int max = 0;
-    const Attribute *max_attr = nullptr;
+    const TerminalColor *max_attr = nullptr;
     for (const auto &it : m_attributes)
     {
         if (it.first <= coloumn && it.first >= max)
