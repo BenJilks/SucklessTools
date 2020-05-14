@@ -9,6 +9,8 @@ static std::string color_to_string(TerminalColor::Named color)
 {
     switch (color)
     {
+        case TerminalColor::DefaultBackground: return "DefaultBackground";
+        case TerminalColor::DefaultForeground: return "DefaultForeground";
         case TerminalColor::Black: return "Black";
         case TerminalColor::Red: return "Red";
         case TerminalColor::Green: return "Green";
@@ -30,16 +32,26 @@ std::string TerminalColor::name() const
 
 static int color_to_int(TerminalColor::Named color)
 {
+    auto to_int = [](const std::string &str) -> int
+    {
+        auto hex = str;
+        if (str.length() <= 6)
+            hex = "FF" + str;
+        return std::stoul(hex, nullptr, 16);
+    };
+    
     switch(color)
     {
-        case TerminalColor::Black: return std::stoul(ColorPalette::Black, nullptr, 16);
-        case TerminalColor::Red: return std::stoul(ColorPalette::Red, nullptr, 16);
-        case TerminalColor::Green: return std::stoul(ColorPalette::Green, nullptr, 16);
-        case TerminalColor::Yellow: return std::stoul(ColorPalette::Yellow, nullptr, 16);
-        case TerminalColor::Blue: return std::stoul(ColorPalette::Blue, nullptr, 16);
-        case TerminalColor::Magenta: return std::stoul(ColorPalette::Magenta, nullptr, 16);
-        case TerminalColor::Cyan: return std::stoul(ColorPalette::Cyan, nullptr, 16);
-        case TerminalColor::White: return std::stoul(ColorPalette::White, nullptr, 16);
+        case TerminalColor::DefaultBackground: return to_int(ColorPalette::DefaultBackground);
+        case TerminalColor::DefaultForeground: return to_int(ColorPalette::DefaultForeground);
+        case TerminalColor::Black: return to_int(ColorPalette::Black);
+        case TerminalColor::Red: return to_int(ColorPalette::Red);
+        case TerminalColor::Green: return to_int(ColorPalette::Green);
+        case TerminalColor::Yellow: return to_int(ColorPalette::Yellow);
+        case TerminalColor::Blue: return to_int(ColorPalette::Blue);
+        case TerminalColor::Magenta: return to_int(ColorPalette::Magenta);
+        case TerminalColor::Cyan: return to_int(ColorPalette::Cyan);
+        case TerminalColor::White: return to_int(ColorPalette::White);
     }
     
     return 0;

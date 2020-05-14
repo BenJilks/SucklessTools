@@ -4,6 +4,8 @@
 #include <cstring>
 #include <unistd.h>
 
+#include "../config.hpp"
+
 XLibOutput::XLibOutput()
 {
     m_display = XOpenDisplay(nullptr);
@@ -16,27 +18,46 @@ XLibOutput::XLibOutput()
     m_width = 100;
     m_height = 100;
     m_screen = DefaultScreen(m_display);
-    m_visual = DefaultVisual(m_display, m_screen);
-    m_color_map = DefaultColormap(m_display, m_screen);
-    m_window = XCreateSimpleWindow(m_display, 
-        RootWindow(m_display, m_screen), 
-        10, 10, m_width, m_height, 1, 
-        BlackPixel(m_display, m_screen), WhitePixel(m_display, m_screen));
+    m_depth = 32;//DefaultDepth(m_display, m_screen);
+    std::cout << "depth: " << m_depth << "\n";
+    
+    XVisualInfo visual_info;
+    if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
+    {
+        std::cerr << "terminal: xlib: 32bit depth not supported\n";
+        return;
+    }
+    m_visual = visual_info.visual;
+    m_color_map = XCreateColormap(m_display, 
+        DefaultRootWindow(m_display), m_visual, AllocNone);
+    
+    XSetWindowAttributes window_attr;
+    window_attr.colormap = m_color_map;
+    window_attr.background_pixel = 0xFFFFFF;
+    window_attr.border_pixel = 0;
+
+    auto window_mask = CWBackPixel | CWColormap | CWBorderPixel;
+    m_window = XCreateWindow(
+        m_display, RootWindow(m_display, m_screen), 
+        10, 10, m_width, m_height, 0, 
+        m_depth, InputOutput, m_visual,
+        window_mask, &window_attr);
     
     m_pixel_buffer = XCreatePixmap(m_display, m_window, 
-        m_width, m_height, XDefaultDepth(m_display, m_screen));
+        m_width, m_height, m_depth);
+    m_gc = XCreateGC(m_display, m_pixel_buffer, 0, 0);
     
     XSelectInput (m_display, m_window,
         ExposureMask | KeyPressMask | StructureNotifyMask | 
         ButtonPress | ButtonReleaseMask | PointerMotionMask);
-    
+     
     auto im = XOpenIM(m_display, nullptr, nullptr, nullptr);
     m_input_context = XCreateIC(im, XNInputStyle, 
         XIMPreeditNothing | XIMStatusNothing,
         XNClientWindow, m_window,
         NULL);
     
-    load_font("DejaVu Sans Mono", 16);
+    load_font(font_name.c_str(), font_size);
     XMapWindow(m_display, m_window);
 }
 
@@ -50,15 +71,23 @@ void XLibOutput::load_font(const std::string &&name, int size)
         return;
     }
     
+    // Helper lambda for loading Xft colors
     auto load_color = [&](XftColor &color, const std::string &hex)
     {
-        if (!XftColorAllocName(m_display, m_visual, m_color_map, ("#" + hex).c_str(), &color))
+        auto str = "#" + hex;
+        if (hex.length() > 6)
+            str = "#" + hex.substr(2, hex.length() - 2);
+
+        if (!XftColorAllocName(m_display, m_visual, m_color_map, str.c_str(), &color))
         {
-            std::cerr << "terminal: xft: Could not allocate font\n";
+            std::cerr << "terminal: xft: Could not allocate font color: " << str << "\n";
             return;
         }
     };
 
+    // Load the full 8 color pallet
+    load_color(m_text_pallet.default_background, ColorPalette::DefaultBackground);
+    load_color(m_text_pallet.default_foreground, ColorPalette::DefaultForeground);
     load_color(m_text_pallet.black, ColorPalette::Black);
     load_color(m_text_pallet.red, ColorPalette::Red);
     load_color(m_text_pallet.green, ColorPalette::Green);
@@ -83,6 +112,7 @@ CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
     {
         if (y >= curr_y && y <= curr_y + m_font->height)
         {
+            // We've found the row, now find the coloumn
             const auto &line = line_at(CursorPosition(0, row));
             int curr_x = 0;
             
@@ -94,18 +124,19 @@ CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
                 XftTextExtentsUtf8(m_display, m_font, 
                     (const FcChar8 *)&c, 1, &extents);
                 
+                curr_x += extents.xOff;
                 if (x >= curr_x && x <= curr_x + extents.xOff)
                     return CursorPosition(coloumn, row);
-                    
-                curr_x += extents.xOff;
             }
             
-            return CursorPosition(line.data().length(), row);
+            // If no coloumn was found, then make it the end of the line
+            return CursorPosition(line.length(), row);
         }
 
         curr_y += m_font->height;
     }
-    
+
+    // If no row was found, make it the last line
     return CursorPosition(0, m_lines.size());
 }
 
@@ -127,20 +158,25 @@ std::string XLibOutput::update()
                 switch (event.xbutton.button)
                 {
                     case Button1:
+                        // Start a new selection
                         m_selection_start = m_mouse_pos;
                         m_in_selection = true;
                         if (m_has_selection)
                         {
+                            // If there already is one, remove it so that clicking 
+                            // without moving the mouse will unselect all
                             m_has_selection = false;
                             draw_window();
                         }
                         break;
                     
                     case Button4:
+                        // Scroll up
                         scroll(-1);
                         break;
 
                     case Button5:
+                        // Scroll down
                         scroll(1);
                         break;
                 }
@@ -160,9 +196,10 @@ std::string XLibOutput::update()
                 auto x = event.xmotion.x;
                 auto y = event.xmotion.y;
                 m_mouse_pos = cursor_position_from_pixels(x, y);
-
+                
                 if (m_in_selection)
                 {
+                    // If we're in a selction, update it
                     m_has_selection = true;
                     m_selection_end = m_mouse_pos;
                     line_at(m_selection_end).mark_dirty();
@@ -178,11 +215,27 @@ std::string XLibOutput::update()
                     m_width = event.xconfigure.width;
                     m_height = event.xconfigure.height;
                     m_rows = m_height / m_font->height;
+                    
+                    if (on_resize)
+                    {
+                        // Tell the terminal program that we've resized
+                        struct winsize size;
+                        size.ws_row = m_rows;
+                        size.ws_col = m_width / m_font->max_advance_width;
+                        size.ws_xpixel = m_width;
+                        size.ws_ypixel = m_height;
 
+                        m_cursor.move_to_begging_of_line();
+                        line_at(m_cursor).clear();
+                        on_resize(size);
+                    }
+
+                    // Create a new back buffer with the new size
                     XFreePixmap(m_display, m_pixel_buffer);
                     m_pixel_buffer = XCreatePixmap(m_display, m_window, 
-                        m_width, m_height, XDefaultDepth(m_display, m_screen));
+                        m_width, m_height, m_depth);
                     
+                    // We need to tell Xft about the new buffer
                     XftDrawDestroy(m_draw);
                     m_draw = XftDrawCreate(m_display, m_pixel_buffer, 
                         m_visual, m_color_map);
@@ -198,10 +251,10 @@ std::string XLibOutput::update()
 
 void XLibOutput::redraw_all()
 {
-    auto gc = DefaultGC(m_display, m_screen);
+    auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);    
     
-    XSetForeground(m_display, gc, 0x000000);
-    XFillRectangle(m_display, m_pixel_buffer, gc,
+    XSetForeground(m_display, m_gc, color.background_int());
+    XFillRectangle(m_display, m_pixel_buffer, m_gc,
         0, 0, m_width, m_height);
 
     for (auto &line : m_lines)
@@ -244,19 +297,18 @@ void XLibOutput::scroll(int by)
         by = -m_curr_frame_index;
     
     auto by_pixels = by * m_font->height;
-    auto gc = DefaultGC(m_display, m_screen);
-    
-    XCopyArea(m_display, m_pixel_buffer, m_pixel_buffer, gc, 
+    XCopyArea(m_display, m_pixel_buffer, m_pixel_buffer, m_gc, 
         0, 0, m_width, m_height, 0, -by_pixels);
 
+    auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
     if (by > 0)
     {
         // Down
-        XSetForeground(m_display, gc, 0x000000);
-        XFillRectangle(m_display, m_pixel_buffer, gc, 
+        XSetForeground(m_display, m_gc, color.background_int());
+        XFillRectangle(m_display, m_pixel_buffer, m_gc, 
             0, m_height - by_pixels, m_width, by_pixels);
         
-        for (int i = m_curr_frame_index - by - 1; i < m_curr_frame_index; i++)
+        for (int i = m_curr_frame_index - by - 1; i < m_curr_frame_index + 1; i++)
         {
             if (i >= 0)
                 m_lines[i].mark_dirty();
@@ -265,8 +317,8 @@ void XLibOutput::scroll(int by)
     else
     {
         // Up
-        XSetForeground(m_display, gc, 0x000000);
-        XFillRectangle(m_display, m_pixel_buffer, gc, 
+        XSetForeground(m_display, m_gc, color.background_int());
+        XFillRectangle(m_display, m_pixel_buffer, m_gc, 
             0, 0, m_width, -by_pixels);
 
         for (int i = m_curr_frame_index + m_rows - 1; i < m_curr_frame_index + m_rows - by; i++)
@@ -284,6 +336,9 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
 {
     switch (color.foreground())
     {
+        case TerminalColor::DefaultBackground: return m_text_pallet.default_background;
+        case TerminalColor::DefaultForeground: return m_text_pallet.default_foreground;
+
         case TerminalColor::Black: return m_text_pallet.black;
         case TerminalColor::Red: return m_text_pallet.red;
         case TerminalColor::Green: return m_text_pallet.green;
@@ -305,20 +360,19 @@ void XLibOutput::draw_window()
         return;
     }
     
-    auto gc = DefaultGC(m_display, m_screen);
     int y = m_font->height;
     for (int row = m_curr_frame_index; row < m_curr_frame_index + m_rows; row++)
     {
         if (row >= m_lines.size())
             break;
         auto &line = m_lines[row];
-        auto color = TerminalColor(TerminalColor::White, TerminalColor::Black);
+        auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
         
         bool in_selection = line_in_selection(row);
         if (line.is_dirty() || line.was_in_selection() || in_selection)
         {
             int selection_start, selection_end;
-            int background_color = 0x000000;
+            int background_color = color.background_int();
             line.unmark_in_selection();
             if (in_selection)
             {
@@ -326,13 +380,13 @@ void XLibOutput::draw_window()
                 selection_start = line_selection_start(row);
                 selection_end = line_selection_end(row);
                 if (selection_start == 0 && selection_end == line.data().length())
-                    background_color = 0xFFFFFF;
+                    background_color = color.foreground_int();
             }
 
             int x = m_font->max_advance_width;
-            XSetForeground(m_display, gc, background_color);
+            XSetForeground(m_display, m_gc, background_color);
             XFillRectangle(m_display, m_pixel_buffer,
-                gc, 0, y - m_font->height + 4, m_width, m_font->height);
+                m_gc, 0, y - m_font->height + 4, m_width, m_font->height);
             
             for (int column = 0; column < line.data().length(); column++)
             {
@@ -355,8 +409,8 @@ void XLibOutput::draw_window()
                 XftTextExtentsUtf8(m_display, m_font, 
                     (const FcChar8 *)&c, 1, &extents);
                 
-                XSetForeground(m_display, gc, effective_color.background_int());
-                XFillRectangle(m_display, m_pixel_buffer, gc, 
+                XSetForeground(m_display, m_gc, effective_color.background_int());
+                XFillRectangle(m_display, m_pixel_buffer, m_gc, 
                     x, y - m_font->height + 4, extents.xOff, m_font->height);
                 
                 XftDrawStringUtf8(m_draw, &text_color_from_terminal(effective_color), 
@@ -368,8 +422,8 @@ void XLibOutput::draw_window()
             
             if (m_cursor.row() == row && m_cursor.coloumn() == line.data().length())
             {
-                XSetForeground(m_display, gc, 0xFFFFFF);
-                XFillRectangle(m_display, m_pixel_buffer, gc, 
+                XSetForeground(m_display, m_gc, color.foreground_int());
+                XFillRectangle(m_display, m_pixel_buffer, m_gc, 
                     x, y - m_font->height + 4, 
                     m_font->max_advance_width, m_font->height);
             }
@@ -385,8 +439,7 @@ void XLibOutput::draw_window()
 
 void XLibOutput::swap_buffers()
 {
-    auto gc = DefaultGC(m_display, m_screen);    
-    XCopyArea(m_display, m_pixel_buffer, m_window, gc, 
+    XCopyArea(m_display, m_pixel_buffer, m_window, m_gc, 
         0, 0, m_width, m_height, 0, 0);
     XFlush(m_display);
 }

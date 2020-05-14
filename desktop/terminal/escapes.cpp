@@ -35,8 +35,8 @@ static void decode_attribute_number(std::unique_ptr<Attribute> &attr, int num)
 {
     if (num == 0)
     {
-        attr->add(TerminalColor::Foreground, TerminalColor::White);
-        attr->add(TerminalColor::Background, TerminalColor::Black);
+        attr->add(TerminalColor::Foreground, TerminalColor::DefaultForeground);
+        attr->add(TerminalColor::Background, TerminalColor::DefaultBackground);
         attr->add(TerminalColor::Clear, true);
         attr->add(TerminalColor::Bright, false);
         return;
@@ -95,6 +95,11 @@ static std::unique_ptr<Sequence> parse_private(std::string_view str, int &index)
                 case 'l': return std::make_unique<Escape::Cursor>(Escape::Cursor::Hide, index);
                 default: break;
             }
+            break;
+        
+        default:
+            std::cout << "Unkown mode " << *num << " = " << 
+                (str[index] == 'h' ? "enable" : "disable") << "\n";
             break;
     }
     

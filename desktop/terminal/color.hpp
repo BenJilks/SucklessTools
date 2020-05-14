@@ -1,23 +1,16 @@
 #pragma once
 #include <string>
 
-namespace ColorPalette
-{
-    static std::string Black = "000000";
-    static std::string Red = "FF0000";
-    static std::string Green = "00FF00";
-    static std::string Yellow = "FFFF00";
-    static std::string Blue = "0000FF";
-    static std::string Magenta = "FF00FF";
-    static std::string Cyan = "00FFFF";
-    static std::string White = "FFFFFF";
-};
+#include "config.hpp"
 
 class TerminalColor
 {
 public:
     enum Named
     {
+        DefaultBackground,
+        DefaultForeground,
+        
         Black, Red, Green, Yellow,
         Blue, Magenta, Cyan, White,
     };
@@ -40,8 +33,8 @@ public:
         , m_flags(flags) {}
     
     TerminalColor()
-        : m_foreground(White)
-        , m_background(Black)
+        : m_foreground(DefaultForeground)
+        , m_background(DefaultBackground)
         , m_flags(0) {}
     
     TerminalColor inverted() const;

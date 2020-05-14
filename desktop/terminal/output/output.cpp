@@ -4,7 +4,7 @@
 
 Line &Output::line_at(const CursorPosition &position)
 {
-    if (position.row() < 0)
+    if (position.row() <= 0)
     {
         if (m_lines.size() == 0)
             m_lines.emplace_back();
@@ -12,7 +12,15 @@ Line &Output::line_at(const CursorPosition &position)
     }
     
     while (position.row() >= m_lines.size())
-        m_lines.emplace_back();
+    {
+        auto &last_line = m_lines.back();
+        auto attr = last_line.curr_attribute(last_line.length());
+
+        Line line;
+        if (attr)
+            line.set_attribute(0, *attr);
+        m_lines.push_back(line);
+    }
     
     return m_lines[position.row()];
 }
@@ -72,24 +80,27 @@ void Output::out(std::string_view buff)
         
         if (!escape_sequence)
         {
+            if (c == '\r')
+                continue;
+            
             if (c == '\n')
             {
+                line_at(m_cursor).mark_dirty();
                 m_cursor.move_by(0, 1);
                 m_cursor.move_to_begging_of_line();
+                line_at(m_cursor).mark_dirty();
             }
             else
             {
                 line_at(m_cursor).set(m_cursor.coloumn(), c);
                 m_cursor.move_by(1, 0);
-                
-                if (m_cursor.row() >= m_curr_frame_index + m_rows)
-                    scroll(m_cursor.row() - (m_curr_frame_index + m_rows - 1));
             }
             
+            if (m_cursor.row() >= m_curr_frame_index + m_rows)
+                scroll(m_cursor.row() - (m_curr_frame_index + m_rows - 1));
             continue;
         }
-        
-        std::cout << "Escape: " << *escape_sequence << "\n";
+
         switch (escape_sequence->type())
         {
             case Escape::Sequence::Attribute:

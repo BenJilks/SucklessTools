@@ -8,6 +8,9 @@
 
 struct XftPallet
 {
+    XftColor default_background;
+    XftColor default_foreground;
+    
     XftColor black;
     XftColor red;
     XftColor green;
@@ -41,6 +44,7 @@ private:
     
     int m_width { 0 };
     int m_height { 0 };
+    int m_depth { 0 };
     CursorPosition m_mouse_pos;
     
     // Xft
@@ -54,6 +58,7 @@ private:
     Visual *m_visual;
     Window m_window;
     Pixmap m_pixel_buffer;
+    GC m_gc;
     int m_screen;
     int m_color_map;
     

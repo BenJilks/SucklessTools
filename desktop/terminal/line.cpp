@@ -55,6 +55,22 @@ void Line::set_attribute(int coloumn, TerminalColor::Flags flag, bool enabled)
     m_attributes.push_back(std::make_pair(coloumn, attribute));
 }
 
+void Line::set_attribute(int coloumn, TerminalColor color)
+{
+    const auto *current = curr_attribute(coloumn);
+    
+    TerminalColor attribute;
+    if (current)
+        attribute = *current;
+    
+    // Copy all the attributes over
+    attribute.set_foreground(color.foreground());
+    attribute.set_background(color.background());
+    attribute.set_flag(TerminalColor::Bright, color.is(TerminalColor::Bright));
+    attribute.set_flag(TerminalColor::Clear, color.is(TerminalColor::Clear));
+    m_attributes.push_back(std::make_pair(coloumn, attribute));
+}
+
 const TerminalColor *Line::curr_attribute(int coloumn)
 {
     int max = 0;

@@ -2,6 +2,9 @@
 #include "../line.hpp"
 #include "../cursor.hpp"
 #include <string>
+#include <functional>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 class Output
 {
@@ -12,6 +15,9 @@ public:
     virtual std::string update() = 0;
     void out(std::string_view str);
 
+    // Hooks
+    std::function<void(struct winsize)> on_resize;
+    
 protected:
     virtual void redraw_all() = 0;
     virtual void draw_window() = 0;

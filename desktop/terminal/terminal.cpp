@@ -12,6 +12,15 @@ static bool wait_flag = false;
 Terminal::Terminal(Output &&output) 
     : m_output(output)
 {
+    output.on_resize = [&](auto size)
+    {
+        if (ioctl(m_master, TIOCSWINSZ, &size) < 0)
+        {
+            perror("ioctl(TIOCSWINSZ)");
+            return;
+        }
+    };
+    
     init();
     run_event_loop();
 }

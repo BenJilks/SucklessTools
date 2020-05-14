@@ -9,6 +9,10 @@ OBJ=main.o \
 	output/output.o \
 	output/xlib.o
 
+ifeq ($(PREFIX),)
+    PREFIX := /usr/local
+endif
+
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
@@ -19,3 +23,5 @@ clean:
 	$(RM) $(OBJ)
 	$(RM) terminal
 
+install:
+	install -m 755 terminal $(PREFIX)/bin/
