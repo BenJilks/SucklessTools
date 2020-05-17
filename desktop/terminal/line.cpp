@@ -1,88 +1,85 @@
 #include "line.hpp"
 #include <iostream>
 
-void Line::set(int coloumn, char c)
+const Rune &Line::operator[](int index)
 {
-    while (coloumn >= m_data.length())
-        m_data += ' ';
-    m_data[coloumn] = c;
-    
-    m_is_dirty = true;
+    if (index >= m_data.size())
+        set(index, ' ');
+    return m_data[index];
 }
 
-void Line::insert(int coloumn, char c)
+void Line::set(int column, uint32_t c)
 {
-    if (coloumn >= m_data.length())
-        set(coloumn, c);
-    
-    m_data.insert(coloumn, std::string(&c, 1));
-    m_is_dirty = true;
-}
-
-void Line::erase(int coloumn, int count)
-{
-    m_data.erase(coloumn, count);
-    m_is_dirty = true;
-}
-
-void Line::set_attribute(int coloumn, TerminalColor::Type type, TerminalColor::Named color)
-{
-    const auto *current = curr_attribute(coloumn);
-    
-    TerminalColor attribute;
-    if (current)
-        attribute = *current;
-    
-    switch (type)
+    while (column >= m_data.size())
     {
-        case TerminalColor::Foreground: attribute.set_foreground(color); break;
-        case TerminalColor::Background: attribute.set_background(color); break;
-        default: break;
+        TerminalColor attr;
+        if (m_data.size() > 0)
+            attr = m_data[m_data.size()-1].color;
+        m_data.push_back({ ' ', attr });
+    }
+    m_data[column].value = c;
+    
+    m_is_dirty = true;
+}
+
+void Line::insert(int column, uint32_t c)
+{
+    if (column >= m_data.size())
+    {
+        set(column, c);
+        return;
     }
     
-    m_attributes.push_back(std::make_pair(coloumn, attribute));
+    auto attr = m_data[column].color;
+    m_data.insert(m_data.begin() + column, { c, attr });
+    m_is_dirty = true;
 }
 
-void Line::set_attribute(int coloumn, TerminalColor::Flags flag, bool enabled)
+void Line::erase(int column, int count)
 {
-    const auto *current = curr_attribute(coloumn);
-    
-    TerminalColor attribute;
-    if (current)
-        attribute = *current;
-    
-    attribute.set_flag(flag, enabled);
-    m_attributes.push_back(std::make_pair(coloumn, attribute));
+    m_data.erase(m_data.begin() + column, m_data.begin() + column + count);
+    m_is_dirty = true;
 }
 
-void Line::set_attribute(int coloumn, TerminalColor color)
+void Line::modify_attribute(int column, std::function<void(TerminalColor&)> callback)
 {
-    const auto *current = curr_attribute(coloumn);
+    if (column >= m_data.size())
+        set(column, ' ');
     
-    TerminalColor attribute;
-    if (current)
-        attribute = *current;
-    
-    // Copy all the attributes over
-    attribute.set_foreground(color.foreground());
-    attribute.set_background(color.background());
-    attribute.set_flag(TerminalColor::Bright, color.is(TerminalColor::Bright));
-    attribute.set_flag(TerminalColor::Clear, color.is(TerminalColor::Clear));
-    m_attributes.push_back(std::make_pair(coloumn, attribute));
+    auto attr = m_data[column].color;
+    callback(attr);
+    m_data[column].color = attr;
 }
 
-const TerminalColor *Line::curr_attribute(int coloumn)
+void Line::set_attribute(int column, TerminalColor::Type type, TerminalColor::Named color)
 {
-    int max = 0;
-    const TerminalColor *max_attr = nullptr;
-    for (const auto &it : m_attributes)
+    modify_attribute(column, [&](TerminalColor &attr)
     {
-        if (it.first <= coloumn && it.first >= max)
+        switch (type)
         {
-            max = it.first;
-            max_attr = &it.second;
+            case TerminalColor::Foreground: attr.set_foreground(color); break;
+            case TerminalColor::Background: attr.set_background(color); break;
+            default: break;
         }
-    }
-    
-    return max_attr;
+    });
+}
+
+void Line::set_attribute(int column, TerminalColor::Flags flag, bool enabled)
+{
+    modify_attribute(column, [&](TerminalColor &attr)
+    {
+        attr.set_flag(flag, enabled);
+    });
+}
+
+void Line::set_attribute(int column, TerminalColor color)
+{
+    modify_attribute(column, [&](TerminalColor &attr)
+    {
+        // Copy all the attributes over
+        attr.set_foreground(color.foreground());
+        attr.set_background(color.background());
+        attr.set_flag(TerminalColor::Bright, color.is(TerminalColor::Bright));
+        attr.set_flag(TerminalColor::Clear, color.is(TerminalColor::Clear));
+    });
 }

@@ -18,8 +18,7 @@ XLibOutput::XLibOutput()
     m_width = 100;
     m_height = 100;
     m_screen = DefaultScreen(m_display);
-    m_depth = 32;//DefaultDepth(m_display, m_screen);
-    std::cout << "depth: " << m_depth << "\n";
+    m_depth = 32;
     
     XVisualInfo visual_info;
     if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
@@ -113,16 +112,16 @@ CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
         if (y >= curr_y && y <= curr_y + m_font->height)
         {
             // We've found the row, now find the coloumn
-            const auto &line = line_at(CursorPosition(0, row));
+            auto &line = line_at(CursorPosition(0, row));
             int curr_x = 0;
             
-            for (int coloumn = 0; coloumn < line.data().length(); coloumn++)
+            for (int coloumn = 0; coloumn < line.length(); coloumn++)
             {
-                int c = line.data()[coloumn];
+                auto rune = line[coloumn];
                 
                 XGlyphInfo extents;
                 XftTextExtentsUtf8(m_display, m_font, 
-                    (const FcChar8 *)&c, 1, &extents);
+                    (const FcChar8 *)&rune.value, 1, &extents);
                 
                 curr_x += extents.xOff;
                 if (x >= curr_x && x <= curr_x + extents.xOff)
@@ -379,7 +378,7 @@ void XLibOutput::draw_window()
                 line.mark_in_selection();
                 selection_start = line_selection_start(row);
                 selection_end = line_selection_end(row);
-                if (selection_start == 0 && selection_end == line.data().length())
+                if (selection_start == 0 && selection_end == line.length())
                     background_color = color.foreground_int();
             }
 
@@ -388,11 +387,10 @@ void XLibOutput::draw_window()
             XFillRectangle(m_display, m_pixel_buffer,
                 m_gc, 0, y - m_font->height + 4, m_width, m_font->height);
             
-            for (int column = 0; column < line.data().length(); column++)
+            for (int column = 0; column < line.length(); column++)
             {
-                auto attribute = line.curr_attribute(column);
-                if (attribute)
-                    color = *attribute;
+                const auto &rune = line[column];
+                color = rune.color;
                 
                 auto effective_color = color;
                 if (in_selection)
@@ -404,7 +402,7 @@ void XLibOutput::draw_window()
                 if (m_cursor.row() == row && m_cursor.coloumn() == column)
                     effective_color = color.inverted();
                 
-                char c = line.data()[column];
+                auto c = rune.value;
                 XGlyphInfo extents;
                 XftTextExtentsUtf8(m_display, m_font, 
                     (const FcChar8 *)&c, 1, &extents);
@@ -420,7 +418,7 @@ void XLibOutput::draw_window()
                 x += extents.xOff;
             }
             
-            if (m_cursor.row() == row && m_cursor.coloumn() == line.data().length())
+            if (m_cursor.row() == row && m_cursor.coloumn() == line.length())
             {
                 XSetForeground(m_display, m_gc, color.foreground_int());
                 XFillRectangle(m_display, m_pixel_buffer, m_gc, 

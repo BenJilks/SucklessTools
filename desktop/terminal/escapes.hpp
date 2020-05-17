@@ -12,12 +12,15 @@ namespace Escape
     public:
         virtual ~Sequence() {}
 
-        static std::unique_ptr<Sequence> parse(std::string_view str);
+        static std::unique_ptr<Sequence> interpret_sequence(
+            char command, std::vector<int> args, bool is_private);
         
         enum Type
         {
             Attribute,
             Cursor,
+            SetMode,
+            SetCursor,
             Insert,
             Delete,
             Clear,
@@ -25,14 +28,10 @@ namespace Escape
         };
         
         inline Type type() const { return m_type; }
-        inline int char_count() const { return m_char_count; }
 
     protected:
-        Sequence(Type type, int char_count) 
-            : m_char_count(char_count)
-            , m_type(type) {}
-        
-        int m_char_count;
+        Sequence(Type type) 
+            : m_type(type) {}
         
     private:
         Type m_type;
@@ -43,7 +42,7 @@ namespace Escape
     {
     public:
         Attribute()
-            : Sequence(Sequence::Attribute, 0) {}
+            : Sequence(Sequence::Attribute) {}
 
         inline void add(TerminalColor::Type type, TerminalColor::Named color) 
         { 
@@ -56,7 +55,6 @@ namespace Escape
         
         inline const auto &colors() const { return m_colors; }
         inline const auto &flags() const { return m_flags; }
-        inline void set_char_count(int count) { m_char_count = count; }
         
         virtual ~Attribute() {}
         
@@ -74,22 +72,16 @@ namespace Escape
             Left,
             Right,
             Up,
-            Down,
-
-            TopLeft,
-            Hide,
-            Show,
-            EnableAutoWrap,
-            DisableAutoWrap
+            Down
         };
         
-        Cursor(Direction direction, int char_count)
-            : Sequence(Sequence::Cursor, char_count)
+        Cursor(Direction direction)
+            : Sequence(Sequence::Cursor)
             , m_direction(direction)
             , m_amount(1) {}
 
-        Cursor(Direction direction, int amount, int char_count)
-            : Sequence(Sequence::Cursor, char_count)
+        Cursor(Direction direction, int amount)
+            : Sequence(Sequence::Cursor)
             , m_direction(direction)
             , m_amount(amount) {}
             
@@ -103,12 +95,6 @@ namespace Escape
                 case Right: return "Right";
                 case Up: return "Up";
                 case Down: return "Down";
-                
-                case TopLeft: return "TopLeft";
-                case Hide: return "Hide";
-                case Show: return "Show";
-                case EnableAutoWrap: return "EnableAutoWrap";
-                case DisableAutoWrap: return "DisableAutoWrap";
             }
             
             return "Unkown";
@@ -120,11 +106,52 @@ namespace Escape
 
     };
 
+    class SetMode : public Sequence
+    {
+    public:
+        enum Mode
+        {
+            CursorVisable,
+            CursorBlink,
+            AutoWrap
+        };
+        
+        SetMode(Mode mode, bool value)
+            : Sequence(Sequence::SetMode)
+            , m_mode(mode)
+            , m_value(value) {}
+        
+        inline Mode mode() const { return m_mode; }
+        inline bool value() const { return m_value; }
+        
+    private:
+        Mode m_mode;
+        bool m_value;
+        
+    };
+    
+    class SetCursor : public Sequence
+    {
+    public:
+        SetCursor(int coloumn, int row) 
+            : Sequence(Sequence::SetCursor)
+            , m_coloumn(coloumn)
+            , m_row(row) {}
+        
+        inline int coloumn() const { return m_coloumn; }
+        inline int row() const { return m_row; }
+        
+    private:
+        int m_coloumn { 0 };
+        int m_row { 0 };
+        
+    };
+
     class Insert : public Sequence
     {
     public:
-        Insert(int count, int char_count)
-            : Sequence(Sequence::Insert, char_count)
+        Insert(int count)
+            : Sequence(Sequence::Insert)
             , m_count(count) {}
 
         inline int count() const { return m_count; }
@@ -137,8 +164,8 @@ namespace Escape
     class Delete : public Sequence
     {
     public:
-        Delete(int count, int char_count)
-            : Sequence(Sequence::Delete, char_count)
+        Delete(int count)
+            : Sequence(Sequence::Delete)
             , m_count(count) {}
         
         inline int count() const { return m_count; }
@@ -159,8 +186,8 @@ namespace Escape
             Screen
         };
         
-        Clear(Mode mode, int char_count)
-            : Sequence(Sequence::Clear, char_count)
+        Clear(Mode mode)
+            : Sequence(Sequence::Clear)
             , m_mode(mode) {}
 
         inline Mode mode() const { return m_mode; }
@@ -174,7 +201,7 @@ namespace Escape
     {
     public:
         Bell()
-            : Sequence(Sequence::Bell, 0) {}
+            : Sequence(Sequence::Bell) {}
     };
 
 }

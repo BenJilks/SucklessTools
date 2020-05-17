@@ -1,6 +1,7 @@
 #pragma once
 #include "../line.hpp"
 #include "../cursor.hpp"
+#include "../decoder.hpp"
 #include <string>
 #include <functional>
 #include <termios.h>
@@ -22,6 +23,9 @@ protected:
     virtual void redraw_all() = 0;
     virtual void draw_window() = 0;
     virtual void scroll(int by) = 0;
+    void out_rune(uint32_t);
+    void out_escape(std::unique_ptr<Escape::Sequence>);
+
     Line &line_at(const CursorPosition &position);
     bool line_in_selection(int row);
     int line_selection_start(int row);
@@ -31,6 +35,9 @@ protected:
     CursorPosition m_cursor;
     int m_rows { 1024 };
     int m_curr_frame_index { 0 };
+    
+    Decoder m_decoder;
+    int m_insert_count { 0 };
 
     bool m_in_selection { false };
     bool m_has_selection { false };

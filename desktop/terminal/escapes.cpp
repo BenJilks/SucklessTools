@@ -4,25 +4,6 @@
 #include <vector>
 using namespace Escape;
 
-static std::optional<int> parse_number(std::string_view str, int &index)
-{
-    std::string num;
-    while (index < str.length())
-    {
-        char c = str[index];
-        if (!std::isdigit(c))
-            break;
-        
-        num += c;
-        index += 1;
-    }
-
-    if (num.length() == 0)
-        return std::nullopt;
-    
-    return std::atoi(num.c_str());
-}
-
 enum class ColorTypeFlags
 {
     Forground = 0x1 << 0,
@@ -70,175 +51,95 @@ static void decode_attribute_number(std::unique_ptr<Attribute> &attr, int num)
     }
 }
 
-static std::unique_ptr<Sequence> parse_private(std::string_view str, int &index)
+std::unique_ptr<Sequence> Sequence::interpret_sequence(
+    char command, std::vector<int> args, bool is_private)
 {
-    index += 1;
-    auto num = parse_number(str, index);
-    if (!num)
-        return nullptr;
+    auto argc = args.size();
     
-    switch (*num)
+    if (is_private)
     {
-        case 7:
-            switch (str[index])
-            {
-                case 'h': return std::make_unique<Escape::Cursor>(Escape::Cursor::EnableAutoWrap, index);
-                case 'l': return std::make_unique<Escape::Cursor>(Escape::Cursor::DisableAutoWrap, index);
-                default: break;
-            }
-            break;
-        
-        case 25:
-            switch (str[index])
-            {
-                case 'h': return std::make_unique<Escape::Cursor>(Escape::Cursor::Show, index);
-                case 'l': return std::make_unique<Escape::Cursor>(Escape::Cursor::Hide, index);
-                default: break;
-            }
-            break;
-        
-        default:
-            std::cout << "Unkown mode " << *num << " = " << 
-                (str[index] == 'h' ? "enable" : "disable") << "\n";
-            break;
-    }
-    
-    return nullptr;
-}
-
-std::unique_ptr<Sequence> Sequence::parse(std::string_view str)
-{
-    if (str.length() < 3 || (str[0] != '\033' && str[1] != '['))
-    {
-        if (str.length() >= 1)
-        {
-            switch (str[0])
-            {
-                case 7: return std::make_unique<Escape::Bell>();
-                case 8: return std::make_unique<Escape::Cursor>(Escape::Cursor::Left, 0);
-                default: break;
-            }
-        }
-        return nullptr;
-    }
-    
-    int index = 2;
-    auto first_num = parse_number(str, index);
-    if (!first_num)
-    {
-        if (index >= str.length())
+        if (command != 'h' && command != 'l')
+            return nullptr;
+        if (argc != 1)
             return nullptr;
         
-        switch (str[index])
+        bool enabled = (command == 'h');
+        switch (args[0])
         {
-            case 'K': return std::make_unique<Escape::Clear>(Escape::Clear::CursorToLineEnd, 2);
-            case 'H': return std::make_unique<Escape::Cursor>(Escape::Cursor::TopLeft, 2);
-            case 'A': return std::make_unique<Escape::Cursor>(Escape::Cursor::Up, 2);
-            case 'B': return std::make_unique<Escape::Cursor>(Escape::Cursor::Down, 2);
-            case 'C': return std::make_unique<Escape::Cursor>(Escape::Cursor::Left, 2);
-            case 'D': return std::make_unique<Escape::Cursor>(Escape::Cursor::Right, 2);
-            case '?':
-            {
-                auto private_escape = parse_private(str, index);
-                if (private_escape)
-                    return private_escape;
-                
-                break;
-            }
-            default: break;
+            case 7: 
+                return std::make_unique<Escape::SetMode>(
+                    SetMode::AutoWrap, enabled);
+            case 12: 
+                return std::make_unique<Escape::SetMode>(
+                    SetMode::CursorBlink, enabled);
+            case 25: 
+                return std::make_unique<Escape::SetMode>(
+                    SetMode::CursorVisable, enabled);
+            default: return nullptr;
         }
-        return nullptr;
     }
-    
-    if (index < str.length())
+    else
     {
-        char c = str[index];
-        switch (c)
+        switch (command)
         {
-            case 'm': 
-            {
-                auto attr = std::make_unique<Escape::Attribute>();
-                decode_attribute_number(attr, *first_num);
-                attr->set_char_count(index);
-                return std::move(attr);
-            }
+            case 'K': 
+                return std::make_unique<Escape::Clear>(
+                    Clear::CursorToLineEnd);
+            case 'A': 
+                return std::make_unique<Escape::Cursor>(
+                    Cursor::Up, argc ? args[0] : 1);
+            case 'B': 
+                return std::make_unique<Escape::Cursor>(
+                    Cursor::Down, argc ? args[0] : 1);
+            case 'C': 
+                return std::make_unique<Escape::Cursor>(
+                    Cursor::Right, argc ? args[0] : 1);
+            case 'D': 
+                return std::make_unique<Escape::Cursor>(
+                    Cursor::Left, argc ? args[0] : 1);
+            case '@': 
+                return std::make_unique<Escape::Insert>(
+                    argc ? args[0] : 1);
+            case 'P': 
+                return std::make_unique<Escape::Delete>(
+                    argc ? args[0] : 1);
             
-            case ';':
+            case 'H': 
             {
-                auto attr = std::make_unique<Escape::Attribute>();
-                decode_attribute_number(attr, *first_num);
-                
-                while (str[index] == ';')
-                {
-                    auto num = parse_number(str, ++index);
-                    if (!num || index > str.length())
-                        break;
-                    decode_attribute_number(attr, *num);
-                }
-                
-                if (str[index] != 'm')
+                if (argc > 2)
                     return nullptr;
                 
-                attr->set_char_count(index);
-                return std::move(attr);
+                auto rows = argc >= 1 ? args[0] : 0;
+                auto coloumns = argc >= 2 ? args[1] : 0;
+                return std::make_unique<Escape::SetCursor>(
+                    coloumns, rows);
             }
             
-            case '@':
+            case 'J': 
             {
-                return std::make_unique<Escape::Insert>(
-                    *first_num, index);
-            }
-            
-            case 'P':
-            {
-                return std::make_unique<Escape::Delete>(
-                    *first_num, index);
-            }
-            
-            case 'J':
-            {
-                switch (*first_num)
+                if (argc <= 0)
+                    return nullptr;
+                
+                Clear::Mode mode;
+                switch (args[0])
                 {
-                    case 2: 
-                        return std::make_unique<Escape::Clear>(
-                            Escape::Clear::Screen, index);
-                        break;
-                        
-                    default: 
-                        break;
+                    case 2: mode = Clear::Screen; break;
+                    default: return nullptr;
                 }
+
+                return std::make_unique<Escape::Clear>(mode);
             }
             
-            case 'A':
+            case 'm':
             {
-                return std::make_unique<Escape::Cursor>(
-                    Escape::Cursor::Up, *first_num, index);
+                auto attribute = std::make_unique<Escape::Attribute>();
+                for (int num : args)
+                    decode_attribute_number(attribute, num);
+                return std::move(attribute);
             }
-
-            case 'B':
-            {
-                return std::make_unique<Escape::Cursor>(
-                    Escape::Cursor::Down, *first_num, index);
-            }
-
-            case 'C':
-            {
-                return std::make_unique<Escape::Cursor>(
-                    Escape::Cursor::Right, *first_num, index);
-            }
-
-            case 'D':
-            {
-                return std::make_unique<Escape::Cursor>(
-                    Escape::Cursor::Left, *first_num, index);
-            }
-
-            default:
-                break;
         }
     }
     
-    std::cout << "FIXME: escapes.cpp: parse: Add single number parsing here\n";
     return nullptr;
 }
 
@@ -253,6 +154,20 @@ std::ostream &operator<<(std::ostream &stream, const Sequence& sequence)
             break;
         }
 
+        case Sequence::SetMode:
+        {
+            auto set_mode = static_cast<const SetMode&>(sequence);
+            stream << "SetMode(mode = " << set_mode.mode() << ", value = " << set_mode.value() << ")";
+            break;
+        }
+
+        case Sequence::SetCursor:
+        {
+            auto set_cursor = static_cast<const SetCursor&>(sequence);
+            stream << "SetCursor(coloumn = " << set_cursor.coloumn() << ", row = " << set_cursor.row() << ")";
+            break;
+        }
+        
         case Sequence::Cursor: 
         {
             auto cursor = static_cast<const Cursor&>(sequence);

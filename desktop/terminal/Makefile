@@ -1,11 +1,12 @@
 CC=g++
-CXXFLAGS=-std=c++17 -I/usr/include/freetype2 -O2
+CXXFLAGS=-std=c++17 -I/usr/include/freetype2 -g
 LINKFLAGS=-lutil -lX11 -lXft
 OBJ=main.o \
 	terminal.o \
 	escapes.o \
 	line.o \
 	color.o \
+	decoder.o \
 	output/output.o \
 	output/xlib.o
 
