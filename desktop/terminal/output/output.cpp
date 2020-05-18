@@ -116,10 +116,14 @@ void Output::out_escape(Escape::Sequence &escape_sequence)
         case Escape::Sequence::Type::Attribute:
         {
             auto attributes = escape_sequence.attribute();
-            for (const auto &color : attributes.colors())
-                set_attribute(m_cursor, color.first, color.second);
-            for (const auto &flag : attributes.flags())
-                set_attribute(m_cursor, flag.first, flag.second);
+            attributes.for_each_color([this](auto type, auto color)
+            {
+                set_attribute(m_cursor, type, color);
+            });
+            attributes.for_each_flag([this](auto flag, auto value)
+            {
+                set_attribute(m_cursor, flag, value);
+            });
             break;
         }
         

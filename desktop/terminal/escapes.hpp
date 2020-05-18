@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <functional>
 
 namespace Escape
 {
@@ -16,19 +17,40 @@ namespace Escape
 
         inline void add(TerminalColor::Type type, TerminalColor::Named color) 
         { 
-            m_colors.push_back(std::make_pair(type, color));
+            switch (type)
+            {
+                case TerminalColor::Foreground: m_foreground = color; break;
+                case TerminalColor::Background: m_background = color; break;
+                default: break;
+            }
         }
         inline void add(TerminalColor::Flags flag, bool enabled) 
-        { 
-            m_flags.push_back(std::make_pair(flag, enabled));
+        {
+            switch (flag)
+            {
+                case TerminalColor::Bright: m_flag_bright = enabled; break;
+                case TerminalColor::Clear: m_flag_clear = enabled; break;
+                default: break;
+            }
         }
         
-        inline const auto &colors() const { return m_colors; }
-        inline const auto &flags() const { return m_flags; }
+        inline void for_each_color(std::function<void(TerminalColor::Type, TerminalColor::Named)> callback) const
+        {
+            if (m_foreground) callback(TerminalColor::Foreground, *m_foreground);
+            if (m_background) callback(TerminalColor::Background, *m_background);
+        }
+
+        inline void for_each_flag(std::function<void(TerminalColor::Flags, bool)> callback) const
+        {
+            if (m_flag_bright) callback(TerminalColor::Bright, *m_flag_bright);
+            if (m_flag_clear) callback(TerminalColor::Clear, *m_flag_clear);
+        }
         
     private:
-        std::vector<std::pair<TerminalColor::Type, TerminalColor::Named>> m_colors;
-        std::vector<std::pair<TerminalColor::Flags, bool>> m_flags;
+        std::optional<TerminalColor::Named> m_foreground { std::nullopt };
+        std::optional<TerminalColor::Named> m_background { std::nullopt };
+        std::optional<bool> m_flag_bright { std::nullopt };
+        std::optional<bool> m_flag_clear { std::nullopt };
 
     };
 
