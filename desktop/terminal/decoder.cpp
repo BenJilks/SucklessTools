@@ -1,4 +1,5 @@
 #include "decoder.hpp"
+#include <optional>
 
 Decoder::Result Decoder::parse(char c)
 {
@@ -19,21 +20,14 @@ Decoder::Result Decoder::parse(char c)
                         break;
                     
                     case 7:
-                        return
-                        {
-                            Result::Escape,
-                            std::make_unique<Escape::Bell>()
-                        };
-                        break;
+                        return { Result::Escape, Escape::Bell() };
 
                     case 8:
                         return
                         {
                             Result::Escape,
-                            std::make_unique<Escape::Cursor>(
-                                Escape::Cursor::Left, 1)
+                            Escape::Cursor(Escape::Cursor::Left, 1)
                         };
-                        break;
                     
                     default:
                         return { Result::Rune, c };
@@ -89,13 +83,13 @@ Decoder::Result Decoder::parse(char c)
             {
                 m_state = State::Ascii;
                 
-                auto sequence = Escape::Sequence::interpret_sequence(
+                auto sequence = Escape::interpret_sequence(
                     c, m_current_args, 
                     m_current_is_private);
                 if (!sequence)
                     break;
                 
-                return { Result::Escape, std::move(sequence) };
+                return { Result::Escape, std::move(*sequence) };
             }
         }
     } while (!should_consume);

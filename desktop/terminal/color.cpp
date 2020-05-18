@@ -1,5 +1,12 @@
 #include "color.hpp"
 
+bool TerminalColor::operator== (const TerminalColor &other) const
+{
+    return m_foreground == other.m_foreground &&
+           m_background == other.m_background &&
+           m_flags == other.m_flags;
+}
+
 TerminalColor TerminalColor::inverted() const
 {
     return TerminalColor(m_background, m_foreground, m_flags);

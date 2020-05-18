@@ -25,7 +25,7 @@ public:
         };
 
         Type type;
-        std::variant<uint32_t, std::unique_ptr<Escape::Sequence>> value;
+        std::variant<uint32_t, Escape::Sequence> value;
     };
     
     Decoder() {}

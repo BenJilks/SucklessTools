@@ -97,23 +97,35 @@ void Output::out_rune(uint32_t rune)
         scroll(m_cursor.row() - (m_curr_frame_index + m_rows - 1));
 }
 
-void Output::out_escape(std::unique_ptr<Escape::Sequence> escape_sequence)
+void Output::set_attribute(const CursorPosition& pos, TerminalColor::Type type, TerminalColor::Named color)
 {
-    switch (escape_sequence->type())
+    auto &line = line_at(m_cursor);
+    line.set_attribute(m_cursor.coloumn(), type, color);
+}
+
+void Output::set_attribute(const CursorPosition&, TerminalColor::Flags flag, bool value)
+{
+    auto &line = line_at(m_cursor);
+    line.set_attribute(m_cursor.coloumn(), flag, value);
+}
+
+void Output::out_escape(Escape::Sequence &escape_sequence)
+{
+    switch (escape_sequence.type())
     {
-        case Escape::Sequence::Attribute:
+        case Escape::Sequence::Type::Attribute:
         {
-            auto attributes = static_cast<Escape::Attribute&>(*escape_sequence);
+            auto attributes = escape_sequence.attribute();
             for (const auto &color : attributes.colors())
-                line_at(m_cursor).set_attribute(m_cursor.coloumn(), color.first, color.second);
+                set_attribute(m_cursor, color.first, color.second);
             for (const auto &flag : attributes.flags())
-                line_at(m_cursor).set_attribute(m_cursor.coloumn(), flag.first, flag.second);              
+                set_attribute(m_cursor, flag.first, flag.second);
             break;
         }
         
-        case Escape::Sequence::Cursor:
+        case Escape::Sequence::Type::Cursor:
         {
-            auto cursor = static_cast<Escape::Cursor&>(*escape_sequence);
+            auto cursor = escape_sequence.cursor();
             switch (cursor.direction())
             {
                 case Escape::Cursor::Up:
@@ -139,9 +151,9 @@ void Output::out_escape(std::unique_ptr<Escape::Sequence> escape_sequence)
             break;
         }
         
-        case Escape::Sequence::SetCursor:
+        case Escape::Sequence::Type::SetCursor:
         {
-            auto set_cursor = static_cast<Escape::SetCursor&>(*escape_sequence);
+            auto set_cursor = escape_sequence.set_cursor();
             auto column = std::max(set_cursor.coloumn() - 1, 0);
             auto row = std::max(set_cursor.row() - 1, 0);
             
@@ -149,23 +161,23 @@ void Output::out_escape(std::unique_ptr<Escape::Sequence> escape_sequence)
             break;
         }
         
-        case Escape::Sequence::Insert:
+        case Escape::Sequence::Type::Insert:
         {
-            auto insert = static_cast<Escape::Insert&>(*escape_sequence);
+            auto insert = escape_sequence.insert();
             m_insert_count = insert.count();
             break;
         }
         
-        case Escape::Sequence::Delete:
+        case Escape::Sequence::Type::Delete:
         {
-            auto del = static_cast<Escape::Delete&>(*escape_sequence);
+            auto del = escape_sequence.delete_();
             line_at(m_cursor).erase(m_cursor.coloumn() - del.count() + 1, del.count());
             break;
         }
         
-        case Escape::Sequence::Clear:
+        case Escape::Sequence::Type::Clear:
         {
-            auto clear = static_cast<Escape::Clear&>(*escape_sequence);
+            auto clear = escape_sequence.clear();
             
             switch (clear.mode())
             {
@@ -218,8 +230,8 @@ void Output::out(std::string_view buff)
             case Decoder::Result::Rune: out_rune(std::get<uint32_t>(result.value)); break;
             case Decoder::Result::Escape:
             {
-                auto &sequence = std::get<std::unique_ptr<Escape::Sequence>>(result.value);
-                out_escape(std::move(sequence)); 
+                auto &sequence = std::get<Escape::Sequence>(result.value);
+                out_escape(sequence);
                 break;
             }
             default: break;

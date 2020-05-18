@@ -8,6 +8,26 @@ const Rune &Line::operator[](int index)
     return m_data[index];
 }
 
+const Rune &Line::first() const
+{
+    static Rune blank = { ' ' };
+
+    if (m_data.size() <= 0)
+        return blank;
+    
+    return m_data[0];
+}
+
+const Rune &Line::last() const
+{
+    static Rune blank = { ' ' };
+
+    if (m_data.size() <= 0)
+        return blank;
+    
+    return m_data.back();
+}
+
 void Line::set(int column, uint32_t c)
 {
     while (column >= m_data.size())
@@ -47,8 +67,16 @@ void Line::modify_attribute(int column, std::function<void(TerminalColor&)> call
         set(column, ' ');
     
     auto attr = m_data[column].color;
+    auto original = attr;
     callback(attr);
+
     m_data[column].color = attr;
+    for (int i = column; i < m_data.size(); i++)
+    {
+        // Cascade this change down the rest of the line
+        if (m_data[i].color == original)
+            m_data[i].color = attr;
+    }
 }
 
 void Line::set_attribute(int column, TerminalColor::Type type, TerminalColor::Named color)

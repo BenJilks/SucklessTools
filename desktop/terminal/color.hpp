@@ -27,6 +27,9 @@ public:
         Clear = 1 << 1
     };
 
+    bool operator== (const TerminalColor &other) const;
+    bool operator!= (const TerminalColor &other) const { return !(*this == other); };
+    
     TerminalColor(Named foreground, Named background, int flags = 0)
         : m_foreground(foreground)
         , m_background(background)
@@ -53,7 +56,7 @@ public:
     int foreground_int() const;
     int background_int() const;
     std::string name() const;
-
+    
 private:
     Named m_foreground, m_background;
     int m_flags;

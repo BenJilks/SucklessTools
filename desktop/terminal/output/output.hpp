@@ -24,7 +24,9 @@ protected:
     virtual void draw_window() = 0;
     virtual void scroll(int by) = 0;
     void out_rune(uint32_t);
-    void out_escape(std::unique_ptr<Escape::Sequence>);
+    void out_escape(Escape::Sequence&);
+    void set_attribute(const CursorPosition&, TerminalColor::Type, TerminalColor::Named);
+    void set_attribute(const CursorPosition&, TerminalColor::Flags, bool);
 
     Line &line_at(const CursorPosition &position);
     bool line_in_selection(int row);

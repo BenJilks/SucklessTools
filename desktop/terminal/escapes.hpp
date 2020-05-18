@@ -3,46 +3,16 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <optional>
 
 namespace Escape
 {
 
-    class Sequence
+    class Attribute
     {
     public:
-        virtual ~Sequence() {}
-
-        static std::unique_ptr<Sequence> interpret_sequence(
-            char command, std::vector<int> args, bool is_private);
-        
-        enum Type
-        {
-            Attribute,
-            Cursor,
-            SetMode,
-            SetCursor,
-            Insert,
-            Delete,
-            Clear,
-            Bell
-        };
-        
-        inline Type type() const { return m_type; }
-
-    protected:
-        Sequence(Type type) 
-            : m_type(type) {}
-        
-    private:
-        Type m_type;
-
-    };
-
-    class Attribute : public Sequence
-    {
-    public:
-        Attribute()
-            : Sequence(Sequence::Attribute) {}
+        Attribute() {}
+        ~Attribute() = default;
 
         inline void add(TerminalColor::Type type, TerminalColor::Named color) 
         { 
@@ -56,15 +26,13 @@ namespace Escape
         inline const auto &colors() const { return m_colors; }
         inline const auto &flags() const { return m_flags; }
         
-        virtual ~Attribute() {}
-        
     private:
         std::vector<std::pair<TerminalColor::Type, TerminalColor::Named>> m_colors;
         std::vector<std::pair<TerminalColor::Flags, bool>> m_flags;
 
     };
 
-    class Cursor : public Sequence
+    class Cursor
     {
     public:
         enum Direction
@@ -76,13 +44,11 @@ namespace Escape
         };
         
         Cursor(Direction direction)
-            : Sequence(Sequence::Cursor)
-            , m_direction(direction)
+            : m_direction(direction)
             , m_amount(1) {}
 
         Cursor(Direction direction, int amount)
-            : Sequence(Sequence::Cursor)
-            , m_direction(direction)
+            : m_direction(direction)
             , m_amount(amount) {}
             
         inline Direction direction() const { return m_direction; }
@@ -106,7 +72,7 @@ namespace Escape
 
     };
 
-    class SetMode : public Sequence
+    class SetMode
     {
     public:
         enum Mode
@@ -117,8 +83,7 @@ namespace Escape
         };
         
         SetMode(Mode mode, bool value)
-            : Sequence(Sequence::SetMode)
-            , m_mode(mode)
+            : m_mode(mode)
             , m_value(value) {}
         
         inline Mode mode() const { return m_mode; }
@@ -130,12 +95,11 @@ namespace Escape
         
     };
     
-    class SetCursor : public Sequence
+    class SetCursor
     {
     public:
         SetCursor(int coloumn, int row) 
-            : Sequence(Sequence::SetCursor)
-            , m_coloumn(coloumn)
+            : m_coloumn(coloumn)
             , m_row(row) {}
         
         inline int coloumn() const { return m_coloumn; }
@@ -147,12 +111,11 @@ namespace Escape
         
     };
 
-    class Insert : public Sequence
+    class Insert
     {
     public:
         Insert(int count)
-            : Sequence(Sequence::Insert)
-            , m_count(count) {}
+            : m_count(count) {}
 
         inline int count() const { return m_count; }
         
@@ -161,12 +124,11 @@ namespace Escape
         
     };
 
-    class Delete : public Sequence
+    class Delete
     {
     public:
         Delete(int count)
-            : Sequence(Sequence::Delete)
-            , m_count(count) {}
+            : m_count(count) {}
         
         inline int count() const { return m_count; }
             
@@ -175,7 +137,7 @@ namespace Escape
         
     };
 
-    class Clear : public Sequence
+    class Clear
     {
     public:
         enum Mode
@@ -187,8 +149,7 @@ namespace Escape
         };
         
         Clear(Mode mode)
-            : Sequence(Sequence::Clear)
-            , m_mode(mode) {}
+            : m_mode(mode) {}
 
         inline Mode mode() const { return m_mode; }
         
@@ -197,13 +158,92 @@ namespace Escape
 
     };
 
-    class Bell : public Sequence
+    class Bell
     {
     public:
-        Bell()
-            : Sequence(Sequence::Bell) {}
+        Bell() {}
     };
 
+    class Sequence
+    {
+    public:
+        enum class Type
+        {
+            Attribute,
+            Cursor,
+            SetMode,
+            SetCursor,
+            Insert,
+            Delete,
+            Clear,
+            Bell
+        };
+
+        Sequence(Attribute v) 
+            : m_type(Type::Attribute)
+            , m_attribute(v) {}
+
+        Sequence(Cursor v) 
+            : m_type(Type::Cursor)
+            , m_cursor(v) {}
+
+        Sequence(SetMode v) 
+            : m_type(Type::SetMode)
+            , m_set_mode(v) {}
+        
+        Sequence(SetCursor v) 
+            : m_type(Type::SetCursor)
+            , m_set_cursor(v) {}
+        
+        Sequence(Insert v) 
+            : m_type(Type::Insert)
+            , m_insert(v) {}
+            
+        Sequence(Delete v) 
+            : m_type(Type::Delete)
+            , m_delete(v) {}
+        
+        Sequence(Clear v) 
+            : m_type(Type::Clear)
+            , m_clear(v) {}
+        
+        Sequence(Bell v) 
+            : m_type(Type::Bell)
+            , m_bell(v) {}
+        
+        Sequence(const Sequence &other);
+        
+        ~Sequence() {}
+        
+        inline Type type() const { return m_type; }
+        inline const Attribute &attribute() const { return m_attribute; }
+        inline const Cursor &cursor() const { return m_cursor; }
+        inline const SetMode &set_mode() const { return m_set_mode; }
+        inline const SetCursor &set_cursor() const { return m_set_cursor; }
+        inline const Insert &insert() const { return m_insert; }
+        inline const Delete &delete_() const { return m_delete; }
+        inline const Clear &clear() const { return m_clear; }
+        inline const Bell &bell() const { return m_bell; }
+        
+    private:
+        Type m_type;
+        union
+        {
+            Attribute m_attribute;
+            Cursor m_cursor;
+            SetMode m_set_mode;
+            SetCursor m_set_cursor;
+            Insert m_insert;
+            Delete m_delete;
+            Clear m_clear;
+            Bell m_bell;
+        };
+
+    };
+    
+    std::optional<Sequence> interpret_sequence(char command, 
+        std::vector<int> args, bool is_private);
+    
 }
 
 std::ostream &operator<<(std::ostream &stream, const Escape::Sequence& sequence);

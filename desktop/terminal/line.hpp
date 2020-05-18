@@ -21,6 +21,8 @@ public:
     const auto begin() const { return m_data.begin(); }
     const auto end() const { return m_data.end(); }
     const Rune &operator[](int index);
+    const Rune &first() const;
+    const Rune &last() const;
     
     void set(int column, uint32_t c);
     void insert(int column, uint32_t c);
