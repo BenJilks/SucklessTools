@@ -13,6 +13,10 @@ OBJ=shell.o \
 	modules/alias.o \
 	main.o
 
+ifeq ($(PREFIX),)
+    PREFIX := /usr/local
+endif
+
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
@@ -22,3 +26,6 @@ all: $(OBJ)
 clean:
 	$(RM) $(OBJ)
 	$(RM) shell
+
+install:
+	install -m 755 shell $(PREFIX)/bin/

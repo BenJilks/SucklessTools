@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <iostream>
+#include <sstream>
 
 #define READ 		0
 #define WRITE 		1
@@ -36,6 +37,32 @@ std::pair<std::string, std::string> Command::parse_assignment(Lexer &lexer)
 
 	return std::make_pair(name, value);
 }
+
+static std::string parse_glob(const std::string &glob)
+{
+	return "";
+}
+
+class StdOutCapture
+{
+public:
+	StdOutCapture()
+	{
+		_stdout = std::cout.rdbuf(stream.rdbuf());
+	}
+
+	inline const std::string str() const { return stream.str(); }
+
+	~StdOutCapture()
+	{
+		std::cout.rdbuf(_stdout);
+	}
+
+private:
+	std::ostringstream stream;
+	std::streambuf *_stdout;
+
+};
 
 std::unique_ptr<Command> Command::parse_exec(Lexer &lexer)
 {
@@ -70,6 +97,17 @@ std::unique_ptr<Command> Command::parse_exec(Lexer &lexer)
 			case Token::Type::VariableAssignment:
 				assignments.push_back(parse_assignment(lexer));
 				break;
+
+			case Token::Type::SubCommand:
+			{
+				auto source = lexer.consume(Token::Type::SubCommand)->data;
+				auto sub_command = parse(source);
+
+				StdOutCapture capture;
+				sub_command->execute();
+				arguments.push_back(capture.str());
+				break;
+			}
 
 			case Token::Type::Name: 
 				if (!has_command)
@@ -212,10 +250,7 @@ int CommandExec::execute()
 		exit(-1);
 	}
 
-	int status;
-	waitpid(pid, &status, 0);
-
-	return status;
+	return Shell::the().foreground(pid);
 }
 
 void CommandExec::execute_and_exit()
@@ -261,9 +296,7 @@ int CommandPipe::execute()
 		exit(-1);
 	}
 
-	int status;
-	waitpid(pid, &status, 0);
-	return status;
+	return Shell::the().foreground(pid);
 }
 
 void CommandPipe::execute_and_exit()

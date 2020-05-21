@@ -61,7 +61,7 @@ std::string Lexer::parse_string()
 	}
 
 	pointer += 1; // Skip "
-	return parse_escapes(buffer);
+	return buffer;
 }
 
 std::optional<Token> Lexer::parse_name()
@@ -75,13 +75,20 @@ std::optional<Token> Lexer::parse_name()
 		if (std::isspace(c) || c == ';' || c == '|')
 			break;
 
-		if (c == '=')
-			type = Token::Type::VariableAssignment;
-
-		if (c == '"')
+		switch (c)
 		{
-			auto str = parse_string();
-			buffer += str;
+			case '=':
+				type = Token::Type::VariableAssignment;
+				break;
+
+			case '*':
+				type = Token::Type::Glob;
+				break;
+		}
+
+		if (c ==  '"')
+		{
+			buffer += parse_string();
 			break;
 		}
 
@@ -92,7 +99,7 @@ std::optional<Token> Lexer::parse_name()
 			break;
 	}
 
-	return Token {parse_escapes(buffer), type};
+	return Token { parse_escapes(buffer), type };
 }
 
 std::optional<Token> Lexer::peek(int count)
@@ -163,10 +170,30 @@ std::optional<Token> Lexer::parse_double_token(
 	return Token { buffer, a };
 }
 
-std::optional<Token> Lexer::parse_variable()
+std::optional<Token> Lexer::parse_sub_command()
 {
-	// Skip '$'
-	pointer += 1;
+	pointer += 1; // Skip '('
+
+	std::string buffer;
+	while (pointer < source.length())
+	{
+		char c = source[pointer];
+		if (c == ')')
+			break;
+
+		buffer += c;
+		pointer += 1;
+	}
+
+	pointer += 1; // Skip ')'
+	return Token { buffer, Token::Type::SubCommand };
+}
+
+std::optional<Token> Lexer::parse_variable()
+{	
+	pointer += 1; // Skip '$'
+	if (source[pointer] == '(')
+		return parse_sub_command();
 
 	bool braced = false;
 	if (source[pointer] == '{')

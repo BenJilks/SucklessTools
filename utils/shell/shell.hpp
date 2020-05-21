@@ -17,8 +17,8 @@ public:
 	void run_script(const std::string &file_path);
 	void exit();
 
-	void disable_echo();
-	void enable_echo();
+	int foreground(pid_t);
+	void handle_int_signal();
 
 	std::string simplify_path(const std::string &path);
 	std::string expand_path(const std::string &path);
@@ -41,11 +41,19 @@ public:
 private:
 	void exec_line(const std::string &line);
 	std::string substitute_variables(const std::string &);
+    char next_char();
+
+	std::string line;
+	int cursor;
+
+	std::vector<pid_t> bg_processes;
+	pid_t fg_process { -1 };
 
 	std::map<std::string, std::string> env_buffer;
 	std::vector<std::string> command_history;
 	std::vector<std::unique_ptr<Module>> modules;
-	std::string home;
-	bool should_exit;
+	std::string home { "/" };
+	bool should_exit { false };
+	bool cancel_line { false };
 };
 

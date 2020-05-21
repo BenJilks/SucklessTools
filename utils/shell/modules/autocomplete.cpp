@@ -2,9 +2,12 @@
 #include "../shell.hpp"
 #include <filesystem>
 #include <iostream>
+#include <algorithm>
+#include <sys/ioctl.h>
+#include <unistd.h>
 namespace fs = std::filesystem;
 
-std::string find_name(const std::string &str)
+static std::string find_name(const std::string &str)
 {
 	int last_slash_index = 0;
 	for (int i = str.length() - 1; i >= 0; i--)
@@ -17,6 +20,32 @@ std::string find_name(const std::string &str)
 	}
 
 	return str.substr(last_slash_index, str.length() - last_slash_index);
+}
+
+static std::string print_grid(const std::vector<std::string> &strs)
+{
+	size_t max_len = 0;
+	for (const auto &str : strs)
+		max_len = std::max(str.length(), max_len);
+	max_len += 2;
+
+	struct winsize size;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
+	int coloumn_count = size.ws_col / max_len;
+
+	std::stringstream stream;
+	for (int i = 0; i < strs.size(); i++)
+	{
+		const auto &str = strs[i];
+		stream << str;
+		for (int j = 0; j < max_len - str.length(); j++)
+			stream << " ";
+
+		if ((i + 1) % coloumn_count == 0)
+			stream << "\n";
+	}
+
+	return stream.str();
 }
 
 bool AutoCompleteModule::hook_input(char c, 
@@ -89,11 +118,13 @@ bool AutoCompleteModule::hook_input(char c,
 
 	if (patch.empty())
 	{
-		if (options.size() > 0)
+		if (options.size() > 1)
 		{
-			std::string suggestions;
-			for (const auto &option : options)
-				suggestions += find_name(option) + " ";
+			std::vector<std::string> names;
+			for (const auto &path : options)
+				names.push_back(find_name(path));
+
+			std::string suggestions = print_grid(names);
 			message(suggestions);
 		}
 	}

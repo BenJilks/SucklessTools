@@ -43,6 +43,15 @@ bool AliasModule::hook_macro(std::string &line)
 		auto start = std::string_view(line.c_str(), alias.length());
 		if (start == alias)
 		{
+			if (line.length() == alias.length())
+			{
+				line = value.second;
+				return true;
+			}
+
+			if (line[alias.length()] != ' ')
+				return false;
+
 			line = value.second + line.substr(
 				alias.length(), line.length() - alias.length());
 			return true;

@@ -7,11 +7,12 @@
 #include <termios.h>
 #include <pwd.h>
 #include <unistd.h>
-
-Shell shell;
+#include <sys/wait.h>
+#include <csignal>
 
 Shell &Shell::the()
 {
+    static Shell shell;
 	return shell;
 }
 
@@ -21,28 +22,48 @@ Shell::Shell()
 	home = std::string(pw->pw_dir);
 }
 
-void Shell::disable_echo()
+void Shell::handle_int_signal()
 {
-	struct termios config;
-	if (tcgetattr(0, &config) < 0)
-		perror("tcgetattr()");
-	
-	config.c_lflag &= ~ICANON;
-	config.c_lflag &= ~ECHO;
-	if (tcsetattr(0, TCSANOW, &config) < 0)
-		perror("tcsetattr()");
+	if (fg_process == -1)
+	{
+		std::cout << "^C\n" << substitute_variables(get("PS1"));
+        std::cout.flush();
+		line = "";
+		cursor = 0;
+		return;
+	}
+	std::cout << "\n";
 }
 
-void Shell::enable_echo()
+int Shell::foreground(pid_t pid)
 {
-	struct termios config;
-	if (tcgetattr(0, &config) < 0)
-		perror("tcgetattr()");
-	
-	config.c_lflag |= ICANON;
-	config.c_lflag |= ECHO;
-	if (tcsetattr(0, TCSANOW, &config) < 0)
-		perror("tcsetattr()");
+	fg_process = pid;
+
+	int status = -1;
+	for (;;)
+	{
+		if (waitpid(pid, &status, WNOHANG) == pid)
+			break;
+	}
+
+	fg_process = -1;
+	return status;
+}
+
+char Shell::next_char()
+{
+    static struct termios old, current;
+    
+    tcgetattr(0, &old);
+    current = old;
+    current.c_lflag &= ~ICANON; // Disable buffered i/o
+    current.c_lflag &= ~ECHO; // Disable echo
+    tcsetattr(0, TCSANOW, &current);
+    
+    auto c = std::getchar();
+    tcsetattr(0, TCSANOW, &old);
+    
+    return c;
 }
 
 void Shell::prompt()
@@ -50,24 +71,19 @@ void Shell::prompt()
 	std::string ps1 = substitute_variables(get("PS1"));
 	std::cout << ps1;
 
-	std::string line = "";
-	int cursor = 0;
+	line = "";
+	cursor = 0;
 	int history_index = -1;
 	bool line_end = false;
 
 	auto replace_line = [&](const std::string &with)
 	{
-		// Move the the start of the current line
+		// Move to the start of the current line
 		for (int i = 0; i < cursor; i++)
-			std::cout << "\033[D";
+			std::cout << "\b";
 
 		// Replace the current line with the new one
-		std::cout << with;
-		
-		for (int i = with.length(); i < (int)line.length(); i++)
-			std::cout << " ";
-		for (int i = with.length(); i < (int)line.length(); i++)
-			std::cout << "\033[D";
+		std::cout << with << "\033[K";
 		
 		line = with;
 		cursor = with.length();
@@ -75,30 +91,31 @@ void Shell::prompt()
 
 	auto insert = [&](const std::string &with)
 	{
-		for (char c : with)
-		{
-			line.insert(cursor, sizeof(char), c);
-			for (int i = cursor; i < line.length(); i++)
-				std::cout << line[i];
-			for (int i = cursor; i < line.length(); i++)
-				std::cout << "\033[D";
-	
-			cursor += 1;
-			std::cout << c;
-		}
+        if (cursor >= line.length())
+        {
+            line += with;
+            cursor += with.length();
+            std::cout << with;
+        }
+        else
+        {
+            line.insert(cursor, with);
+            cursor += with.length();
+            
+            std::cout << "\033[" << with.length() << "@";
+            std::cout << with;
+        }
 	};
 
 	auto message = [&](const std::string &msg)
 	{
 		std::cout << "\n" << msg << "\n";
 		std::cout << ps1 << line;
-		for (int i = cursor; i < line.length(); i++)
-			std::cout << "\033[D";
 	};
 
 	while (!line_end)
 	{
-		char c = std::getchar();
+		char c = next_char();
 		bool has_module_hook = false;
 
 		for (const auto &mod : modules)
@@ -119,13 +136,15 @@ void Shell::prompt()
 		{
 			case '\n':
 				line_end = true;
+                std::cout << "\n";
 				break;
-						
+            
 			case '\033':
 			{
 				std::getchar(); // Skip [
 				char action_char = std::getchar();
-				switch(action_char)
+                
+                switch(action_char)
 				{
 					// History
 					case 'A': // Up
@@ -151,15 +170,15 @@ void Shell::prompt()
 					case 'C': // Right
 						if (cursor < line.length())
 						{
+							std::cout << line[cursor];
 							cursor += 1;
-							std::cout << "\033[C";
 						}
 						break;
 					case 'D': // Left
 						if (cursor > 0)
 						{
 							cursor -= 1;
-							std::cout << "\033[D";
+							std::cout << "\b";
 						}
 						break;
 					
@@ -167,7 +186,7 @@ void Shell::prompt()
 						std::getchar(); // Skip ~
 					case 'H': // Xterm Home
 						for (int i = cursor - 1; i >= 0; --i)
-							std::cout << "\033[D";
+							std::cout << "\b";
 						cursor = 0;
 						break;
 
@@ -175,12 +194,8 @@ void Shell::prompt()
 						std::getchar(); // Skip ~
 					case 'F': // Xterm end
 						for (int i = cursor; i < line.length(); i++)
-							std::cout << "\033[C";
+							std::cout << line[i];
 						cursor = line.length();
-						break;
-					defualt:
-						std::cout << "\033[" << action_char;
-						cursor += 3;
 						break;
 				}
 				break;
@@ -188,50 +203,34 @@ void Shell::prompt()
 
 			case '\b':
 			case 127:
-				if (!line.empty())
+				if (cursor > 0)
 				{
-					std::cout << "\033[D";	
+					std::cout << "\b \b\033[P";
 					cursor -= 1;
-					
-					for (int i = cursor + 1; i < line.length(); i++)
-						std::cout << line[i];
-					std::cout << " ";
-					for (int i = cursor + 1; i < line.length(); i++)
-						std::cout << "\033[D";
-					std::cout << "\033[D";
-
 					line.erase(cursor, 1);
 				}
 				break;
 
 			default:
-				line.insert(cursor, sizeof(char), c);
-				for (int i = cursor; i < line.length(); i++)
-					std::cout << line[i];
-				for (int i = cursor; i < line.length(); i++)
-					std::cout << "\033[D";
-
-				cursor += 1;
-				std::cout << c;
+                insert(std::string(&c, 1));
 				break;
-
+            
 		}
 	}
 
-	std::cout << std::endl;
-	command_history.push_back(line);
-
-	for (auto &mod : modules)
-		mod->hook_macro(line);
-	exec_line(line);
+	if (!line.empty())
+    {
+        command_history.push_back(line);
+        for (auto &mod : modules)
+            mod->hook_macro(line);
+        exec_line(line);
+    }
 }
 
 void Shell::exec_line(const std::string &line)
 {
-	enable_echo();
 	auto command = Command::parse(line);
 	command->execute();
-	disable_echo();
 }
 
 enum class State
@@ -343,17 +342,20 @@ std::string Shell::directory_name(const std::string &path)
 	return path.substr(last_slash_index, path.length() - last_slash_index);
 }
 
+static void s_handle_sig_int(int s)
+{
+	Shell::the().handle_int_signal();
+}
+
 void Shell::run()
 {
-	disable_echo();
 	should_exit = false;
+	signal(SIGINT, s_handle_sig_int);
 
 	while (!should_exit)
 	{
 		prompt();
 	}
-
-	enable_echo();
 }
 
 void Shell::exit()

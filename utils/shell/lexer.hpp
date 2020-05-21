@@ -14,6 +14,8 @@ struct Token
 		With,
 		Variable,
 		VariableAssignment,
+		Glob,
+		SubCommand,
 		EndCommand
 	};
 
@@ -34,6 +36,7 @@ private:
 	std::optional<Token> parse_name();
 	std::optional<Token> parse_single_token(Token::Type type);
 	std::optional<Token> parse_double_token(Token::Type a, Token::Type b, char b_char);
+	std::optional<Token> parse_sub_command();
 	std::optional<Token> parse_variable();
 	std::optional<Token> next();
 

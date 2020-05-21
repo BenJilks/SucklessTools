@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
 
 	if (argc <= 1)
 	{
-		run_if_exists("test.sh");
+		run_if_exists(Shell::the().get_home() + "/.shellrc");
 
 		Shell::the().add_module<AutoCompleteModule>();
 		Shell::the().run();

@@ -10,7 +10,7 @@ static void update_env_variables()
 	char cwd[PATH_MAX];
 	getcwd(cwd, sizeof(cwd));
 	Shell::the().set("PWD", cwd);
-	Shell::the().set("DIRNAME", Shell::the().directory_name(cwd));
+	Shell::the().set("DIRNAME", Shell::the().directory_name(Shell::the().simplify_path(cwd)));
 }
 
 BuiltInsModule::BuiltInsModule()
