@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <optional>
+#include <iostream>
 
 namespace Json
 {
@@ -16,11 +17,18 @@ namespace Json
 		Boolean,
 		Null
 	};
+    
+    enum class PrintOption
+    {
+        None        = 0,
+        PrettyPrint = 1 << 0
+    };
 
 	class Value
 	{
 	public:
 		Value() {}
+		virtual ~Value() {}
 
 		template <typename T>
 		bool is() const { return this_type() == T::type(); }
@@ -43,7 +51,7 @@ namespace Json
 			return static_cast<const T*>(this);
 		}	
 
-		std::string to_string(bool pretty_print = false) const;
+		std::string to_string(PrintOption options = PrintOption::None) const;
 		float to_float() const;
 		double to_double() const;
 		int to_int() const;
@@ -73,9 +81,7 @@ namespace Json
 	{
 	public:
 		Object()
-			: Value()
-		{
-		}
+			: Value() {}
 
 		inline Value &get(const std::string &name) { return *data[name]; }
 		inline void set(const std::string &name, std::shared_ptr<Value> &value) { data[name] = value; }
@@ -92,6 +98,7 @@ namespace Json
 		void add(const std::string &name, const char *str);
 		void add(const std::string &name, double number);
 		void add(const std::string &name, bool boolean);
+		void add(const std::string &name, std::shared_ptr<Value> value) { data[name] = std::move(value); }
 		void remove(const std::string &name) { data.erase(name); }
 		bool contains(const std::string &name) { return data.find(name) != data.end(); }
 
@@ -127,16 +134,16 @@ namespace Json
 		}
 
 		inline Value &get(int index) { return *data[index]; }
-		inline void set(int index, std::shared_ptr<Value> &value) 
+		inline void set(int index, std::shared_ptr<Value> value) 
 		{
 			if (data.size() <= index)
 				data.resize(index);
-			data[index] = value; 
+			data[index] = std::move(value); 
 		}
 
-		inline void append(std::shared_ptr<Value> &value)
+		inline void append(std::shared_ptr<Value> value)
 		{
-			data.push_back(value);
+			data.push_back(std::move(value));
 		}
 
 		template <typename T>
@@ -229,8 +236,33 @@ namespace Json
 		bool data;
 
 	};
+    
+    struct Error
+    {
+        size_t line, column;
+        std::string message;
+    };
 
-	std::shared_ptr<Value> parse(const std::string &file_path);
+    class Document
+    {
+    public:
+        static Document parse(std::istream &&stream);
+        
+        inline std::shared_ptr<Value> root() const { return m_root; }
+        inline bool has_error() const { return m_errors.size() > 0; }
+        void log_errors(std::ostream &stream = std::cout);
+        
+    private:
+        explicit Document() {}
+        
+        inline void set_root(std::shared_ptr<Value> root) { m_root = std::move(root); }
+        inline void emit_error(const Error &&error) { m_errors.push_back(error); }
+        
+        std::shared_ptr<Value> m_root;
+        std::vector<Error> m_errors;
+        
+    };
+
 	std::ostream &operator << (std::ostream &out, const Value &value);
 	std::ostream &operator << (std::ostream &out, std::shared_ptr<Value> &value);
 

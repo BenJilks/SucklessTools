@@ -1,7 +1,7 @@
-CC=g++
+CC=clang++
 AR=ar
 CXXFLAGS=-std=c++17
-OBJ=libjson.o
+OBJ=libjson.o main.o
 INCLUDE=libjson.hpp
 
 ifeq ($(PREFIX),)
@@ -11,15 +11,12 @@ endif
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
-%.hpp: %.tinylex
-	tinylex -l cpp -o $@ $<
-
-all: lexer.hpp $(OBJ)
-#	$(CC) -o test $(OBJ)
+all: $(OBJ)
+#	$(CC) -o test $^ $(CXXFLAGS)
 	$(AR) rs libjson.a $(OBJ)
 
 clean:
-	$(RM) $(OBJ) lexer.hpp
+	$(RM) $(OBJ)
 	$(RM) libjson.a
 
 install:
