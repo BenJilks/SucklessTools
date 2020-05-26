@@ -1,6 +1,6 @@
 CC=clang++
 AR=ar
-CXXFLAGS=-std=c++17
+CXXFLAGS=-std=c++17 -g
 OBJ=libjson.o main.o
 INCLUDE=libjson.hpp
 

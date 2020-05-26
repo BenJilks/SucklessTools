@@ -1,6 +1,6 @@
 #include "libjson.hpp"
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 int main()
 {
@@ -8,7 +8,7 @@ int main()
     auto root = doc.root();
     if (doc.has_error())
         doc.log_errors();
-    
+
     if (root)
         std::cout << root->to_string(Json::PrintOption::PrettyPrint) << "\n";
     return 0;
