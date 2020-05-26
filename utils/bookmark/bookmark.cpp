@@ -5,7 +5,7 @@
 #include <getopt.h>
 #include <unistd.h>
 
-static struct option cmd_options[] = 
+static struct option cmd_options[] =
 {
 	{ "help",	no_argument,		0, 'h' },
 	{ "add",	required_argument, 	0, 'a' },
@@ -29,15 +29,19 @@ void show_help()
 int main(int argc, char *argv[])
 {
 	auto bookmarks_path = std::string(getenv("HOME")) + "/.bookmarks";
-	auto doc = Json::parse(bookmarks_path);
-	if (!doc)
-		doc = std::make_shared<Json::Object>();
-	
-	auto bookmarks = doc->as<Json::Object>();
+	auto doc = Json::Document::parse(std::ifstream(bookmarks_path));
+    auto root = doc.root();
+    if (doc.has_error())
+        doc.log_errors();
+
+	if (!root)
+		root = std::make_shared<Json::Object>();
+
+	auto bookmarks = root->as<Json::Object>();
 	if (!bookmarks)
 	{
-		doc = std::make_shared<Json::Object>();
-		bookmarks = doc->as<Json::Object>();
+		root = std::make_shared<Json::Object>();
+		bookmarks = root->as<Json::Object>();
 	}
 
 	bool should_list = true;
@@ -66,17 +70,17 @@ int main(int argc, char *argv[])
 				bookmarks->add(optarg, getenv("PWD"));
 				break;
 			}
-		
+
 			case 'r':
 				if (!bookmarks->contains(optarg))
 				{
 					std::cerr << "Error: No bookmark called '" << optarg << "'\n";
 					exit(-1);
 				}
-				
+
 				bookmarks->remove(optarg);
 				break;
-		
+
 			case 'g':
 			{
 				auto dir = bookmarks->get_as<Json::String>(optarg);
@@ -100,7 +104,7 @@ int main(int argc, char *argv[])
 	}
 
 	std::ofstream out(bookmarks_path);
-	out << doc->to_string(true) << "\n";
+	out << root->to_string(Json::PrintOption::PrettyPrint) << "\n";
 	out.close();
 
 	return 0;
