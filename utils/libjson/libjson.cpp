@@ -7,6 +7,9 @@
 
 using namespace Json;
 
+Null Null::s_null_value_impl(nullptr);
+Value *Value::s_null_value = &Null::s_null_value_impl;
+
 #define ENUMARATE_STATES                   \
     __ENUMARATE_STATE(Invalid)             \
     __ENUMARATE_STATE(Initial)             \
@@ -36,6 +39,8 @@ enum class State
 #undef __ENUMARATE_STATE
 };
 
+#ifdef DEBUG_PARSER
+
 static const char* state_to_string(State state)
 {
     switch (state)
@@ -49,6 +54,8 @@ static const char* state_to_string(State state)
 
     return "Unkown";
 }
+
+#endif
 
 template <typename... Args>
 bool is_one_of(uint32_t rune, Args... args)
@@ -65,12 +72,21 @@ bool is_one_of(uint32_t rune, Args... args)
 
 Document Document::parse(std::istream&& stream)
 {
+    Document doc;
+    if (!stream.good())
+        return doc;
+
+    auto &allocator = doc.allocator();
     State state = State::Initial;
     std::vector<State> return_stack { State::Done };
-    std::vector<std::shared_ptr<Value>> value_stack;
+    std::vector<Owner<Value>> value_stack;
     std::string buffer;
 
-    Document doc;
+    // Pre allocate some memory to reduce allocations
+    buffer.reserve(1024);
+    return_stack.reserve(20);
+    value_stack.reserve(20);
+
     size_t line = 1;
     size_t column = 1;
     auto emit_error = [&line, &column, &doc](std::string_view message) {
@@ -138,7 +154,7 @@ Document Document::parse(std::istream&& stream)
 
             if (rune == '{')
             {
-                value_stack.push_back(std::make_shared<Object>());
+                value_stack.push_back(allocator.make<Object>());
                 state = State::ObjectStart;
                 break;
             }
@@ -151,7 +167,7 @@ Document Document::parse(std::istream&& stream)
 
             if (rune == '[')
             {
-                value_stack.push_back(std::make_shared<Array>());
+                value_stack.push_back(allocator.make<Array>());
                 state = State::ArrayStart;
                 break;
             }
@@ -172,7 +188,9 @@ Document Document::parse(std::istream&& stream)
                 break;
             }
 
-            if (rune == '}' && value_stack.size() >= 2 && value_stack[value_stack.size() - 1]->is<String>() && value_stack[value_stack.size() - 2]->is<Object>())
+            if (rune == '}' && value_stack.size() >= 2
+                && value_stack[value_stack.size() - 1]->is<String>()
+                && value_stack[value_stack.size() - 2]->is<Object>())
             {
                 emit_error("Trainling ':' on end of object");
                 value_stack.pop_back();
@@ -188,7 +206,7 @@ Document Document::parse(std::istream&& stream)
         case State::String:
             if (rune == '"')
             {
-                value_stack.push_back(std::make_shared<String>(buffer));
+                value_stack.push_back(allocator.make_string_from_buffer(buffer));
                 buffer.clear();
 
                 state = return_stack.back();
@@ -340,7 +358,7 @@ Document Document::parse(std::istream&& stream)
             break;
 
         case State::NumberDone:
-            value_stack.push_back(std::make_shared<Number>(atof(buffer.c_str())));
+            value_stack.push_back(allocator.make<Number>(atof(buffer.c_str())));
             buffer.clear();
 
             should_reconsume = true;
@@ -414,7 +432,8 @@ Document Document::parse(std::istream&& stream)
             value_stack.pop_back();
 
             auto& object = value_stack.back();
-            object->as<Object>()->add(key->as<String>()->get(), std::move(value));
+            assert (object->is<Object>());
+            object->add(key->to_string(), std::move(value));
 
             if (rune == ',')
             {
@@ -467,7 +486,8 @@ Document Document::parse(std::istream&& stream)
             value_stack.pop_back();
 
             auto& array = value_stack.back();
-            array->as<Array>()->append(std::move(value));
+            assert (array->is<Array>());
+            array->append(std::move(value));
 
             if (rune == ',')
             {
@@ -515,136 +535,162 @@ static std::string print_indent(int indent)
     return out;
 }
 
-static std::string serialize(const Value& value, bool pretty_print, int indent = 0)
+static std::string serialize(const Value& value, int options, int indent = 0);
+static std::string serialize_object(const Object& object, int options, int indent = 0)
+{
+    std::string out = "{";
+
+    bool is_first = true;
+    int new_indent = indent + ((int)options & (int)PrintOption::PrettyPrint ? 1 : 0);
+    for (const auto& it : object)
+    {
+        if (!is_first)
+            out += ", ";
+
+        if ((int)options & (int)PrintOption::PrettyPrint)
+            out += "\n";
+
+        out += print_indent(new_indent);
+        out += "\"" + it.first + "\": ";
+
+        if ((int)options & (int)PrintOption::PrettyPrint
+            && (it.second->is<Object>() || it.second->is<Array>()))
+        {
+            out += "\n" + print_indent(new_indent);
+        }
+
+        out += serialize(*it.second, options | (int)PrintOption::Serialize, new_indent);
+
+        is_first = false;
+    }
+
+    if ((int)options & (int)PrintOption::PrettyPrint)
+        out += "\n" + print_indent(indent);
+
+    return out + "}";
+}
+
+static std::string serialize_array(const Array& array, int options, int indent = 0)
+{
+    std::string out = "[";
+
+    bool is_first = true;
+    int new_indent = indent + ((int)options & (int)PrintOption::PrettyPrint ? 1 : 0);
+    for (const auto& item : array)
+    {
+        if (!is_first)
+            out += ", ";
+
+        if ((int)options & (int)PrintOption::PrettyPrint)
+            out += "\n";
+
+        out += print_indent(new_indent);
+        out += serialize(*item, options | (int)PrintOption::Serialize, new_indent);
+
+        is_first = false;
+    }
+
+    if ((int)options & (int)PrintOption::PrettyPrint)
+        out += "\n" + print_indent(indent);
+
+    return out + "]";
+}
+
+static std::string serialize_string(const String& string, int options)
+{
+    if (options & (int)PrintOption::Serialize)
+        return "\"" + std::string(string.get_str()) + "\"";
+    return std::string(string.get_str());
+}
+
+static std::string serialize_number(const Number& number)
+{
+    std::stringstream stream;
+    stream << std::noshowpoint << number.to_double();
+    return stream.str();
+}
+
+static std::string serialize_boolean(const Boolean& boolean)
+{
+    return boolean.to_bool() ? "true" : "false";
+}
+
+static std::string serialize(const Value& value, int options, int indent)
 {
     if (value.is<String>())
-        return "\"" + value.as<Json::String>()->get() + "\"";
+        return serialize_string(static_cast<const String&>(value), options);
 
-    if (value.is<Number>())
-    {
-        std::stringstream stream;
-        stream << std::noshowpoint << value.to_double();
-        return stream.str();
-    }
+    else if (value.is<Number>())
+        return serialize_number(static_cast<const Number&>(value));
 
     if (value.is<Boolean>())
-        return value.as<Json::Boolean>()->get() ? "true" : "false";
+        return serialize_boolean(static_cast<const Boolean&>(value));
 
     if (value.is<Object>())
-    {
-        std::string out = "{";
-
-        auto object = value.as<Json::Object>();
-        bool is_first = true;
-        int new_indent = indent + (pretty_print ? 1 : 0);
-        for (const auto& it : *object)
-        {
-            if (!is_first)
-                out += ", ";
-
-            if (pretty_print)
-                out += "\n";
-
-            out += print_indent(new_indent);
-            out += "\"" + it.first + "\": ";
-
-            if (pretty_print && (it.second->is<Object>() || it.second->is<Array>()))
-                out += "\n" + print_indent(new_indent);
-
-            out += serialize(*it.second, pretty_print,
-                new_indent);
-
-            is_first = false;
-        }
-
-        if (pretty_print)
-            out += "\n" + print_indent(indent);
-
-        return out + "}";
-    }
+        return serialize_object(static_cast<const Object&>(value), options, indent);
 
     if (value.is<Array>())
-    {
-        std::string out = "[";
+        return serialize_array(static_cast<const Array&>(value), options, indent);
 
-        auto array = value.as<Json::Array>();
-        bool is_first = true;
-        int new_indent = indent + (pretty_print ? 1 : 0);
-        for (const auto& item : *array)
-        {
-            if (!is_first)
-                out += ", ";
-
-            if (pretty_print)
-                out += "\n";
-
-            out += print_indent(new_indent);
-            out += serialize(*item, pretty_print, new_indent);
-
-            is_first = false;
-        }
-
-        if (pretty_print)
-            out += "\n" + print_indent(indent);
-
-        return out + "]";
-    }
-
-    return "";
+    return "null";
 }
 
 std::string Value::to_string(PrintOption options) const
 {
-    return serialize(*this, (int)options & (int)PrintOption::PrettyPrint);
+    return serialize(*this, (int)options);
 }
-
-float Value::to_float() const
+std::string Null::to_string(PrintOption) const
 {
-    return static_cast<float>(as<Json::Number>()->get());
+    return "null";
 }
-
-double Value::to_double() const
+std::string Object::to_string(PrintOption options) const
 {
-    return as<Json::Number>()->get();
+    return serialize_object(*this, (int)options);
 }
-
-int Value::to_int() const
+std::string Array::to_string(PrintOption options) const
 {
-    return static_cast<int>(as<Json::Number>()->get());
+    return serialize_array(*this, (int)options);
 }
-
-bool Value::to_bool() const
+std::string String::to_string(PrintOption options) const
 {
-    return as<Json::Boolean>()->get();
+    return serialize_string(*this, (int)options);
 }
-
-void Object::add(const std::string& name, const std::string str)
+std::string Number::to_string(PrintOption) const
 {
-    data[name] = std::make_shared<String>(str);
+    return serialize_number(*this);
 }
-
-void Object::add(const std::string& name, const char* str)
+std::string Boolean::to_string(PrintOption) const
 {
-    data[name] = std::make_shared<String>(std::string(str));
+    return serialize_boolean(*this);
 }
 
-void Object::add(const std::string& name, double number)
+void Object::add(Allocator &allocator, const std::string& name, const std::string str)
 {
-    data[name] = std::make_shared<Number>(number);
+    m_data[name] = allocator.make_string_from_buffer(str);
 }
 
-void Object::add(const std::string& name, bool boolean)
+void Object::add(Allocator &allocator, const std::string& name, const char* str)
 {
-    data[name] = std::make_shared<Boolean>(boolean);
+    m_data[name] = allocator.make_string_from_buffer(std::string(str));
 }
 
-std::ostream& Json::operator<<(std::ostream& out, const Value& value)
+void Object::add(Allocator &allocator, const std::string& name, double number)
+{
+    m_data[name] = allocator.make<Number>(number);
+}
+
+void Object::add(Allocator &allocator, const std::string& name, bool boolean)
+{
+    m_data[name] = allocator.make<Boolean>(boolean);
+}
+
+std::ostream& Json::operator<<(std::ostream& out, const Value &value)
 {
     out << value.to_string();
     return out;
 }
 
-std::ostream& Json::operator<<(std::ostream& out, std::shared_ptr<Value>& value)
+std::ostream& Json::operator<<(std::ostream& out, Owner<Value> &value)
 {
     if (!value)
     {
