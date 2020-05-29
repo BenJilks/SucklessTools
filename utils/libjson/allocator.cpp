@@ -1,15 +1,12 @@
 #include "allocator.hpp"
-#include <iostream>
-#include <algorithm>
 #include "libjson.hpp"
+#include <algorithm>
+#include <iostream>
 using namespace Json;
-
-#define BUFFER_STEPS 1024
 
 Allocator::Allocator()
 {
 }
-
 
 Allocator::MemoryChunk::~MemoryChunk()
 {
@@ -20,33 +17,31 @@ Allocator::MemoryChunk::~MemoryChunk()
 
 void Allocator::insure_size(size_t size)
 {
-    // If the memory chain is empty, make an initial one
-    if (!m_current_memory_link)
+    if (!m_current_memory_chunk)
     {
-        m_current_memory_link = std::make_shared<MemoryChunk>(std::max(s_link_size, size));
-#ifdef DEBUG_ALLOCATOR
-    std::cout << "Allocator: initial chunk " << m_current_memory_link->size << "\n";
-#endif
+        m_memory_chain = std::make_unique<MemoryChunk>(std::max(s_link_size, size));
+        m_current_memory_chunk = m_memory_chain.get();
     }
 
     // If this new allocation will go outside the current memory link's range, then make a
     // new one, insuring that this new data will fit
-    if (m_current_memory_link->pointer + size > m_current_memory_link->size)
+    if (m_current_memory_chunk->pointer + size > m_current_memory_chunk->size)
     {
-        m_current_memory_link = std::make_shared<MemoryChunk>(std::max(s_link_size, size));
+        m_current_memory_chunk->next = std::make_unique<MemoryChunk>(std::max(s_link_size, size));
+        m_current_memory_chunk = m_current_memory_chunk->next.get();
 #ifdef DEBUG_ALLOCATOR
-    std::cout << "Allocator: further chunk " << m_current_memory_link->size << "\n";
+        std::cout << "Allocator: New chunk " << m_current_memory_chunk->size << "\n";
 #endif
     }
 }
 
-Owner<String> Allocator::make_string_from_buffer(const std::string &buffer)
+String *Allocator::make_string_from_buffer(const std::string &buffer)
 {
     insure_size(buffer.size());
 
-    auto ptr = m_current_memory_link->memory.get() + m_current_memory_link->pointer;
+    auto ptr = m_current_memory_chunk->memory.get() + m_current_memory_chunk->pointer;
     memcpy(ptr, buffer.data(), buffer.size());
-    m_current_memory_link->pointer += buffer.size();
+    m_current_memory_chunk->pointer += buffer.size();
 
 #ifdef DEBUG_ALLOCATOR
     std::cout << "Allocator: Copy string data to " << (void*)ptr << ", of size " << buffer.size() << "\n";

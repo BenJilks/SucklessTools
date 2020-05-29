@@ -24,6 +24,7 @@ install:
 	install -m 644 libjson.a $(PREFIX)/lib/
 	install -m 644 libjson.hpp $(PREFIX)/include/libjson/
 	install -m 644 allocator.hpp $(PREFIX)/include/libjson/
+	install -m 644 forward.hpp $(PREFIX)/include/libjson/
 
 uninstall:
 	$(RM) -r $(PREFIX)/include/libjson

@@ -7,7 +7,8 @@
 
 using namespace Json;
 
-Null Null::s_null_value_impl(nullptr);
+Allocator null_allocator;
+Null Null::s_null_value_impl(null_allocator);
 Value *Value::s_null_value = &Null::s_null_value_impl;
 
 #define ENUMARATE_STATES                   \
@@ -76,10 +77,10 @@ Document Document::parse(std::istream&& stream)
     if (!stream.good())
         return doc;
 
-    auto &allocator = doc.allocator();
+    auto &allocator = *doc.m_allocator;
     State state = State::Initial;
     std::vector<State> return_stack { State::Done };
-    std::vector<Owner<Value>> value_stack;
+    std::vector<Value*> value_stack;
     std::string buffer;
 
     // Pre allocate some memory to reduce allocations
@@ -179,7 +180,7 @@ Document Document::parse(std::istream&& stream)
                 break;
             }
 
-            if (value_stack.back()->is<Array>() && rune == ']')
+            if (value_stack.back()->is_array() && rune == ']')
             {
                 emit_error("Trainling ',' on end of array");
                 return_stack.pop_back();
@@ -189,8 +190,8 @@ Document Document::parse(std::istream&& stream)
             }
 
             if (rune == '}' && value_stack.size() >= 2
-                && value_stack[value_stack.size() - 1]->is<String>()
-                && value_stack[value_stack.size() - 2]->is<Object>())
+                && value_stack[value_stack.size() - 1]->is_string()
+                && value_stack[value_stack.size() - 2]->is_object())
             {
                 emit_error("Trainling ':' on end of object");
                 value_stack.pop_back();
@@ -432,8 +433,8 @@ Document Document::parse(std::istream&& stream)
             value_stack.pop_back();
 
             auto& object = value_stack.back();
-            assert (object->is<Object>());
-            object->add(key->to_string(), std::move(value));
+            assert (object->is_object());
+            object->add(key->to_string(), value);
 
             if (rune == ',')
             {
@@ -486,7 +487,7 @@ Document Document::parse(std::istream&& stream)
             value_stack.pop_back();
 
             auto& array = value_stack.back();
-            assert (array->is<Array>());
+            assert (array->is_array());
             array->append(std::move(value));
 
             if (rune == ',')
@@ -554,7 +555,7 @@ static std::string serialize_object(const Object& object, int options, int inden
         out += "\"" + it.first + "\": ";
 
         if ((int)options & (int)PrintOption::PrettyPrint
-            && (it.second->is<Object>() || it.second->is<Array>()))
+            && (it.second->is_object() || it.second->is_array()))
         {
             out += "\n" + print_indent(new_indent);
         }
@@ -617,19 +618,19 @@ static std::string serialize_boolean(const Boolean& boolean)
 
 static std::string serialize(const Value& value, int options, int indent)
 {
-    if (value.is<String>())
+    if (value.is_string())
         return serialize_string(static_cast<const String&>(value), options);
 
-    else if (value.is<Number>())
+    else if (value.is_number())
         return serialize_number(static_cast<const Number&>(value));
 
-    if (value.is<Boolean>())
+    if (value.is_boolean())
         return serialize_boolean(static_cast<const Boolean&>(value));
 
-    if (value.is<Object>())
+    if (value.is_object())
         return serialize_object(static_cast<const Object&>(value), options, indent);
 
-    if (value.is<Array>())
+    if (value.is_array())
         return serialize_array(static_cast<const Array&>(value), options, indent);
 
     return "null";
@@ -664,24 +665,24 @@ std::string Boolean::to_string(PrintOption) const
     return serialize_boolean(*this);
 }
 
-void Object::add(Allocator &allocator, const std::string& name, const std::string str)
+void Object::add(const std::string& name, const std::string str)
 {
-    m_data[name] = allocator.make_string_from_buffer(str);
+    m_data[name] = m_allocator.make_string_from_buffer(str);
 }
 
-void Object::add(Allocator &allocator, const std::string& name, const char* str)
+void Object::add(const std::string& name, const char* str)
 {
-    m_data[name] = allocator.make_string_from_buffer(std::string(str));
+    m_data[name] = m_allocator.make_string_from_buffer(std::string(str));
 }
 
-void Object::add(Allocator &allocator, const std::string& name, double number)
+void Object::add(const std::string& name, double number)
 {
-    m_data[name] = allocator.make<Number>(number);
+    m_data[name] = m_allocator.make<Number>(number);
 }
 
-void Object::add(Allocator &allocator, const std::string& name, bool boolean)
+void Object::add(const std::string& name, bool boolean)
 {
-    m_data[name] = allocator.make<Boolean>(boolean);
+    m_data[name] = m_allocator.make<Boolean>(boolean);
 }
 
 std::ostream& Json::operator<<(std::ostream& out, const Value &value)
@@ -690,7 +691,7 @@ std::ostream& Json::operator<<(std::ostream& out, const Value &value)
     return out;
 }
 
-std::ostream& Json::operator<<(std::ostream& out, Owner<Value> &value)
+std::ostream& Json::operator<<(std::ostream& out, Value *value)
 {
     if (!value)
     {
