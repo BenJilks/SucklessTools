@@ -1,4 +1,4 @@
-#include <libjson.hpp>
+#include <libjson/libjson.hpp>
 #include <map>
 #include <iostream>
 #include <fstream>
@@ -30,19 +30,12 @@ int main(int argc, char *argv[])
 {
 	auto bookmarks_path = std::string(getenv("HOME")) + "/.bookmarks";
 	auto doc = Json::Document::parse(std::ifstream(bookmarks_path));
-    auto root = doc.root();
     if (doc.has_error())
         doc.log_errors();
 
-	if (!root)
-		root = std::make_shared<Json::Object>();
-
-	auto bookmarks = root->as<Json::Object>();
-	if (!bookmarks)
-	{
-		root = std::make_shared<Json::Object>();
-		bookmarks = root->as<Json::Object>();
-	}
+    auto &bookmarks = doc.root();
+	if (!bookmarks.is<Json::Object>())
+		bookmarks = *doc.allocator().make<Json::Object>();
 
 	bool should_list = true;
 	for (;;)
@@ -67,30 +60,30 @@ int main(int argc, char *argv[])
 
 			case 'a':
 			{
-				bookmarks->add(optarg, getenv("PWD"));
+				bookmarks.add(optarg, doc.allocator().make_string_from_buffer(getenv("PWD")));
 				break;
 			}
 
 			case 'r':
-				if (!bookmarks->contains(optarg))
+				if (!bookmarks.contains(optarg))
 				{
 					std::cerr << "Error: No bookmark called '" << optarg << "'\n";
 					exit(-1);
 				}
 
-				bookmarks->remove(optarg);
+				bookmarks.remove(optarg);
 				break;
 
 			case 'g':
 			{
-				auto dir = bookmarks->get_as<Json::String>(optarg);
-				if (!dir)
+				auto &dir = bookmarks[optarg];
+				if (!dir.is<Json::String>())
 				{
-					std::cerr << "Error: No bookmark called '" << optarg << "'\n";
+					std::cerr << "Error: No valid bookmark called '" << optarg << "'\n";
 					exit(-1);
 				}
 
-				chdir(dir->get().c_str());
+				chdir(dir.to_string().c_str());
 				system(getenv("SHELL"));
 				exit(0);
 			}
@@ -99,12 +92,12 @@ int main(int argc, char *argv[])
 
 	if (should_list)
 	{
-		for (auto value : *bookmarks)
-			std::cout << value.first << " -> " << value.second << "\n";
+		for (auto value : bookmarks.to_key_value_array())
+			std::cout << value.first << " -> " << *value.second << "\n";
 	}
 
 	std::ofstream out(bookmarks_path);
-	out << root->to_string(Json::PrintOption::PrettyPrint) << "\n";
+	out << bookmarks.to_string(Json::PrintOption::PrettyPrint) << "\n";
 	out.close();
 
 	return 0;
