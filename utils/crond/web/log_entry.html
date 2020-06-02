@@ -1,0 +1,37 @@
+<html>
+
+    <head>
+        <title>[[ name ]] [[ date ]] [[ time ]]</title>
+        <link rel="stylesheet" href="style.css">
+        <style>
+            .output
+            {
+                background-color: #3F4352;
+                color: white;
+                padding: 40px;
+                margin: 10px 0px;
+                box-shadow: inset 0 0 10px #00000044;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="content">
+            <h1>[[ name ]] [[ date ]] - [[ time ]]</h1>
+            <div class="inner-content">
+                <div class="info-box">
+                    <div><p id="left">ID</p><p id="right">[[ id ]]</p></div>
+                    <div><p id="left">Exit Status</p><p id="right">[[ exit_status ]]</p></div>
+                    <div><p id="left">Runtime</p><p id="right">[[ runtime ]]</p></div>
+                    <div class="clearfix"></div>
+                </div>
+
+                <div class="output">
+                    [[ output ]]
+                </div>
+            </div>
+        </div>
+    </body>
+
+</html>
+

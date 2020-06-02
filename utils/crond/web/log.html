@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <title>Log [[ date ]]</title>
+        <link rel="stylesheet" href="style.css">
+        <style>
+            #tomorrow
+            {
+                float: left;
+            }
+            #yesterday
+            {
+                float: right;
+            }
+            #date
+            {
+                float: left;
+                margin: 0px;
+                padding: 0px 20px;
+            }
+
+            .history
+            {
+                margin-top: 20px;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="content">
+            <a href="/?date=[[ tomorrow ]]"><button id="tomorrow">Tomorrow</button></a>
+            <h1 id="date">[[ date ]]</h1>
+            <a href="/"><button id="tomorrow">Today</button></a>
+            <a href="/?date=[[ yesterday ]]"><button id="yesterday">Yesterday</button></a>
+            <div class="clearfix"></div>
+
+            <div class="inner-content history">
+                [[ history ]]
+            </div>
+        </div>
+    </body>
+
+</html>
