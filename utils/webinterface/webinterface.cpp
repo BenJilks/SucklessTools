@@ -6,6 +6,8 @@
 #include <unistd.h>
 using namespace Web;
 
+//#define DEBUG_REQUESTS
+
 void Interface::route(const std::string &path,
                       std::function<void(const Url&, Response&)> callback)
 {
@@ -75,7 +77,9 @@ void Interface::start()
             assert (false);
         }
 
+#ifdef DEBUG_REQUESTS
         std::cout << "Got request: " << request->url().path() << "\n";
+#endif
 
         const Route *route = nullptr;
         for (const auto &it : m_routes)
@@ -90,12 +94,12 @@ void Interface::start()
         Response response(std::move(*request));
         if (!route)
         {
-            response.response_code(404);
+            response.code(404);
             response.send_text("Error 404: page not found");
         }
         else
         {
-            response.response_code(200);
+            response.code(200);
             route->callback(request->url(), response);
         }
 

@@ -45,22 +45,17 @@ namespace Web
     public:
         Response() = delete;
         Response(Request &&request)
-            : Request(request) {}
-
-        template <typename ...Arg>
-        void send_template(const std::string &path, Arg ...args)
-        {
-            send_template_impl(path, { args... });
-        }
+            : Request(request)
+            , m_content_type("text/html") {}
 
         void send_text(const std::string &str);
         void send(int client_sock);
-        void response_code(int code) { m_response_code = code; }
+        void code(int code) { m_response_code = code; }
+        void content_type(const std::string &type) { m_content_type = type; }
 
     private:
-        void send_template_impl(const std::string &path, std::vector<std::string> args);
-
         std::string m_data;
+        std::string m_content_type;
         int m_response_code { 200 };
 
     };

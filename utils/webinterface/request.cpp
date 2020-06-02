@@ -197,7 +197,6 @@ std::optional<Request> Request::parse(const std::string &raw_request)
 #undef __ENUMERATE_STATE
     };
 
-#ifdef DEBUG_REQUEST
     auto string_name = [](State state) -> std::string
     {
         switch (state)
@@ -207,15 +206,19 @@ std::optional<Request> Request::parse(const std::string &raw_request)
 #undef __ENUMERATE_STATE
         }
     };
-
-    std::cout << raw_request << "\n";
-#endif
-#undef ENUMERATE_STATEs
+#undef ENUMERATE_STATES
 
     auto state = State::Method;
     size_t index = 0;
     std::string buffer;
     std::string curr_header_name;
+
+    auto crash = [&]()
+    {
+        std::cout << "Crash in state " << string_name(state) << "\n";
+        std::cout << "Raw request: \n" << raw_request << "\n";
+        assert (false);
+    };
 
     for (;;)
     {
@@ -233,7 +236,7 @@ std::optional<Request> Request::parse(const std::string &raw_request)
         if (index > raw_request.size())
         {
             // TODO: Error, unexpected end
-            assert (false);
+            crash();
             return std::nullopt;
         }
         index += 1;
@@ -242,7 +245,7 @@ std::optional<Request> Request::parse(const std::string &raw_request)
         {
             default:
                 // TODO: Error, invalid state
-                assert (false);
+                crash();
                 return std::nullopt;
 
             case State::Method:
@@ -252,6 +255,12 @@ std::optional<Request> Request::parse(const std::string &raw_request)
                     buffer.clear();
                     state = State::Url;
                     break;
+                }
+
+                if (!c)
+                {
+                    // NOTE: This is a blank request
+                    return std::nullopt;
                 }
 
                 buffer += c;
@@ -355,7 +364,7 @@ std::optional<Request> Request::parse(const std::string &raw_request)
                 }
 
                 // TODO: Error, invalid body
-                assert (false);
+                crash();
                 return std::nullopt;
 
             case State::Body:
@@ -379,37 +388,13 @@ void Response::send_text(const std::string &str)
     m_data += str;
 }
 
-void Response::send_template_impl(const std::string &path, std::vector<std::string> args)
-{
-    std::ifstream stream(path);
-    std::stringstream buffer;
-    buffer << stream.rdbuf();
-
-    auto str = buffer.str();
-    for (const auto &arg : args)
-    {
-        auto name_end = arg.find('=');
-        auto name = "[[ " + std::string(arg.data(), name_end) + " ]]";
-        auto value = std::string(arg.data() + name_end + 1, arg.size() - name_end - 1);
-
-        size_t start_pos = 0;
-        while((start_pos = str.find(name, start_pos)) != std::string::npos)
-        {
-            str.replace(start_pos, name.length(), value);
-            start_pos += value.length();
-        }
-    }
-
-    m_data += str;
-}
-
 void Response::send(int client_sock)
 {
     std::string response =
         "HTTP/1.1 " + std::to_string(m_response_code) + " OK\n"
         "Accept-Ranges: bytes\n"
         "Content-Length: " + std::to_string(m_data.size()) + "\n" +
-        "Content-Type: text/html\n\r\n" +
+        "Content-Type: " + m_content_type + "\n\r\n" +
         m_data;
 
     write(client_sock, response.data(), response.size());
