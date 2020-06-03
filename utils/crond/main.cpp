@@ -9,6 +9,7 @@
 #include <pwd.h>
 #include <sstream>
 #include <signal.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <thread>
 #include <unistd.h>
@@ -64,9 +65,9 @@ static std::optional<Json::Document> load_log(const std::string &date, const std
     return std::move(doc);
 }
 
-static void web_thread(Json::Value *log, std::mutex *log_mutex, const std::string cron_path)
+static void web_thread(Json::Value *log, std::mutex *log_mutex, const std::string cron_path, int port)
 {
-    Web::Interface interface;
+    Web::Interface interface(port);
     auto log_template_or_error = Web::Template::load_from_file(g_web_dir + "/log.html");
     auto log_entry_template_or_error = Web::Template::load_from_file(g_web_dir + "/log_entry.html");
     if (!log_template_or_error || !log_entry_template_or_error)
@@ -182,25 +183,22 @@ static std::string insure_cron_path()
 
 static void daemonize()
 {
-//    setuid(0);
-//    setgid(0);
-
     auto pid = fork();
     if (pid < 0)
     {
         perror("fork()");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
     // Terminate the parent
     if (pid > 0)
-        exit(0);
+        exit(EXIT_SUCCESS);
 
     // Make the child the session leader
     if (setsid() < 0)
     {
         perror("setsid()");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
     // Start second fork
@@ -208,12 +206,12 @@ static void daemonize()
     if (pid < 0)
     {
         perror("fork()");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
     // Terminate the first parent
     if (pid > 0)
-        exit(0);
+        exit(EXIT_SUCCESS);
 
     // Make root the working directory
     chdir("/");
@@ -228,7 +226,7 @@ static void daemonize()
     // TODO: Make lock
 }
 
-static void start_cron(const std::string &cron_path)
+static void start_cron(const std::string &cron_path, bool enable_web_interface, int port)
 {
     auto log_path = cron_path + "/log/log-" + Timer::make_time_stamp() + ".json";
     std::vector<Cron> crons;
@@ -250,7 +248,10 @@ static void start_cron(const std::string &cron_path)
 
     std::cout << "Loading crons\n";
     load_crons(crons, cron_path);
-    std::thread web(web_thread, &log, &log_mutex, cron_path);
+
+    std::thread web;
+    if (enable_web_interface)
+        web = std::thread(web_thread, &log, &log_mutex, cron_path, port);
 
     for (;;)
     {
@@ -270,28 +271,36 @@ static void start_cron(const std::string &cron_path)
 
 static struct option cmd_options[] =
 {
-    { "help",      no_argument, 0, 'h' },
-    { "daemon",    no_argument, 0, 'd' },
+    { "help",       no_argument,        0, 'h' },
+    { "daemon",     no_argument,        0, 'd' },
+    { "web",        no_argument,        0, 'w' },
+    { "port",       required_argument,  0, 'p' },
+    { "output",     no_argument,        0, 'o' },
 };
 
 void show_help()
 {
-    std::cout << "usage: crond [-h] [-d]\n";
-    std::cout << "\nManage bookmarks\n";
+    std::cout << "usage: crond [-d] [-w] [-p port]\n";
+    std::cout << "\nRun cron jobs\n";
     std::cout << "\noptional arguments:\n";
     std::cout << "  -h, --help\t\tShow this help message and exit\n";
     std::cout << "  -d, --daemon\t\tStart as a daemon\n";
+    std::cout << "  -w, --web\t\tEnable the web interface\n";
+    std::cout << "  -p, --port\t\tSpecify what port you want the web interface to run on\n";
+    std::cout << "  -o, --output\t\tShow the output log for today\n";
 }
 
 int main(int argc, char *argv[])
 {
     bool should_daemonize = false;
+    bool enable_web_interface = false;
+    int port = 8080;
     srand(time(NULL));
 
     for (;;)
     {
         int option_index;
-        int c = getopt_long(argc, argv, "hd",
+        int c = getopt_long(argc, argv, "hdwp:o",
             cmd_options, &option_index);
 
         if (c == -1)
@@ -306,6 +315,30 @@ int main(int argc, char *argv[])
             case 'd':
                 should_daemonize = true;
                 break;
+
+            case 'w':
+                enable_web_interface = true;
+                break;
+
+            case 'p':
+                port = std::atoi(optarg);
+                if (port < 0)
+                {
+                    std::cerr << "Error: Invalid port " << optarg << ", must be positive\n";
+                    return EXIT_FAILURE;
+                }
+
+                if (getuid() != 0 && (port == 80 || port == 443))
+                {
+                    std::cerr << "Error: Must be root to access port " << optarg << "\n";
+                    return EXIT_FAILURE;
+                }
+                break;
+
+            case 'o':
+                std::system(("cat \"" + insure_cron_path() + "/log/log-" +
+                    Timer::make_time_stamp() + ".json\" | less").c_str());
+                return EXIT_SUCCESS;
         }
     }
 
@@ -322,6 +355,6 @@ int main(int argc, char *argv[])
     }
 
     std::cout << "Started\n";
-    start_cron(cron_path);
-    return 0;
+    start_cron(cron_path, enable_web_interface, port);
+    return EXIT_SUCCESS;
 }
