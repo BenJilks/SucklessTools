@@ -2,17 +2,21 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <iostream>
 #include <libjson/libjson.hpp>
-#include <webinterface/webinterface.hpp>
-#include <webinterface/template.hpp>
-#include <webinterface/table.hpp>
-#include <thread>
 #include <mutex>
+#include <pwd.h>
+#include <sstream>
+#include <signal.h>
+#include <sys/stat.h>
+#include <thread>
+#include <unistd.h>
+#include <webinterface/table.hpp>
+#include <webinterface/template.hpp>
+#include <webinterface/webinterface.hpp>
 namespace fs = std::filesystem;
 
-static const auto g_cron_path = std::string("crons");
+static auto g_web_dir = std::string("/usr/local/share/crond/web");
 
 static void load_crons(std::vector<Cron> &crons, const std::string &path)
 {
@@ -49,21 +53,21 @@ static std::string replace_all(std::string str, const std::string& from, const s
     return str;
 }
 
-static std::optional<Json::Document> load_log(const std::string &date)
+static std::optional<Json::Document> load_log(const std::string &date, const std::string &cron_path)
 {
     auto now = Timer::make_time_stamp();
     if (date == now)
         return std::nullopt;
 
-    auto doc = Json::Document::parse(std::ifstream(g_cron_path + "/log/log-" + date + ".json"));
+    auto doc = Json::Document::parse(std::ifstream(cron_path + "/log/log-" + date + ".json"));
     return std::move(doc);
 }
 
-static void web_thread(Json::Value *log, std::mutex *log_mutex)
+static void web_thread(Json::Value *log, std::mutex *log_mutex, const std::string cron_path)
 {
     Web::Interface interface;
-    auto log_template_or_error = Web::Template::load_from_file("web/log.html");
-    auto log_entry_template_or_error = Web::Template::load_from_file("web/log_entry.html");
+    auto log_template_or_error = Web::Template::load_from_file(g_web_dir + "/log.html");
+    auto log_entry_template_or_error = Web::Template::load_from_file(g_web_dir + "/log_entry.html");
     if (!log_template_or_error || !log_entry_template_or_error)
     {
         // TODO: Error, unable to load template
@@ -75,7 +79,7 @@ static void web_thread(Json::Value *log, std::mutex *log_mutex)
 
     interface.route("/style.css", [&](const auto&, auto &response)
     {
-        std::ifstream file_stream("web/style.css");
+        std::ifstream file_stream(g_web_dir + "/style.css");
         std::stringstream stream;
         stream << file_stream.rdbuf();
 
@@ -91,7 +95,7 @@ static void web_thread(Json::Value *log, std::mutex *log_mutex)
             date = Timer::make_time_stamp();
 
         auto this_log = log;
-        auto log_doc = load_log(date);
+        auto log_doc = load_log(date, cron_path);
         if (log_doc)
             this_log = &log_doc->root();
 
@@ -159,13 +163,82 @@ static void web_thread(Json::Value *log, std::mutex *log_mutex)
     interface.start();
 }
 
-int main()
+static std::string insure_cron_path()
 {
-    auto log_path = g_cron_path + "/log/log-" + Timer::make_time_stamp() + ".json";
+    auto *pw = getpwuid(getuid());
+    auto home_dir = pw->pw_dir;
+
+    auto cron_path = std::string(home_dir) + "/.crons";
+    if (!fs::exists(cron_path))
+        fs::create_directory(cron_path);
+
+    auto log_path = cron_path + "/log";
+    if (!fs::exists(log_path))
+        fs::create_directory(log_path);
+
+    return cron_path;
+}
+
+static void daemonize()
+{
+    setuid(0);
+    setgid(0);
+
+    auto pid = fork();
+    if (pid < 0)
+    {
+        perror("fork()");
+        exit(-1);
+    }
+
+    // Terminate the parent
+    if (pid > 0)
+        exit(0);
+
+    // Make the child the session leader
+    if (setsid() < 0)
+    {
+        perror("setsid()");
+        exit(-1);
+    }
+
+    // Ignore signals from child to parent
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);
+
+    // Start second fork
+    pid = fork();
+    if (pid < 0)
+    {
+        perror("fork()");
+        exit(-1);
+    }
+
+    // Terminate the first parent
+    if (pid > 0)
+        exit(0);
+
+    // Make root the working directory
+    chdir("/");
+
+    // New file permissions
+    umask(0);
+
+    // Close all open file descriptors
+    for (auto fd = sysconf(_SC_OPEN_MAX); fd > 0; --fd)
+		close(fd);
+
+    // TODO: Make lock
+}
+
+static void start_cron(const std::string &cron_path)
+{
+    auto log_path = cron_path + "/log/log-" + Timer::make_time_stamp() + ".json";
     std::vector<Cron> crons;
     size_t run_time = 0;
     std::mutex log_mutex;
 
+    std::cout << "Loading log: " << log_path << "\n";
     auto log_doc = Json::Document::parse(std::ifstream(log_path));
     auto &log = log_doc.root_or_new<Json::Array>();
 
@@ -178,8 +251,9 @@ int main()
         log_mutex.unlock();
     };
 
-    load_crons(crons, g_cron_path);
-    std::thread web(web_thread, &log, &log_mutex);
+    std::cout << "Loading crons\n";
+    load_crons(crons, cron_path);
+    std::thread web(web_thread, &log, &log_mutex, cron_path);
 
     for (;;)
     {
@@ -195,6 +269,14 @@ int main()
         run_time += 1;
         std::this_thread::sleep_for(std::chrono::minutes(1));
     }
+}
 
+int main()
+{
+    auto cron_path = insure_cron_path();
+    daemonize();
+
+    std::cout << "Started\n";
+    start_cron(cron_path);
     return 0;
 }

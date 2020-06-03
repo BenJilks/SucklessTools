@@ -31,7 +31,7 @@ std::optional<Cron> Cron::load(const std::string &path, std::ostream &out)
     }
 
     auto name = json_name.to_string_or(path);
-    auto script = "./" + path + "/" + json_script.to_string();
+    auto script = path + "/" + json_script.to_string();
     auto timer = Timer::parse(config, log_path, out);
     if (!timer)
     {
@@ -40,6 +40,8 @@ std::optional<Cron> Cron::load(const std::string &path, std::ostream &out)
         return std::nullopt;
     }
 
+    if (!script.empty() && script[0] != '/')
+        script = "./" + script;
     return Cron(name, script, std::move(*timer));
 }
 
@@ -66,8 +68,7 @@ void Cron::run(Json::Value &log, std::mutex &log_mutex)
     log_entry.add_new<Json::Number>("exit_status", -1);
     log_mutex.unlock();
 
-    std::cout << "Running cron " << m_name << " [|]";
-    std::cout.flush();
+    std::cout << "\nRunning cron " << m_name << "...\n";
     auto begin = std::chrono::steady_clock::now();
 
     int p[2];
@@ -84,7 +85,6 @@ void Cron::run(Json::Value &log, std::mutex &log_mutex)
         return;
     }
 
-    std::string log_buffer;
     if (pid == 0)
     {
         close(STDOUT_FILENO);
@@ -96,32 +96,40 @@ void Cron::run(Json::Value &log, std::mutex &log_mutex)
             perror("execl()");
 
         // We shouldn't be here
+        std::cout << "Error: Unable to execute " << m_script_path << "\n";
         exit(-1);
     }
 
     close(p[WRITE]);
     int status = 0;
-    int tick = 0;
-    for (;;)
+    bool is_still_running = true;
+
+    std::string log_buffer;
+    int log_buffer_pointer = 0;
+    while (is_still_running)
     {
-        char c;
-        while (read(p[READ], &c, 1))
-            log_buffer += c;
-
-        static std::vector<char> anim = {'|', '/', '-', '\\'};
-        std::cout << "\b\b" << anim[tick % 4] << "]";
-        std::cout.flush();
-        tick += 1;
-
-        log_mutex.lock();
-        log_entry.add("output", log_buffer);
-        log_mutex.unlock();
-
         if (waitpid(pid, &status, WNOHANG) == pid)
-            break;
+            is_still_running = false;
+
+        if (log_buffer_pointer + 255 > log_buffer.size())
+            log_buffer.resize(log_buffer.size() + 255);
+
+        for (;;)
+        {
+            auto len = read(p[READ], log_buffer.data() + log_buffer_pointer, 255);
+            if (len <= 0)
+                break;
+
+            log_buffer_pointer += len;
+        }
+
+//        log_mutex.lock();
+//        log_entry.add("output", log_buffer);
+//        log_mutex.unlock();
     }
-    std::cout << "\b\bDone]\n";
+    std::cout << "Done.\n";
     close(p[READ]);
+    log_buffer.resize(log_buffer_pointer);
 
     log_mutex.lock();
     auto end = std::chrono::steady_clock::now();
