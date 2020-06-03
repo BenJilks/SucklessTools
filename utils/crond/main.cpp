@@ -2,6 +2,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <getopt.h>
 #include <iostream>
 #include <libjson/libjson.hpp>
 #include <mutex>
@@ -181,8 +182,8 @@ static std::string insure_cron_path()
 
 static void daemonize()
 {
-    setuid(0);
-    setgid(0);
+//    setuid(0);
+//    setgid(0);
 
     auto pid = fork();
     if (pid < 0)
@@ -201,10 +202,6 @@ static void daemonize()
         perror("setsid()");
         exit(-1);
     }
-
-    // Ignore signals from child to parent
-    signal(SIGCHLD, SIG_IGN);
-    signal(SIGHUP, SIG_IGN);
 
     // Start second fork
     pid = fork();
@@ -225,8 +222,8 @@ static void daemonize()
     umask(0);
 
     // Close all open file descriptors
-    for (auto fd = sysconf(_SC_OPEN_MAX); fd > 0; --fd)
-		close(fd);
+//    for (auto fd = sysconf(_SC_OPEN_MAX); fd > 0; --fd)
+//        close(fd);
 
     // TODO: Make lock
 }
@@ -238,12 +235,12 @@ static void start_cron(const std::string &cron_path)
     size_t run_time = 0;
     std::mutex log_mutex;
 
-    std::cout << "Loading log: " << log_path << "\n";
     auto log_doc = Json::Document::parse(std::ifstream(log_path));
     auto &log = log_doc.root_or_new<Json::Array>();
 
     auto save_log = [&log, &log_path, &log_mutex]()
     {
+        std::cout << "Saving log file\n";
         log_mutex.lock();
         std::ofstream out(log_path);
         out << log.to_string(Json::PrintOption::PrettyPrint);
@@ -271,10 +268,58 @@ static void start_cron(const std::string &cron_path)
     }
 }
 
-int main()
+static struct option cmd_options[] =
 {
+    { "help",      no_argument, 0, 'h' },
+    { "daemon",    no_argument, 0, 'd' },
+};
+
+void show_help()
+{
+    std::cout << "usage: crond [-h] [-d]\n";
+    std::cout << "\nManage bookmarks\n";
+    std::cout << "\noptional arguments:\n";
+    std::cout << "  -h, --help\t\tShow this help message and exit\n";
+    std::cout << "  -d, --daemon\t\tStart as a daemon\n";
+}
+
+int main(int argc, char *argv[])
+{
+    bool should_daemonize = false;
+    srand(time(NULL));
+
+    for (;;)
+    {
+        int option_index;
+        int c = getopt_long(argc, argv, "hd",
+            cmd_options, &option_index);
+
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+            case 'h':
+                show_help();
+                return 0;
+
+            case 'd':
+                should_daemonize = true;
+                break;
+        }
+    }
+
     auto cron_path = insure_cron_path();
-    daemonize();
+    std::ofstream log_file;
+    if (should_daemonize)
+    {
+        daemonize();
+        log_file.open("/tmp/crond_log");
+        log_file.rdbuf()->pubsetbuf(0, 0);
+        std::cout.rdbuf(log_file.rdbuf());
+        std::cerr.rdbuf(log_file.rdbuf());
+        std::clog.rdbuf(log_file.rdbuf());
+    }
 
     std::cout << "Started\n";
     start_cron(cron_path);
