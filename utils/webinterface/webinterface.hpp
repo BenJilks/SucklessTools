@@ -11,6 +11,8 @@ namespace Web
     {
     public:
         Interface() {}
+        Interface(int port)
+            : m_port(port) {}
 
         void route(const std::string &path,
                    std::function<void(const Url&, Response&)> callback);

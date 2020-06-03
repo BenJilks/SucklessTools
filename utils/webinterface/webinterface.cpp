@@ -74,7 +74,8 @@ void Interface::start()
         if (!request)
         {
             // TODO: Error, invalid request
-            assert (false);
+            close(client_sock);
+            continue;
         }
 
 #ifdef DEBUG_REQUESTS
