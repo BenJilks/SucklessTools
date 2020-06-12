@@ -1,6 +1,6 @@
-CC=clang++
+CC=g++
 CXXFLAGS=-std=c++17 -I/usr/local/include -g
-LINKFLAGS=-L/usr/local/lib -ljson -lwebinterface -lpthread
+LINKFLAGS=-L/usr/local/lib -ljson -lwebinterface -lpthread -lstdc++fs
 OBJ=	cron.o \
 	timer.o \
 	main.o

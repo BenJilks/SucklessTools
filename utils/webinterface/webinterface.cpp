@@ -4,6 +4,8 @@
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <memory.h>
+#include <string.h>
 using namespace Web;
 
 //#define DEBUG_REQUESTS
@@ -55,20 +57,24 @@ void Interface::start()
 
         // TODO: This can be made much more better by not allocating a new buffer each time
         std::vector<char> buffer(255);
+	int buffer_pointer = 0;
         for (int i = 0; ; i++)
         {
-            auto len = read(client_sock, buffer.data() + i * 255, 255);
+            auto len = read(client_sock, buffer.data() + buffer_pointer, 255);
             if (len < 0)
             {
                 perror("read()");
                 return;
             }
 
+	    buffer_pointer += len;
             if (len < 255)
                 break;
 
-            buffer.resize(255 * (i + 1));
+	    if (buffer_pointer >= buffer.size())
+            	buffer.resize(buffer.size() + 255);
         }
+	buffer.resize(buffer_pointer);
 
         auto request = Request::parse(std::string(buffer.data(), buffer.size()));
         if (!request)
@@ -85,7 +91,7 @@ void Interface::start()
         const Route *route = nullptr;
         for (const auto &it : m_routes)
         {
-            if (!std::strcmp(it.path.c_str(), request->url().path().c_str()))
+            if (!strcmp(it.path.c_str(), request->url().path().c_str()))
             {
                 route = &it;
                 break;

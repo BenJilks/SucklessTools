@@ -1,4 +1,4 @@
-CC=clang++
+CC=g++
 AR=ar
 CXXFLAGS=-std=c++17 -I/usr/local/include
 OBJ=	webinterface.o \

@@ -1,4 +1,5 @@
 #include "table.hpp"
+#include <algorithm>
 using namespace Web;
 
 std::optional<Table> Table::make_impl(std::vector<std::string> &&args)

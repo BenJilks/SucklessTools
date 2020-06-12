@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 #include <tuple>
+#include <algorithm>
 using namespace Web;
 
 std::optional<Template> Template::load_from_file(const std::string &path)

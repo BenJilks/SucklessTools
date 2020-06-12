@@ -92,7 +92,7 @@ void Cron::run(Json::Value &log, std::mutex &log_mutex)
         close(p[READ]);
         close(p[WRITE]);
 
-        if (execl(m_script_path.c_str(), m_script_path.c_str(), nullptr) < 0)
+        if (execl("/bin/bash", "/bin/bash", m_script_path.c_str(), nullptr) < 0)
             perror("execl()");
 
         // We shouldn't be here

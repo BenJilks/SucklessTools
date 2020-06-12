@@ -2,6 +2,7 @@
 #include "template.hpp"
 #include "table.hpp"
 #include <iostream>
+#include <cassert>
 
 int main()
 {

@@ -71,6 +71,7 @@ namespace Json
         virtual void add(const std::string&, bool) {}
         virtual void remove(const std::string&) {}
         virtual bool contains(const std::string&) const { return false; }
+	virtual void clear() {}
 
         virtual std::string to_string(PrintOption options = PrintOption::None) const;
         virtual std::string to_string_or(const std::string &) const { return to_string(); }
@@ -134,6 +135,7 @@ namespace Json
         virtual void add(const std::string& name, bool) override;
         virtual void remove(const std::string& name) override { m_data.erase(name); }
         virtual bool contains(const std::string& name) const override { return m_data.find(name) != m_data.end(); }
+	virtual void clear() override { m_data.clear(); }
 
         virtual std::string to_string(PrintOption options = PrintOption::None) const override;
         virtual std::vector<std::pair<std::string, const Value*>> to_key_value_array() const override
@@ -179,6 +181,7 @@ namespace Json
         const auto begin() const { return m_data.begin(); }
         const auto end() const { return m_data.end(); }
         virtual bool is_array() const override { return true; }
+	virtual void clear() override { m_data.clear(); }
 
     private:
         explicit Array(Allocator &allocator)

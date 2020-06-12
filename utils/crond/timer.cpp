@@ -27,19 +27,19 @@ std::optional<Timer::DailyTime> Timer::parse_daily_time(const std::string &str, 
 
         if (c == 'm')
         {
-            daily_time.minute = std::atoi(buffer.c_str());
+            daily_time.minute = atoi(buffer.c_str());
             buffer.clear();
             continue;
         }
 
         if (c == 'h')
         {
-            daily_time.hour = std::atoi(buffer.c_str());
+            daily_time.hour = atoi(buffer.c_str());
             buffer.clear();
             continue;
         }
 
-        if (!std::isdigit(c))
+        if (!isdigit(c))
         {
             out << "Timer: DailyTime: Invalid time unit '" << c << "'\n";
             return std::nullopt;
@@ -54,7 +54,7 @@ std::optional<Timer::DailyTime> Timer::parse_daily_time(const std::string &str, 
 static std::string &to_lower(std::string &&str)
 {
     for (size_t i = 0; i < str.length(); i++)
-        str[i] = std::tolower(str[i]);
+        str[i] = tolower(str[i]);
 
     return str;
 }
@@ -183,8 +183,8 @@ std::string Timer::make_time_stamp(const struct tm *date_time)
 
 std::string Timer::make_time_stamp()
 {
-    const auto now = std::time(0);
-    const auto *date_time = std::localtime(&now);
+    const auto now = time(0);
+    const auto *date_time = localtime(&now);
     return make_time_stamp(date_time);
 }
 
@@ -194,7 +194,7 @@ static time_t find_unix_time(const std::string &now)
     sscanf(now.c_str(), "%04d-%02d-%02d", &year, &month, &day);
 
     struct tm time_info;
-    std::memset(&time_info, 0, sizeof time_info);
+    memset(&time_info, 0, sizeof time_info);
     time_info.tm_year = year - 1900;
     time_info.tm_mon = month;
     time_info.tm_mday = day;
@@ -203,28 +203,28 @@ static time_t find_unix_time(const std::string &now)
 
 std::string Timer::make_time_stamp_yeserday(const std::string &now)
 {
-    auto unix_time = std::time(NULL) - 60 * 60 * 24;
+    auto unix_time = time(NULL) - 60 * 60 * 24;
     if (!now.empty())
         unix_time = find_unix_time(now) - 60 * 60 * 24;
 
-    const auto *date_time = std::localtime(&unix_time);
+    const auto *date_time = localtime(&unix_time);
     return make_time_stamp(date_time);
 }
 
 std::string Timer::make_time_stamp_tomorrow(const std::string &now)
 {
-    auto unix_time = std::time(0) + 60 * 60 * 24;
+    auto unix_time = time(0) + 60 * 60 * 24;
     if (!now.empty())
         unix_time = find_unix_time(now) + 60 * 60 * 24;
 
-    const auto *date_time = std::localtime(&unix_time);
+    const auto *date_time = localtime(&unix_time);
     return make_time_stamp(date_time);
 }
 
 std::string Timer::time_string()
 {
-    const auto now = std::time(0);
-    const auto *date_time = std::localtime(&now);
+    const auto now = time(0);
+    const auto *date_time = localtime(&now);
     char buffer[80];
 
     sprintf(buffer, "%02d:%02d:%02d",
@@ -236,8 +236,8 @@ std::string Timer::time_string()
 
 bool Timer::should_run(size_t run_time) const
 {
-    const auto now = std::time(0);
-    const auto *date_time = std::localtime(&now);
+    const auto now = time(0);
+    const auto *date_time = localtime(&now);
     const auto timestamp = make_time_stamp(date_time);
 
     if (m_weekly)
