@@ -11,8 +11,7 @@ namespace DB
     public:
         ~DataBase();
         
-        static std::optional<DataBase> load_from_file(const std::string &path);
-        static std::optional<DataBase> create_new();
+        static std::optional<DataBase> open(const std::string &path);
         
         Table &construct_table(Table::Constructor);
         

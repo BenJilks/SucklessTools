@@ -7,7 +7,7 @@ int main()
 {
 	std::cout << "Hello, databases!!!\n";
 
-    auto db_or_error = DataBase::create_new();
+    auto db_or_error = DataBase::open("test.db");
     assert (db_or_error);
     
     auto db = *db_or_error;

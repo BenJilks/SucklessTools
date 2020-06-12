@@ -2,15 +2,10 @@
 #include <cassert>
 using namespace DB;
 
-std::optional<DataBase> DataBase::load_from_file(const std::string &path)
+std::optional<DataBase> DataBase::open(const std::string&)
 {
     // TODO: Implement this
     assert (false);
-}
-
-std::optional<DataBase> DataBase::create_new()
-{
-    return DataBase();
 }
 
 Table &DataBase::construct_table(Table::Constructor constructor)
