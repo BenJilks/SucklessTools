@@ -1,4 +1,4 @@
-CC=clang++
+CC=c++
 AR=ar
 CXXFLAGS=-std=c++17 -g
 OBJ=libjson.o \

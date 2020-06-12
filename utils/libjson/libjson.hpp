@@ -26,7 +26,10 @@ namespace Json
         Value(Value &&) = delete;
         Value(const Value &) = delete;
         Value(const Value &&) = delete;
-        virtual ~Value() {}
+        virtual ~Value() 
+        {
+            m_allocator.did_delete();
+        }
 
         virtual Value& get(const std::string&) { return *s_null_value; }
         virtual Value& get(int) { return *s_null_value; }
@@ -256,6 +259,8 @@ namespace Json
     {
     public:
         static Document parse(std::istream&& stream);
+        Document(Document&&) = default;
+        ~Document();
 
         inline const Value &root() const { return *m_root; }
         inline Value &root() { return *m_root; }

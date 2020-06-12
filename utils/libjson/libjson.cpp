@@ -1,4 +1,5 @@
 #include "libjson.hpp"
+#include "allocator.hpp"
 #include <assert.h>
 #include <iostream>
 #include <sstream>
@@ -71,6 +72,13 @@ bool is_one_of(uint32_t rune, Args... args)
     return false;
 }
 
+Document::~Document()
+{
+#ifdef DEBUG_ALLOCATOR
+    m_allocator->report_usage();
+#endif
+}
+
 Document Document::parse(std::istream&& stream)
 {
     Document doc;
@@ -81,10 +89,10 @@ Document Document::parse(std::istream&& stream)
     State state = State::Initial;
     std::vector<State> return_stack { State::Done };
     std::vector<Value*> value_stack;
-    std::string buffer;
-
+    std::vector<char> buffer(1024);
+    size_t buffer_pointer = 0;
+    
     // Pre allocate some memory to reduce allocations
-    buffer.reserve(1024);
     return_stack.reserve(20);
     value_stack.reserve(20);
 
@@ -207,8 +215,9 @@ Document Document::parse(std::istream&& stream)
         case State::String:
             if (rune == '"')
             {
-                value_stack.push_back(allocator.make_string_from_buffer(buffer));
-                buffer.clear();
+                auto str = std::string_view(buffer.data(), buffer_pointer);
+                value_stack.push_back(allocator.make_string_from_buffer(str));
+                buffer_pointer = 0;
 
                 state = return_stack.back();
                 return_stack.pop_back();
@@ -221,35 +230,35 @@ Document Document::parse(std::istream&& stream)
                 break;
             }
 
-            buffer += rune;
+            buffer[buffer_pointer++] = rune;
             break;
 
         case State::StringEscape:
             switch (rune)
             {
             case '"':
-                buffer += '"';
+                buffer[buffer_pointer++] = '"';
                 break;
             case '\\':
-                buffer += '\\';
+                buffer[buffer_pointer++] = '\\';
                 break;
             case '/':
-                buffer += '/';
+                buffer[buffer_pointer++] = '/';
                 break;
             case 'b':
-                buffer += '\b';
+                buffer[buffer_pointer++] = '\b';
                 break;
             case 'f':
-                buffer += '\f';
+                buffer[buffer_pointer++] = '\f';
                 break;
             case 'n':
-                buffer += '\n';
+                buffer[buffer_pointer++] = '\n';
                 break;
             case 'r':
-                buffer += '\r';
+                buffer[buffer_pointer++] = '\r';
                 break;
             case 't':
-                buffer += '\t';
+                buffer[buffer_pointer++] = '\t';
                 break;
             case 'u':
                 break;
@@ -276,7 +285,7 @@ Document Document::parse(std::istream&& stream)
             // TODO: Should not accept any numbers starting with 0 other then 0, -0 and 0.x, ...
             if (rune == '-')
             {
-                buffer += "-";
+                buffer[buffer_pointer++] = '-';
                 state = State::Number;
                 break;
             }
@@ -288,20 +297,20 @@ Document Document::parse(std::istream&& stream)
         case State::Number:
             if (isdigit(rune))
             {
-                buffer += rune;
+                buffer[buffer_pointer++] = rune;
                 break;
             }
 
             if (rune == '.')
             {
-                buffer += rune;
+                buffer[buffer_pointer++] = rune;
                 state = State::NumberFraction;
                 break;
             }
 
             if (rune == 'E' || rune == 'e')
             {
-                buffer += 'E';
+                buffer[buffer_pointer++] = 'E';
                 state = State::NumberExponentStart;
                 break;
             }
@@ -313,13 +322,13 @@ Document Document::parse(std::istream&& stream)
         case State::NumberFraction:
             if (isdigit(rune))
             {
-                buffer += rune;
+                buffer[buffer_pointer++] = rune;
                 break;
             }
 
             if (rune == 'E' || rune == 'e')
             {
-                buffer += 'E';
+                buffer[buffer_pointer++] = 'E';
                 state = State::NumberExponentStart;
                 break;
             }
@@ -337,20 +346,20 @@ Document Document::parse(std::istream&& stream)
         case State::NumberExponentStart:
             if (rune == '-' || rune == '+')
             {
-                buffer += rune;
+                buffer[buffer_pointer++] = rune;
                 state = State::NumberExponent;
                 break;
             }
 
             emit_error("Expected '+' or '-' before exponent");
-            buffer += '+';
+            buffer[buffer_pointer++] = '+';
             state = State::NumberExponent;
             break;
 
         case State::NumberExponent:
             if (isdigit(rune))
             {
-                buffer += rune;
+                buffer[buffer_pointer++] = rune;
                 break;
             }
 
@@ -359,13 +368,18 @@ Document Document::parse(std::istream&& stream)
             break;
 
         case State::NumberDone:
-            value_stack.push_back(allocator.make<Number>(atof(buffer.c_str())));
-            buffer.clear();
+        {
+            auto str = std::string_view(buffer.data(), buffer_pointer);
+            buffer[buffer_pointer] = '\0';
+            
+            value_stack.push_back(allocator.make<Number>(atof(str.data())));
+            buffer_pointer = 0;
 
             should_reconsume = true;
             state = return_stack.back();
             return_stack.pop_back();
             break;
+        }
 
         case State::ObjectStart:
             if (isspace(rune))

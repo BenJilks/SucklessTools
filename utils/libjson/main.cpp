@@ -18,6 +18,5 @@ int main()
         doc.log_errors();
     std::cout << root.to_string(Json::PrintOption::PrettyPrint) << "\n";
     std::cout << "Made " << alloc_count << " allocations\n";
-
     return 0;
 }
