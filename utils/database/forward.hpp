@@ -2,10 +2,11 @@
 
 namespace DB
 {
-    
+
     class DataBase;
+    class Chunk;
     class Table;
     class Column;
-    class Cell;
-    
+    class Entry;
+
 }
