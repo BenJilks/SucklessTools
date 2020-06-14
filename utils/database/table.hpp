@@ -34,6 +34,7 @@ namespace DB
         };
 
         inline int id() const { return m_id; }
+        inline const std::string &name() const { return m_name; }
 
         Row::Constructor new_row();
         std::optional<Row> add_row(Row::Constructor);
@@ -41,13 +42,15 @@ namespace DB
 
     private:
         Table(DataBase&, Constructor);
-        Table(std::shared_ptr<Chunk> header);
+        Table(DataBase&, std::shared_ptr<Chunk> header);
 
+        int find_next_row_chunk_index();
         void add_row_data(std::shared_ptr<Chunk> data);
         void write_header();
 
+        DataBase &m_db;
         std::shared_ptr<Chunk> m_header;
-        std::shared_ptr<Chunk> m_data;
+        std::vector<std::shared_ptr<Chunk>> m_row_data_chunks;
         size_t m_row_count_offset;
 
         int m_id { 0xCD };

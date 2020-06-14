@@ -1,4 +1,5 @@
 #include "database.hpp"
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <filesystem>
@@ -13,6 +14,11 @@ Chunk::Chunk(DB::DataBase& db, size_t header_offset)
     m_index = db.read_byte(header_offset + 3);
     m_size_in_bytes = db.read_int(header_offset + 4);
     m_data_offset = header_offset + 8;
+}
+
+bool Chunk::is_active() const
+{
+    return m_db.m_active_chunk.get() == this;
 }
 
 uint8_t Chunk::read_byte(size_t offset)
@@ -103,11 +109,10 @@ std::shared_ptr<DataBase> DataBase::open(const std::string& path)
 {
     FILE *file;
 
-    /*if (!std::filesystem::exists(path))
+    if (!std::filesystem::exists(path))
         file = fopen(path.c_str(), "w+");
     else
-        file = fopen(path.c_str(), "r+");*/
-    file = fopen(path.c_str(), "r+");
+        file = fopen(path.c_str(), "r+");
 
     if (!file)
     {
@@ -137,20 +142,38 @@ DataBase::DataBase(FILE *file)
         if (chunk->type() == "TH")
         {
             // TableHeader
-            assert (!m_table);
-            m_table = new Table(chunk);
+            m_tables.push_back(Table(*this, chunk));
         }
         else if (chunk->type() == "RD")
         {
             // RowData
-            assert(m_table); // NOTE: As we only have one table, assert that it exists
-            assert(m_table->id() == chunk->owner_id()); // Make sure ID's match
-            m_table->add_row_data(chunk);
-            std::cout << "Attached row data to chunk\n";
+            bool did_find_table = false;
+            for (auto &table : m_tables)
+            {
+                if (table.id() == chunk->owner_id())
+                {
+                    table.add_row_data(chunk);
+                    did_find_table = true;
+                    break;
+                }
+            }
+
+            // TODO: Error, no table found
+            assert (did_find_table);
         }
 
         m_chunks.push_back(chunk);
+        m_active_chunk = chunk;
     }
+}
+
+uint8_t DataBase::generate_table_id()
+{
+    uint8_t max_id = 0;
+    for (const auto &table : m_tables)
+        max_id = std::max(max_id, (uint8_t)table.id());
+
+    return max_id + 1;
 }
 
 void DataBase::check_size(size_t size)
@@ -209,28 +232,23 @@ void DataBase::read_string(size_t offset, char *str, size_t len)
 
 Table &DataBase::construct_table(Table::Constructor constructor)
 {
-    // NOTE: There can only be 1 table for now
-    assert (!m_table);
-
-    m_table = new Table(*this, constructor);
-    return *m_table;
+    m_tables.push_back(Table(*this, constructor));
+    return m_tables.back();
 }
 
 std::optional<Table> DataBase::get_table(const std::string &name)
 {
-    if (!m_table)
-        return std::nullopt;
+    for (auto &table : m_tables)
+    {
+        if (table.name() == name)
+            return table;
+    }
 
-    return *m_table;
+    return std::nullopt;
 }
 
 DataBase::~DataBase()
 {
     if (m_file)
-    {
-        if (m_table)
-            delete m_table;
-
         fclose(m_file);
-    }
 }

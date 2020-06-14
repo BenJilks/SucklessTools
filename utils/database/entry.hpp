@@ -10,7 +10,7 @@ namespace DB
     public:
         enum Primitive
         {
-            Integer,
+            Integer = 0,
         };
 
         DataType(Primitive primitive, size_t size, size_t length)
