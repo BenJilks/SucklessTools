@@ -15,14 +15,21 @@ std::shared_ptr<Statement> Parser::parse_select()
     assert (m_lexer.consume(Lexer::Select));
 
     auto select = std::unique_ptr<SelectStatement>(new SelectStatement());
-    for (;;)
+    if (m_lexer.consume(Lexer::Star))
     {
-        auto token = m_lexer.consume(Lexer::Name);
-        assert (token);
+        select->m_all = true;
+    }
+    else
+    {
+        for (;;)
+        {
+            auto token = m_lexer.consume(Lexer::Name);
+            assert (token);
 
-        select->m_columns.push_back(token->data);
-        if (!m_lexer.consume(Lexer::Comma))
-            break;
+            select->m_columns.push_back(token->data);
+            if (!m_lexer.consume(Lexer::Comma))
+                break;
+        }
     }
 
     assert (m_lexer.consume(Lexer::From));

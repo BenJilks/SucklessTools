@@ -19,6 +19,7 @@ namespace DB::Sql
 
         std::vector<std::string> m_columns;
         std::string m_table;
+        bool m_all { false };
 
     };
 
