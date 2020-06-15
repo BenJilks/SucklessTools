@@ -1,4 +1,5 @@
 #include "database.hpp"
+#include "sql/parser.hpp"
 #include <algorithm>
 #include <cassert>
 #include <fstream>
@@ -165,6 +166,14 @@ DataBase::DataBase(FILE *file)
         m_chunks.push_back(chunk);
         m_active_chunk = chunk;
     }
+}
+
+SqlResult DataBase::execute_sql(const std::string &query)
+{
+    auto statement = Sql::Parser::parse(query);
+    assert (statement);
+
+    return statement->execute(*this);
 }
 
 uint8_t DataBase::generate_table_id()

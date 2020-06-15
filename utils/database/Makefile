@@ -5,7 +5,10 @@ OBJ=main.o \
     table.o \
     column.o \
     row.o \
-    entry.o
+    entry.o \
+    sql/lexer.o \
+    sql/parser.o \
+    sql/select.o
 
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)

@@ -35,6 +35,7 @@ namespace DB
 
         inline int id() const { return m_id; }
         inline const std::string &name() const { return m_name; }
+        inline size_t row_count() const { return m_row_count; }
 
         Row::Constructor new_row();
         std::optional<Row> add_row(Row::Constructor);

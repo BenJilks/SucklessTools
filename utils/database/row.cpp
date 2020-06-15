@@ -18,6 +18,22 @@ Row::Row(Constructor&& constructor, const std::vector<Column> &columns)
     }
 }
 
+Row::Row(std::vector<std::string> select_columns, Row &&other)
+    : m_chunk(other.m_chunk)
+{
+    for (auto &column : other.m_entries)
+    {
+        // Only copy in if it's in the selected columns,
+        // then remove it from the list
+        auto index = std::find(select_columns.begin(), select_columns.end(), column.first);
+        if (index != select_columns.end())
+        {
+            m_entries[column.first] = std::move(column.second);
+            select_columns.erase(index);
+        }
+    }
+}
+
 Entry &Row::operator [](const std::string &name)
 {
     return *m_entries[name];

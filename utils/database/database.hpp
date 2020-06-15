@@ -1,5 +1,6 @@
 #pragma once
 #include "table.hpp"
+#include "sql/sql.hpp"
 #include <iostream>
 #include <optional>
 #include <string>
@@ -66,6 +67,8 @@ namespace DB
 
         Table &construct_table(Table::Constructor);
         std::optional<Table> get_table(const std::string &name);
+
+        SqlResult execute_sql(const std::string &query);
 
     private:
         explicit DataBase(FILE *file);

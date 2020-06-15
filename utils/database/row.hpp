@@ -11,6 +11,7 @@ namespace DB
     class Row
     {
         friend Table;
+        friend Sql::SelectStatement;
 
     public:
         class Constructor
@@ -38,6 +39,9 @@ namespace DB
         explicit Row(Constructor&& constructor, const std::vector<Column> &columns);
         explicit Row(Chunk &chunk)
             : m_chunk(chunk) {}
+
+        // Create a row based of a selection
+        explicit Row(std::vector<std::string> select_columns, Row &&other);
 
         Chunk &m_chunk;
         std::unordered_map<std::string, std::unique_ptr<Entry>> m_entries;

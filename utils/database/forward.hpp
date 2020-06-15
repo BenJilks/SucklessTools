@@ -9,4 +9,14 @@ namespace DB
     class Column;
     class Entry;
 
+    namespace Sql
+    {
+
+        class Lexer;
+        class Parser;
+        class Statement;
+        class SelectStatement;
+
+    };
+
 }

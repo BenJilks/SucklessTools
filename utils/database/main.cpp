@@ -50,7 +50,9 @@ int main()
     }
 #endif
 
-    std::cout << *(*table1).get_row(10) << "\n";
+    auto result = db.execute_sql("SELECT ID, Age FROM Test0");
+    for (const auto &row : result)
+        std::cout << row << "\n";
 #endif
 
     return 0;
