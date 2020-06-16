@@ -112,9 +112,9 @@ std::shared_ptr<DataBase> DataBase::open(const std::string& path)
     FILE *file;
 
     if (!std::filesystem::exists(path))
-        file = fopen(path.c_str(), "w+");
+        file = fopen(path.c_str(), "w+b");
     else
-        file = fopen(path.c_str(), "r+");
+        file = fopen(path.c_str(), "r+b");
 
     if (!file)
     {

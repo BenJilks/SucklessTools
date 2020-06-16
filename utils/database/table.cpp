@@ -4,6 +4,8 @@
 #include <cassert>
 using namespace DB;
 
+// #define DEBUG_TABLE_LOAD
+
 Table::Table(DataBase& db, Constructor constructor)
     : m_db(db)
 {
@@ -52,6 +54,12 @@ Table::Table(DataBase &db, std::shared_ptr<Chunk> header)
         auto type = DataType(primitive, 4, length); // TODO: Use real size, assuming 4, for now
         offset += 1 + 1;
 
+#ifdef DEBUG_TABLE_LOAD
+        std::cout << "Loaded Column { " <<
+            "name_length = " << column_name_len << ", " <<
+            "name = " << column_name << ", " <<
+            "primitive = " << primitive << " }\n";
+#endif
         m_columns.push_back(Column(column_name, type));
         m_row_size += type.size();
     }
@@ -80,7 +88,10 @@ void Table::write_header()
         const auto &name = column.m_name;
         const auto &type = column.m_data_type;
 
-        m_header->write_byte(curr_offset, name.size());
+#ifdef DEBUG_TABLE_LOAD
+        std::cout << "Write column " << name << " of size " << (int)(uint8_t)name.size() << "\n";
+#endif
+        m_header->write_byte(curr_offset, (uint8_t)name.size());
         m_header->write_string(curr_offset + 1, name);
         curr_offset += 1 + name.size();
 
