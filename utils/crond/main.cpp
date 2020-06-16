@@ -58,7 +58,7 @@ static std::string replace_all(std::string str, const std::string& from, const s
 static std::optional<Json::Document> load_log(const std::string &date, const std::string &cron_path)
 {
     auto now = Timer::make_time_stamp();
-    if (true || date == now)
+    if (date == now)
         return std::nullopt;
 
     auto doc = Json::Document::parse(std::ifstream(cron_path + "/log/log-" + date + ".json"));
@@ -234,7 +234,7 @@ static void start_cron(const std::string &cron_path, bool enable_web_interface, 
     std::mutex log_mutex;
 
     auto log_doc = Json::Document::parse(std::ifstream(log_path));
-    auto &log = log_doc.root_or_new<Json::Array>();
+    auto &log = log_doc.root_or_new_array();
 
     auto save_log = [&log, &log_path, &log_mutex]()
     {

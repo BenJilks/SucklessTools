@@ -1,6 +1,10 @@
-CC=g++
+CC=c++
 CXXFLAGS=-std=c++17 -I/usr/local/include -g
-LINKFLAGS=-L/usr/local/lib -ljson -lwebinterface -lpthread -lstdc++fs
+LINKFLAGS=-L/usr/local/lib -ljson -lwebinterface -lpthread 
+
+# Enable if on ARM
+# LINKFLAGS+=-lstdc++fs
+
 OBJ=	cron.o \
 	timer.o \
 	main.o

@@ -33,10 +33,7 @@ int main(int argc, char *argv[])
     if (doc.has_error())
         doc.log_errors();
 
-    auto &bookmarks = doc.root();
-	if (!bookmarks.is<Json::Object>())
-		bookmarks = *doc.allocator().make<Json::Object>();
-
+    auto &bookmarks = doc.root_or_new_object();
 	bool should_list = true;
 	for (;;)
 	{
@@ -60,7 +57,7 @@ int main(int argc, char *argv[])
 
 			case 'a':
 			{
-				bookmarks.add(optarg, doc.allocator().make_string_from_buffer(getenv("PWD")));
+				bookmarks.add_new_string(optarg, getenv("PWD"));
 				break;
 			}
 
@@ -77,7 +74,7 @@ int main(int argc, char *argv[])
 			case 'g':
 			{
 				auto &dir = bookmarks[optarg];
-				if (!dir.is<Json::String>())
+				if (!dir.is_string())
 				{
 					std::cerr << "Error: No valid bookmark called '" << optarg << "'\n";
 					exit(-1);

@@ -10,7 +10,7 @@ Timer::Timer(const std::string &log_path)
     auto doc = Json::Document::parse(std::move(stream));
     if (doc.has_error())
         doc.log_errors();
-    doc.root_or_new<Json::Object>();
+    doc.root_or_new_object();
 
     m_log_doc = std::make_unique<Json::Document>(std::move(doc));
 }
@@ -148,7 +148,7 @@ bool Timer::has_done_daily(const DailyTime& daily_time, const std::string &now) 
         std::to_string(daily_time.minute) + "m";
 
     auto &done = m_log_doc->root();
-    auto &daily = done.get_or_new<Json::Object>("daily");
+    auto &daily = done.get_or_new_object("daily");
 
     auto timestamp = daily["timestamp"].to_string_or("");
     if (timestamp != now)
@@ -157,7 +157,7 @@ bool Timer::has_done_daily(const DailyTime& daily_time, const std::string &now) 
         daily.add("timestamp", now);
     }
 
-    auto &done_list = daily.get_or_new<Json::Array>("done_list");
+    auto &done_list = daily.get_or_new_array("done_list");
     for (const auto &done : done_list.to_array())
     {
         if (!done->is_string())
@@ -167,7 +167,7 @@ bool Timer::has_done_daily(const DailyTime& daily_time, const std::string &now) 
             return true;
     }
 
-    done_list.append_new<Json::String>(serilized);
+    done_list.append_new_string(serilized);
     return false;
 }
 

@@ -59,13 +59,13 @@ void Cron::run(Json::Value &log, std::mutex &log_mutex)
 {
     log_mutex.lock();
     auto start_time = Timer::time_string();
-    auto &log_entry = log.append_new<Json::Object>();
+    auto &log_entry = log.append_new_object();
     log_entry.add("name", m_name);
     log_entry.add("id", new_id());
     log_entry.add("start_time", start_time);
     log_entry.add("runtime", "In Progress...");
     log_entry.add("end_time", "In Progress...");
-    log_entry.add_new<Json::Number>("exit_status", -1);
+    log_entry.add_new_number("exit_status", -1);
     log_mutex.unlock();
 
     std::cout << "\nRunning cron " << m_name << "...\n";
@@ -137,7 +137,7 @@ void Cron::run(Json::Value &log, std::mutex &log_mutex)
     auto runtime_sec = std::chrono::duration_cast<std::chrono::seconds>(end - begin).count();
     auto runtime_msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
     auto runtime = std::to_string(runtime_sec) + "s " + std::to_string(runtime_msec) + "ms";
-    log_entry.add_new<Json::Number>("exit_status", status);
+    log_entry.add_new_number("exit_status", status);
     log_entry.add("output", log_buffer);
     log_entry.add("runtime", runtime);
     log_entry.add("end_time", end_time);
