@@ -33,11 +33,6 @@ int main()
         }
     }
 #else
-    auto table0 = db.get_table("Test0");
-    auto table1 = db.get_table("Test1");
-    assert (table0);
-    assert (table1);
-
 #if 0
     for (size_t i = 0; i < 2; i++)
     {
@@ -50,7 +45,9 @@ int main()
     }
 #endif
 
-    auto result = db.execute_sql("SELECT ID, Age FROM Test0");
+    db.drop_table("Test0");
+
+    auto result = db.execute_sql("SELECT ID, Age FROM Test1");
     for (const auto &row : result)
         std::cout << row << "\n";
 #endif

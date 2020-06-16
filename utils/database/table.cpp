@@ -44,7 +44,7 @@ Table::Table(DataBase &db, std::shared_ptr<Chunk> header)
     for (size_t i = 0; i < column_count; i++)
     {
         // Column name
-        auto column_name_len = header->read_byte(offset);
+        auto column_name_len = (size_t)header->read_byte(offset);
         auto column_name = header->read_string(offset + 1, column_name_len);
         offset += 1 + column_name_len;
 
@@ -107,9 +107,6 @@ void Table::write_header()
 std::optional<Row> Table::add_row(Row::Constructor constructor)
 {
     const auto &data = constructor.m_entries;
-
-    std::cout << "Create new row at " << constructor.m_row_offset << "\n";
-
     if (data.size() != m_columns.size())
     {
         // TODO: Error
@@ -205,4 +202,11 @@ void Table::add_row_data(std::shared_ptr<Chunk> data)
     {
         return a->index() < b->index();
     });
+}
+
+void Table::drop()
+{
+    m_header->drop();
+    for (const auto &chunk : m_row_data_chunks)
+        chunk->drop();
 }

@@ -31,6 +31,7 @@ namespace DB
         void write_byte(size_t offset, uint8_t);
         void write_int(size_t offset, int);
         void write_string(size_t offset, const std::string&);
+        void drop();
 
     private:
         Chunk(DataBase&, size_t header_offset);
@@ -47,6 +48,7 @@ namespace DB
         size_t m_size_in_bytes { 0 };
         uint8_t m_owner_id { 0xCD };
         uint8_t m_index { 0xCD };
+        bool m_has_been_dropped { false };
 
     };
 
@@ -66,7 +68,8 @@ namespace DB
         static std::shared_ptr<DataBase> open(const std::string &path);
 
         Table &construct_table(Table::Constructor);
-        std::optional<Table> get_table(const std::string &name);
+        Table *get_table(const std::string &name);
+        bool drop_table(const std::string &name);
 
         SqlResult execute_sql(const std::string &query);
 

@@ -20,21 +20,25 @@ Chunk::Chunk(DB::DataBase& db, size_t header_offset)
 
 bool Chunk::is_active() const
 {
+    assert (!m_has_been_dropped);
     return m_db.m_active_chunk.get() == this;
 }
 
 uint8_t Chunk::read_byte(size_t offset)
 {
+    assert (!m_has_been_dropped);
     return m_db.read_byte(m_data_offset + offset);
 }
 
 int Chunk::read_int(size_t offset)
 {
+    assert (!m_has_been_dropped);
     return m_db.read_int(m_data_offset + offset);
 }
 
 std::string Chunk::read_string(size_t offset, size_t len)
 {
+    assert (!m_has_been_dropped);
     std::vector<char> buffer(len);
     m_db.read_string(m_data_offset + offset, buffer.data(), len);
     return std::string(buffer.data(), buffer.size());
@@ -52,20 +56,29 @@ void Chunk::check_size(size_t size)
 
 void Chunk::write_byte(size_t offset, uint8_t byte)
 {
+    assert (!m_has_been_dropped);
     check_size(offset + 1);
     m_db.write_byte(m_data_offset + offset, byte);
 }
 
 void Chunk::write_int(size_t offset, int i)
 {
+    assert (!m_has_been_dropped);
     check_size(offset + 4);
     m_db.write_int(m_data_offset + offset, i);
 }
 
 void Chunk::write_string(size_t offset, const std::string &str)
 {
+    assert (!m_has_been_dropped);
     check_size(offset + str.size());
     m_db.write_string(m_data_offset + offset, str);
+}
+
+void Chunk::drop()
+{
+    m_db.write_string(m_header_offset, "RM");
+    m_has_been_dropped = true;
 }
 
 std::ostream &operator <<(std::ostream &stream, const Chunk &chunk)
@@ -139,6 +152,14 @@ DataBase::DataBase(FILE *file)
     {
         auto chunk = std::shared_ptr<Chunk>(new Chunk(*this, offset));
         offset += 8 + chunk->size_in_bytes();
+        
+        if (chunk->type() == "RM")
+        {
+            std::cout << "Dropped chunk " << 
+                "at: " << chunk->data_offset() << 
+                " of size: " << chunk->size_in_bytes() << "\n";
+            continue;
+        }
 
         std::cout << "Loaded " << *chunk << "\n";
         if (chunk->type() == "TH")
@@ -203,7 +224,7 @@ void DataBase::write_int(size_t offset, int i)
 {
     check_size(offset + sizeof(int));
     fseek(m_file, offset, SEEK_SET);
-    fwrite(reinterpret_cast<char*>(&i), 1, sizeof(int), m_file);
+    fwrite((char*)(&i), 1, sizeof(int), m_file);
 }
 
 void DataBase::write_string(size_t offset, const std::string& str)
@@ -246,15 +267,35 @@ Table &DataBase::construct_table(Table::Constructor constructor)
     return m_tables.back();
 }
 
-std::optional<Table> DataBase::get_table(const std::string &name)
+Table *DataBase::get_table(const std::string &name)
 {
     for (auto &table : m_tables)
     {
         if (table.name() == name)
-            return table;
+            return &table;
     }
 
-    return std::nullopt;
+    return nullptr;
+}
+
+bool DataBase::drop_table(const std::string &name)
+{
+    auto table_index = m_tables.end();
+    for (auto it = m_tables.begin(); it != m_tables.end(); ++it)
+    {
+        if (it->name() == name)
+        {
+            table_index = it;
+            break;
+        }
+    }
+    
+    if (table_index == m_tables.end())
+        return false;
+    
+    table_index->drop();
+    m_tables.erase(table_index);
+    return true;
 }
 
 DataBase::~DataBase()

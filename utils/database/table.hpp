@@ -14,6 +14,9 @@ namespace DB
         friend DataBase;
 
     public:
+        Table(const Table&) = default;
+        Table operator=(const Table&& table) { return Table(std::move(table)); };
+        
         class Constructor
         {
             friend Table;
@@ -40,6 +43,7 @@ namespace DB
         Row::Constructor new_row();
         std::optional<Row> add_row(Row::Constructor);
         std::optional<Row> get_row(size_t index);
+        void drop();
 
     private:
         Table(DataBase&, Constructor);
