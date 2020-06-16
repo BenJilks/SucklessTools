@@ -1,6 +1,7 @@
 #include "parser.hpp"
 #include "select.hpp"
 #include "../entry.hpp"
+#include <cassert>
 #include <iostream>
 #include <memory>
 using namespace DB::Sql;

@@ -1,6 +1,7 @@
 #include "row.hpp"
 #include "entry.hpp"
 #include "column.hpp"
+#include <algorithm>
 #include <iostream>
 using namespace DB;
 

@@ -2,6 +2,7 @@
 #include "sql/parser.hpp"
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <fstream>
 #include <filesystem>
 using namespace DB;

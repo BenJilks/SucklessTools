@@ -1,4 +1,5 @@
 #include "column.hpp"
+#include <cassert>
 using namespace DB;
 
 std::unique_ptr<Entry> Column::read(Chunk &chunk, size_t offset) const

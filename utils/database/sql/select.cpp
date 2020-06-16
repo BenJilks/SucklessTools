@@ -1,5 +1,6 @@
 #include "select.hpp"
 #include "../database.hpp"
+#include <cassert>
 using namespace DB;
 using namespace DB::Sql;
 
