@@ -14,8 +14,18 @@ public:
     {
         None,
         Name,
+
         Select,
         From,
+
+        Insert,
+        Into,
+        OpenBrace,
+        CloseBrace,
+        Values,
+
+        Integer,
+
         Star,
         Comma,
     };
@@ -37,7 +47,8 @@ private:
     enum class State
     {
         Normal,
-        Name
+        Name,
+        Integer
     };
 
     std::optional<Token> next();

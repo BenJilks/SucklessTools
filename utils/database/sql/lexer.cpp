@@ -40,12 +40,23 @@ std::optional<Lexer::Token> Lexer::next()
                     break;
                 }
 
+                if (isnumber(c))
+                {
+                    m_should_reconsume = true;
+                    m_state = State::Integer;
+                    break;
+                }
+
                 switch (c)
                 {
                     case '*':
                         return Token { "*", Type::Star };
                     case ',':
                         return Token { ",", Type::Comma };
+                    case '(':
+                        return Token { "(", Type::OpenBrace };
+                    case ')':
+                        return Token { ")", Type::CloseBrace };
                     default:
                         break;
                 }
@@ -59,6 +70,17 @@ std::optional<Lexer::Token> Lexer::next()
                     m_should_reconsume = true;
                     m_state = State::Normal;
                     return parse_name(buffer);
+                }
+
+                buffer += c;
+                break;
+
+            case State::Integer:
+                if (!isnumber(c))
+                {
+                    m_should_reconsume = true;
+                    m_state = State::Normal;
+                    return Token { buffer, Type::Integer };
                 }
 
                 buffer += c;
@@ -81,6 +103,12 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Select };
     else if (lower == "from")
         return { buffer, Type::From };
+    else if (lower == "insert")
+        return { buffer, Type::Insert };
+    else if (lower == "into")
+        return { buffer, Type::Into };
+    else if (lower == "values")
+        return { buffer, Type::Values };
     return { buffer, Type::Name };
 }
 

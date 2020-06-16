@@ -26,17 +26,16 @@ namespace Json
 
     public:
         AllocatorCustom();
-        
+
         virtual Null *make_null() override;
         virtual Object *make_object() override;
         virtual Array *make_array() override;
         virtual String *make_string(const std::string_view) override;
         virtual Number *make_number(double) override;
         virtual Boolean *make_boolean(bool) override;
-        
-#ifdef DEBUG_ALLOCATOR
+
         virtual void report_usage() override;
-#endif
+        virtual void did_delete() override;
 
     private:
         struct MemoryChunk
@@ -73,12 +72,11 @@ namespace Json
         }
 
         void insure_size(size_t);
-        void did_delete();
 
         std::unique_ptr<MemoryChunk> m_memory_chain;
         MemoryChunk *m_current_memory_chunk { nullptr };
         static constexpr size_t s_link_size = 1024;
-        
+
 #ifdef DEBUG_ALLOCATOR
         // Memory tracking data
         size_t m_max_usage { 0 };

@@ -13,6 +13,7 @@ namespace DB::Sql
         enum Type
         {
             Select,
+            Insert,
         };
 
         virtual SqlResult execute(DataBase&) const = 0;

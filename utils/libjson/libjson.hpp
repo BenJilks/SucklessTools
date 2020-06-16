@@ -16,9 +16,15 @@ namespace Json
         Serialize   = 1 << 1,
     };
 
+#define GET_OR_NEW(type) \
+    if (contains(name)) \
+        return get(name); \
+     \
+    return (Value&)*m_allocator.make_##type;
+
     class Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
         friend Document;
 
     public:
@@ -26,7 +32,7 @@ namespace Json
         Value(Value &&) = delete;
         Value(const Value &) = delete;
         Value(const Value &&) = delete;
-        virtual ~Value() 
+        virtual ~Value()
         {
             m_allocator.did_delete();
         }
@@ -41,29 +47,26 @@ namespace Json
         inline const Value &operator[] (const std::string& name) const { return get(name); }
         inline const Value &operator[] (size_t index) const { return get(index); }
 
-        template <typename T, typename ...Args>
-        inline Value &get_or_new(const std::string& name, Args ...args)
-        {
-            if (contains(name))
-                return get(name);
+        inline Value &get_or_new_null(const std::string &name) { GET_OR_NEW(null()); }
+        inline Value &get_or_new_object(const std::string &name) { GET_OR_NEW(object()); }
+        inline Value &get_or_new_array(const std::string &name) { GET_OR_NEW(array()); }
+        inline Value &get_or_new_string(const std::string &name, std::string_view str) { GET_OR_NEW(string(str)); }
+        inline Value &get_or_new_number(const std::string &name, double n) { GET_OR_NEW(number(n)); }
+        inline Value &get_or_new_boolean(const std::string &name, bool b) { GET_OR_NEW(boolean(b)); }
 
-            return add_new<T>(name, args...);
-        }
+        inline Value &add_new_null(const std::string &name) { return add_new(name, m_allocator.make_null()); }
+        inline Value &add_new_object(const std::string &name) { return add_new(name, m_allocator.make_object()); }
+        inline Value &add_new_array(const std::string &name) { return add_new(name, m_allocator.make_array()); }
+        inline Value &add_new_string(const std::string &name, std::string_view str) { return add_new(name, m_allocator.make_string(str)); }
+        inline Value &add_new_number(const std::string &name, double n) { return add_new(name, m_allocator.make_number(n)); }
+        inline Value &add_new_boolean(const std::string &name, bool b) { return add_new(name, m_allocator.make_boolean(b)); }
 
-        template <typename T, typename ...Args>
-        inline Value &add_new(const std::string& name, Args ...args)
-        {
-            auto value = m_allocator.make<T>(args...);
-            add(name, value);
-            return static_cast<Value&>(*value);
-        }
-        template <typename T, typename ...Args>
-        inline Value &append_new(Args ...args)
-        {
-            auto value = m_allocator.make<T>(args...);
-            append(value);
-            return static_cast<Value&>(*value);
-        }
+        inline Value &append_new_null() { return append_new(m_allocator.make_null()); }
+        inline Value &append_new_object() { return append_new(m_allocator.make_object()); }
+        inline Value &append_new_array() { return append_new(m_allocator.make_array()); }
+        inline Value &append_new_string(std::string_view str) { return append_new(m_allocator.make_string(str)); }
+        inline Value &append_new_number(double n) { return append_new(m_allocator.make_number(n)); }
+        inline Value &append_new_boolean(bool b) { return append_new(m_allocator.make_boolean(b)); }
 
         virtual void add(const std::string&, const std::string) {}
         virtual void add(const std::string&, const char*) {}
@@ -71,7 +74,7 @@ namespace Json
         virtual void add(const std::string&, bool) {}
         virtual void remove(const std::string&) {}
         virtual bool contains(const std::string&) const { return false; }
-	virtual void clear() {}
+        virtual void clear() {}
 
         virtual std::string to_string(PrintOption options = PrintOption::None) const;
         virtual std::string to_string_or(const std::string &) const { return to_string(); }
@@ -93,6 +96,19 @@ namespace Json
         Value(Allocator &allocator)
             : m_allocator(allocator) {}
 
+        template<typename T>
+        inline Value &add_new(const std::string& name, T *value)
+        {
+            add(name, value);
+            return static_cast<Value&>(*value);
+        }
+        template<typename T>
+        inline Value &append_new(T *value)
+        {
+            append(value);
+            return static_cast<Value&>(*value);
+        }
+
         virtual void add(const std::string&, Value*) {}
         virtual void append(Value*) {}
 
@@ -102,7 +118,7 @@ namespace Json
 
     class Null final : public Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
 
     public:
         virtual std::string to_string(PrintOption options = PrintOption::None) const override;
@@ -117,7 +133,7 @@ namespace Json
 
     class Object final : public Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
 
     public:
         virtual Value& get(const std::string& name) override
@@ -164,7 +180,7 @@ namespace Json
 
     class Array final : public Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
 
     public:
         virtual Value& get(int index) override { return *m_data[index]; }
@@ -197,7 +213,7 @@ namespace Json
 
     class String final : public Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
 
     public:
         inline const std::string_view get_str() const { return m_data; }
@@ -214,7 +230,7 @@ namespace Json
 
     class Number final : public Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
 
     public:
         virtual std::string to_string(PrintOption options = PrintOption::None) const override;
@@ -234,7 +250,7 @@ namespace Json
 
     class Boolean final : public Value
     {
-        friend Allocator;
+        friend AllocatorCustom;
 
     public:
         virtual std::string to_string(PrintOption options = PrintOption::None) const override;
@@ -268,12 +284,16 @@ namespace Json
         inline const Value &root() const { return *m_root; }
         inline Value &root() { return *m_root; }
 
-        template<typename T, typename ...Args>
-        inline Value &root_or_new(Args ...args)
+        inline Value &root_or_new_object()
         {
             if (m_root->is_null())
-                m_root = m_allocator->make<T>(args...);
-
+                m_root = m_allocator->make_object();
+            return *m_root;
+        }
+        inline Value &root_or_new_array()
+        {
+            if (m_root->is_null())
+                m_root = m_allocator->make_object();
             return *m_root;
         }
 

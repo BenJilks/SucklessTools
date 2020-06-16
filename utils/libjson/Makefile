@@ -2,7 +2,7 @@ CC=c++
 AR=ar
 CXXFLAGS=-std=c++17 -g
 OBJ=libjson.o \
-    allocator.o
+    allocatorcustom.o
 
 ifeq ($(PREFIX),)
     PREFIX := /usr/local
@@ -12,8 +12,8 @@ endif
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
-	$(CC) -o test $^ $(CXXFLAGS) main.cpp
-#	$(AR) rs libjson.a $(OBJ)
+#	$(CC) -o test $^ $(CXXFLAGS) main.cpp
+	$(AR) rs libjson.a $(OBJ)
 
 clean:
 	$(RM) $(OBJ)

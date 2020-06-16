@@ -15,12 +15,11 @@ namespace Json
         friend Document;
 
     public:
-        Allocator();
+        Allocator() {}
         virtual ~Allocator() {}
-        
-#ifdef DEBUG_ALLOCATOR
+
         virtual void report_usage() = 0;
-#endif
+        virtual void did_delete() = 0;
 
         virtual Null *make_null() = 0;
         virtual Object *make_object() = 0;

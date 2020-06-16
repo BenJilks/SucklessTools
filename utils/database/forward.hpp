@@ -16,6 +16,7 @@ namespace DB
         class Parser;
         class Statement;
         class SelectStatement;
+        class InsertStatement;
 
     };
 

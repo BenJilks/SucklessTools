@@ -1,5 +1,6 @@
 #include "libjson.hpp"
 #include "allocator.hpp"
+#include "allocatorcustom.hpp"
 #include <assert.h>
 #include <iostream>
 #include <sstream>
@@ -8,7 +9,7 @@
 
 using namespace Json;
 
-Allocator null_allocator;
+AllocatorCustom null_allocator;
 Null Null::s_null_value_impl(null_allocator);
 Value *Value::s_null_value = &Null::s_null_value_impl;
 
@@ -81,7 +82,7 @@ Document::~Document()
 
 Document Document::parse(std::istream&& stream)
 {
-    Document doc;
+    Document doc(std::make_unique<AllocatorCustom>());
     if (!stream.good())
         return doc;
 
@@ -91,7 +92,7 @@ Document Document::parse(std::istream&& stream)
     std::vector<Value*> value_stack;
     std::vector<char> buffer(1024);
     size_t buffer_pointer = 0;
-    
+
     // Pre allocate some memory to reduce allocations
     return_stack.reserve(20);
     value_stack.reserve(20);
@@ -163,7 +164,7 @@ Document Document::parse(std::istream&& stream)
 
             if (rune == '{')
             {
-                value_stack.push_back(allocator.make<Object>());
+                value_stack.push_back(allocator.make_object());
                 state = State::ObjectStart;
                 break;
             }
@@ -371,7 +372,7 @@ Document Document::parse(std::istream&& stream)
         {
             auto str = std::string_view(buffer.data(), buffer_pointer);
             buffer[buffer_pointer] = '\0';
-            
+
             value_stack.push_back(allocator.make_number(atof(str.data())));
             buffer_pointer = 0;
 

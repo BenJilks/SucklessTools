@@ -89,13 +89,13 @@ Boolean *AllocatorCustom::make_boolean(bool b)
     return make<Boolean>(b);
 }
 
-#ifdef DEBUG_ALLOCATOR
 void AllocatorCustom::report_usage()
 {
+#ifdef DEBUG_ALLOCATOR
     std::cout << "\nMemory usage report:\n";
     std::cout << "\tMax: " << m_max_usage << " bytes\n";
     std::cout << "\tObjects: " << m_objects_allocated << "\n";
     std::cout << "\tStrings: " << m_strings_allocated << "\n";
     std::cout << "\tObjects In Use: " << m_objects_in_use << "\n";
-}
 #endif
+}
