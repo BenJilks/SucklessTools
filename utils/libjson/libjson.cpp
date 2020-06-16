@@ -176,7 +176,7 @@ Document Document::parse(std::istream&& stream)
 
             if (rune == '[')
             {
-                value_stack.push_back(allocator.make<Array>());
+                value_stack.push_back(allocator.make_array());
                 state = State::ArrayStart;
                 break;
             }
@@ -216,7 +216,7 @@ Document Document::parse(std::istream&& stream)
             if (rune == '"')
             {
                 auto str = std::string_view(buffer.data(), buffer_pointer);
-                value_stack.push_back(allocator.make_string_from_buffer(str));
+                value_stack.push_back(allocator.make_string(str));
                 buffer_pointer = 0;
 
                 state = return_stack.back();
@@ -372,7 +372,7 @@ Document Document::parse(std::istream&& stream)
             auto str = std::string_view(buffer.data(), buffer_pointer);
             buffer[buffer_pointer] = '\0';
             
-            value_stack.push_back(allocator.make<Number>(atof(str.data())));
+            value_stack.push_back(allocator.make_number(atof(str.data())));
             buffer_pointer = 0;
 
             should_reconsume = true;
@@ -681,22 +681,22 @@ std::string Boolean::to_string(PrintOption) const
 
 void Object::add(const std::string& name, const std::string str)
 {
-    m_data[name] = m_allocator.make_string_from_buffer(str);
+    m_data[name] = m_allocator.make_string(str);
 }
 
 void Object::add(const std::string& name, const char* str)
 {
-    m_data[name] = m_allocator.make_string_from_buffer(std::string(str));
+    m_data[name] = m_allocator.make_string(std::string(str));
 }
 
 void Object::add(const std::string& name, double number)
 {
-    m_data[name] = m_allocator.make<Number>(number);
+    m_data[name] = m_allocator.make_number(number);
 }
 
 void Object::add(const std::string& name, bool boolean)
 {
-    m_data[name] = m_allocator.make<Boolean>(boolean);
+    m_data[name] = m_allocator.make_boolean(boolean);
 }
 
 std::ostream& Json::operator<<(std::ostream& out, const Value &value)

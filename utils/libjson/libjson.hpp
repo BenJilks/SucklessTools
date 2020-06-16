@@ -281,10 +281,10 @@ namespace Json
         void log_errors(std::ostream& stream = std::cout);
 
     private:
-        Document()
-            : m_allocator(std::make_unique<Allocator>())
+        Document(std::unique_ptr<Allocator> allocator)
+            : m_allocator(std::move(allocator))
         {
-            m_root = m_allocator->make<Null>();
+            m_root = m_allocator->make_null();
         }
 
         inline void set_root(Value *root) { m_root = root; }

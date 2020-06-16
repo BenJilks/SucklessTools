@@ -12,8 +12,8 @@ endif
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
-#	$(CC) -o test $^ $(CXXFLAGS) main.cpp
-	$(AR) rs libjson.a $(OBJ)
+	$(CC) -o test $^ $(CXXFLAGS) main.cpp
+#	$(AR) rs libjson.a $(OBJ)
 
 clean:
 	$(RM) $(OBJ)

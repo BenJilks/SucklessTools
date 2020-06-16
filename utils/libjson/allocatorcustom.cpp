@@ -1,22 +1,22 @@
-#include "allocator.hpp"
+#include "allocatorcustom.hpp"
 #include "libjson.hpp"
 #include <algorithm>
 #include <iostream>
 #include <cstring>
 using namespace Json;
 
-Allocator::Allocator()
+AllocatorCustom::AllocatorCustom()
 {
 }
 
-Allocator::MemoryChunk::~MemoryChunk()
+AllocatorCustom::MemoryChunk::~MemoryChunk()
 {
 #ifdef DEBUG_ALLOCATOR
     std::cout << "Allocator: free chunk of size " << size << "\n";
 #endif
 }
 
-void Allocator::insure_size(size_t size)
+void AllocatorCustom::insure_size(size_t size)
 {
     if (!m_current_memory_chunk)
     {
@@ -39,14 +39,29 @@ void Allocator::insure_size(size_t size)
     }
 }
 
-void Allocator::did_delete()
+void AllocatorCustom::did_delete()
 {
 #ifdef DEBUG_ALLOCATOR
     m_objects_in_use -= 1;
 #endif
 }
 
-String *Allocator::make_string_from_buffer(const std::string_view buffer)
+Null *AllocatorCustom::make_null()
+{
+    return make<Null>();
+}
+
+Object *AllocatorCustom::make_object()
+{
+    return make<Object>();
+}
+
+Array *AllocatorCustom::make_array()
+{
+    return make<Array>();
+}
+
+String *AllocatorCustom::make_string(const std::string_view buffer)
 {
     insure_size(buffer.size());
 
@@ -64,8 +79,18 @@ String *Allocator::make_string_from_buffer(const std::string_view buffer)
     return make<String>(str);
 }
 
+Number *AllocatorCustom::make_number(double num)
+{
+    return make<Number>(num);
+}
+
+Boolean *AllocatorCustom::make_boolean(bool b)
+{
+    return make<Boolean>(b);
+}
+
 #ifdef DEBUG_ALLOCATOR
-void Allocator::report_usage()
+void AllocatorCustom::report_usage()
 {
     std::cout << "\nMemory usage report:\n";
     std::cout << "\tMax: " << m_max_usage << " bytes\n";

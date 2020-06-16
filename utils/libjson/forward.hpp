@@ -10,6 +10,7 @@ namespace Json
     class Array;
     class String;
     class Number;
+    class Boolean;
     class Document;
 
 }
