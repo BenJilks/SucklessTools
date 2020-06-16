@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <tuple>
 
 namespace DB
 {
@@ -40,7 +41,6 @@ namespace DB
         inline const std::string &name() const { return m_name; }
         inline size_t row_count() const { return m_row_count; }
 
-        Row::Constructor new_row();
         std::optional<Row> add_row(Row::Constructor);
         std::optional<Row> get_row(size_t index);
         void drop();
@@ -49,6 +49,7 @@ namespace DB
         Table(DataBase&, Constructor);
         Table(DataBase&, std::shared_ptr<Chunk> header);
 
+        std::tuple<std::shared_ptr<Chunk>, size_t> find_chunk_and_offset_for_row(size_t row);
         int find_next_row_chunk_index();
         void add_row_data(std::shared_ptr<Chunk> data);
         void write_header();

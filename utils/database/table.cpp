@@ -114,6 +114,26 @@ std::optional<Row> Table::add_row(Row::Constructor constructor)
         return std::nullopt;
     }
 
+    std::shared_ptr<Chunk> active_chunk;
+    auto new_chunk = [&]() {
+        auto chunk = m_db.new_chunk("RD", m_id, find_next_row_chunk_index());
+        m_row_data_chunks.push_back(chunk);
+        return chunk;
+    };
+    
+    if (m_row_data_chunks.size() <= 0)
+    {
+        active_chunk = new_chunk();
+    }
+    else
+    {
+        active_chunk = m_row_data_chunks.back();
+        if (!active_chunk->is_active())
+            active_chunk = new_chunk();
+    }
+    
+    auto offset = active_chunk->size_in_bytes();
+    auto entry_offset = offset;
     for (size_t i = 0; i < data.size(); i++)
     {
         auto &entry = data[i];
@@ -123,29 +143,40 @@ std::optional<Row> Table::add_row(Row::Constructor constructor)
             assert (false);
             return std::nullopt;
         }
-        entry->write();
+        
+        entry->write(*active_chunk, entry_offset);
+        entry_offset += entry->type().size();
     }
 
     return Row(std::move(constructor), m_columns);
 }
 
-Row::Constructor Table::new_row()
+std::tuple<std::shared_ptr<Chunk>, size_t> Table::find_chunk_and_offset_for_row(size_t row)
 {
-    std::shared_ptr<Chunk> active_chunk = nullptr;
-    if (m_row_data_chunks.size() > 0)
-        active_chunk = m_row_data_chunks.back();
+    std::shared_ptr<Chunk> chunk_containing_row = nullptr;
+    size_t curr_max_row_count = 0;
+    size_t row_count_at_start_of_chunk = 0;
 
-    if (!active_chunk || !active_chunk->is_active())
+    for (const auto &chunk : m_row_data_chunks)
     {
-        active_chunk = m_db.new_chunk("RD", m_id, find_next_row_chunk_index());
-        m_row_data_chunks.push_back(active_chunk);
+        auto chunk_size_in_bytes = chunk->size_in_bytes();
+        auto chunk_row_count = chunk_size_in_bytes / m_row_size;
+        row_count_at_start_of_chunk = curr_max_row_count;
+        curr_max_row_count += chunk_row_count;
+
+        if (row < curr_max_row_count)
+        {
+            chunk_containing_row = chunk;
+            break;
+        }
     }
 
-    auto row_count_in_chunk = active_chunk->size_in_bytes() / m_row_size;
-    Row::Constructor row(*active_chunk, row_count_in_chunk * m_row_size);
-    m_row_count += 1;
-    m_header->write_int(m_row_count_offset, m_row_count);
-    return row;
+    // No chunk found
+    if (chunk_containing_row == nullptr)
+        return std::make_tuple(nullptr, 0);
+
+    auto row_offset = (row - row_count_at_start_of_chunk) * m_row_size;
+    return std::make_tuple(chunk_containing_row, row_offset);
 }
 
 int Table::find_next_row_chunk_index()
@@ -159,34 +190,13 @@ int Table::find_next_row_chunk_index()
 
 std::optional<Row> Table::get_row(size_t index)
 {
-    std::shared_ptr<Chunk> chunk_containing_row = nullptr;
-    size_t curr_max_row_count = 0;
-    size_t row_count_at_start_of_chunk = 0;
+    auto [chunk, offset] = find_chunk_and_offset_for_row(index);
 
-    for (const auto &chunk : m_row_data_chunks)
-    {
-        auto chunk_size_in_bytes = chunk->size_in_bytes();
-        auto chunk_row_count = chunk_size_in_bytes / m_row_size;
-        row_count_at_start_of_chunk = curr_max_row_count;
-        curr_max_row_count += chunk_row_count;
-
-        if (index < curr_max_row_count)
-        {
-            chunk_containing_row = chunk;
-            break;
-        }
-    }
-
-    // No chunk found
-    if (chunk_containing_row == nullptr)
-        return std::nullopt;
-
-    Row row(*chunk_containing_row);
-    auto row_offset = (index - row_count_at_start_of_chunk) * m_row_size;
-    auto entry_offset = row_offset;
+    Row row;
+    auto entry_offset = offset;
     for (const auto &column : m_columns)
     {
-        row.m_entries[column.name()] = column.read(*chunk_containing_row, entry_offset);
+        row.m_entries[column.name()] = column.read(*chunk, entry_offset);
         entry_offset += column.data_type().size();
     }
 

@@ -13,15 +13,14 @@ DataType DataType::integer()
     return DataType(Integer, 4, 1);
 }
 
-IntegerEntry::IntegerEntry(Chunk &chunk, size_t data_offset)
-    : Entry(chunk, DataType::integer(), data_offset)
+void IntegerEntry::write(Chunk &chunk, size_t offset)
 {
-    m_i = chunk.read_int(data_offset);
+    chunk.write_int(offset, m_i);
 }
 
-void IntegerEntry::write()
+void IntegerEntry::read(Chunk &chunk, size_t offset)
 {
-    chunk().write_int(data_offset(), m_i);
+    m_i = chunk.read_int(offset);
 }
 
 std::ostream &operator<< (std::ostream &stream, const DB::Entry& entry)

@@ -24,7 +24,7 @@ int main()
         auto &table = db.construct_table(tc);
         for (size_t i = 0; i < 10; i++)
         {
-            auto rc = table.new_row();
+            Row::Constructor rc;
             rc.integer_entry(i * 4 + 1);
             rc.integer_entry(i * 4 + 2);
             rc.integer_entry(i * 4 + 3);
@@ -45,11 +45,14 @@ int main()
     }
 #endif
 
-    db.drop_table("Test0");
-
-    auto result = db.execute_sql("SELECT ID, Age FROM Test1");
-    for (const auto &row : result)
-        std::cout << row << "\n";
+    auto table = db.get_table("Test1");
+    assert (table);
+    
+    auto row = table->get_row(0);
+    assert (row);
+    
+    std::cout << *row << "\n";
+    
 #endif
 
     return 0;

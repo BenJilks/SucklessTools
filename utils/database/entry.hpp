@@ -39,23 +39,16 @@ namespace DB
         friend Column;
 
     public:
-        Entry(Chunk &chunk, DataType type, size_t data_offset)
-            : m_chunk(chunk)
-            , m_type(type)
-            , m_data_offset(data_offset) {}
+        Entry(DataType type)
+            : m_type(type) {}
         virtual ~Entry() = default;
 
         const DataType &type() const { return m_type; }
-        virtual void write() = 0;
-
-    protected:
-        inline Chunk &chunk() { return m_chunk; }
-        inline size_t &data_offset() { return m_data_offset; }
+        virtual void read(Chunk &chunk, size_t offset) = 0;
+        virtual void write(Chunk &chunk, size_t offset) = 0;
 
     private:
-        Chunk &m_chunk;
         DataType m_type;
-        size_t m_data_offset;
 
     };
 
@@ -64,13 +57,19 @@ namespace DB
         friend Column;
 
     public:
-        IntegerEntry(Chunk &chunk, size_t data_offset);
-        IntegerEntry(Chunk &chunk, size_t data_offset, int i)
-            : Entry(chunk, DataType::integer(), data_offset)
+        IntegerEntry(Chunk &chunk, size_t offset)
+            : Entry(DataType::integer())
+        {
+            read(chunk, offset);
+        }
+        
+        IntegerEntry(int i)
+            : Entry(DataType::integer())
             , m_i(i) {}
 
         inline int data() const { return m_i; }
-        virtual void write() override;
+        virtual void read(Chunk &chunk, size_t offset) override;
+        virtual void write(Chunk &chunk, size_t offset) override;
 
     private:
         int m_i;

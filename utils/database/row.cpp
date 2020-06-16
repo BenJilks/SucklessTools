@@ -5,12 +5,7 @@
 #include <iostream>
 using namespace DB;
 
-Row::Constructor::Constructor(Chunk &chunk, size_t row_offset)
-    : m_chunk(chunk)
-    , m_row_offset(row_offset) {}
-
 Row::Row(Constructor&& constructor, const std::vector<Column> &columns)
-    : m_chunk(constructor.m_chunk)
 {
     for (size_t i = 0; i < constructor.m_entries.size(); i++)
     {
@@ -20,7 +15,6 @@ Row::Row(Constructor&& constructor, const std::vector<Column> &columns)
 }
 
 Row::Row(std::vector<std::string> select_columns, Row &&other)
-    : m_chunk(other.m_chunk)
 {
     for (auto &column : other.m_entries)
     {
@@ -42,10 +36,7 @@ Entry &Row::operator [](const std::string &name)
 
 void Row::Constructor::integer_entry(int i)
 {
-    auto offset = m_row_offset + m_curr_entry_offset;
-    auto entry = std::make_unique<IntegerEntry>(m_chunk, offset, i);
-
-    m_curr_entry_offset += entry->type().size();
+    auto entry = std::make_unique<IntegerEntry>(i);
     m_entries.push_back(std::move(entry));
 }
 

@@ -20,14 +20,11 @@ namespace DB
             friend Table;
 
         public:
+            Constructor() = default;
+
             void integer_entry(int);
 
         private:
-            Constructor(Chunk &chunk, size_t row_offset);
-
-            Chunk &m_chunk;
-            size_t m_row_offset;
-            size_t m_curr_entry_offset { 0 };
             std::vector<std::unique_ptr<Entry>> m_entries;
         };
 
@@ -37,13 +34,11 @@ namespace DB
 
     private:
         explicit Row(Constructor&& constructor, const std::vector<Column> &columns);
-        explicit Row(Chunk &chunk)
-            : m_chunk(chunk) {}
+        explicit Row() = default;
 
         // Create a row based of a selection
         explicit Row(std::vector<std::string> select_columns, Row &&other);
 
-        Chunk &m_chunk;
         std::unordered_map<std::string, std::unique_ptr<Entry>> m_entries;
     };
 
