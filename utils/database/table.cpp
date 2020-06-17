@@ -106,8 +106,9 @@ void Table::write_header()
 
 void Table::add_row(Row row)
 {
-    auto &data = row.m_entries;
-    if (data.size() != m_columns.size())
+    // TODO: There's much better ways of checking if
+    //       this row belongs to a table
+    if (row.m_entities.size() != m_columns.size())
     {
         // TODO: Error
         assert (false);
@@ -133,20 +134,7 @@ void Table::add_row(Row row)
     }
     
     auto offset = active_chunk->size_in_bytes();
-    auto entry_offset = offset;
-    for (const auto &column : m_columns)
-    {
-        auto &entry = data[column.name()];
-        if (entry->type() != column.m_data_type)
-        {
-            // TODO: Error
-            assert (false);
-            return;
-        }
-        
-        entry->write(*active_chunk, entry_offset);
-        entry_offset += entry->type().size();
-    }
+    row.write(*active_chunk, offset);
 }
 
 Row Table::make_row()
@@ -196,13 +184,7 @@ std::optional<Row> Table::get_row(size_t index)
     auto [chunk, offset] = find_chunk_and_offset_for_row(index);
 
     Row row(m_columns);
-    auto entry_offset = offset;
-    for (const auto &column : m_columns)
-    {
-        row.m_entries[column.name()] = column.read(*chunk, entry_offset);
-        entry_offset += column.data_type().size();
-    }
-
+    row.read(*chunk, offset);
     return std::move(row);
 }
 

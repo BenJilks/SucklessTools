@@ -8,20 +8,25 @@ using namespace DB;
 
 Row::Row(const std::vector<Column> &columns)
 {
+    size_t entry_offset = 0;
     for (const auto &column : columns)
-        m_entries[column.name()] = nullptr;
+    {
+        m_entities.push_back({ column, entry_offset, nullptr });
+        entry_offset += column.data_type().size();
+    }
 }
 
 Row::Row(std::vector<std::string> select_columns, Row &&other)
 {
-    for (auto &column : other.m_entries)
+    for (auto &entity : other.m_entities)
     {
         // Only copy in if it's in the selected columns,
         // then remove it from the list
-        auto index = std::find(select_columns.begin(), select_columns.end(), column.first);
+        auto column = entity.column;
+        auto index = std::find(select_columns.begin(), select_columns.end(), column.name());
         if (index != select_columns.end())
         {
-            m_entries[column.first] = std::move(column.second);
+            (*this)[column.name()] = std::move(entity.entry);
             select_columns.erase(index);
         }
     }
@@ -29,21 +34,45 @@ Row::Row(std::vector<std::string> select_columns, Row &&other)
 
 std::unique_ptr<Entry> &Row::operator [](const std::string &name)
 {
-    if (m_entries.find(name) == m_entries.end())
+    for (auto &entity : m_entities)
     {
-        // TODO: Error: This column doesn't exist
-        assert (false);
+        if (entity.column.name() == name)
+            return entity.entry;
     }
     
-    return m_entries[name];
+    // TODO: Error: This column doesn't exist
+    assert (false);
 }
 
 std::ostream &operator<<(std::ostream &stream, const Row& row)
 {
     stream << "Row: { ";
     for (const auto &it : row)
-        stream << it.first << ": " << *it.second << ", ";
+    {
+        if (it.second != nullptr)
+            stream << it.first << ": " << *it.second << ", ";
+    }
     stream << "}";
     return stream;
 }
 
+void Row::read(Chunk &chunk, size_t row_offset)
+{
+    for (auto &entitiy : m_entities)
+    {
+        auto &entry = entitiy.entry;
+        auto offset = row_offset + entitiy.offset_in_row;
+        entry = entitiy.column.read(chunk, offset);
+    }
+}
+
+void Row::write(Chunk &chunk, size_t row_offset)
+{
+    for (const auto &entitiy : m_entities)
+    {
+        auto &entry = entitiy.entry;
+        auto offset = row_offset + entitiy.offset_in_row;
+        if (entry)
+            entry->write(chunk, offset);
+    }    
+}
