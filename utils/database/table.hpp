@@ -41,8 +41,9 @@ namespace DB
         inline const std::string &name() const { return m_name; }
         inline size_t row_count() const { return m_row_count; }
 
-        std::optional<Row> add_row(Row::Constructor);
         std::optional<Row> get_row(size_t index);
+        void add_row(Row);
+        Row make_row();
         void drop();
 
     private:

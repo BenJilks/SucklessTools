@@ -10,7 +10,7 @@ namespace DB::Sql
         friend Parser;
 
     public:
-        virtual SqlResult execute(DataBase&) const override { return {}; }
+        virtual SqlResult execute(DataBase&) const override;
 
     private:
         InsertStatement()

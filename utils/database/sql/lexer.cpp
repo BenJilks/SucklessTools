@@ -40,7 +40,7 @@ std::optional<Lexer::Token> Lexer::next()
                     break;
                 }
 
-                if (isnumber(c))
+                if (isdigit(c))
                 {
                     m_should_reconsume = true;
                     m_state = State::Integer;
@@ -76,7 +76,7 @@ std::optional<Lexer::Token> Lexer::next()
                 break;
 
             case State::Integer:
-                if (!isnumber(c))
+                if (!isdigit(c))
                 {
                     m_should_reconsume = true;
                     m_state = State::Normal;

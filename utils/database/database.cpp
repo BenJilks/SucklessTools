@@ -192,6 +192,8 @@ DataBase::DataBase(FILE *file)
 
 SqlResult DataBase::execute_sql(const std::string &query)
 {
+    std::cout << "DataBase: Executing SQL '" << query << "'\n";
+    
     auto statement = Sql::Parser::parse(query);
     assert (statement);
 

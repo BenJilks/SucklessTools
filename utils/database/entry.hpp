@@ -55,7 +55,7 @@ namespace DB
     class IntegerEntry : public Entry
     {
         friend Column;
-
+        
     public:
         IntegerEntry(Chunk &chunk, size_t offset)
             : Entry(DataType::integer())

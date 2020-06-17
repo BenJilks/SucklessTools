@@ -2,16 +2,14 @@
 #include "entry.hpp"
 #include "column.hpp"
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 using namespace DB;
 
-Row::Row(Constructor&& constructor, const std::vector<Column> &columns)
+Row::Row(const std::vector<Column> &columns)
 {
-    for (size_t i = 0; i < constructor.m_entries.size(); i++)
-    {
-        auto &entry = constructor.m_entries[i];
-        m_entries[columns[i].name()] = std::move(entry);
-    }
+    for (const auto &column : columns)
+        m_entries[column.name()] = nullptr;
 }
 
 Row::Row(std::vector<std::string> select_columns, Row &&other)
@@ -29,15 +27,15 @@ Row::Row(std::vector<std::string> select_columns, Row &&other)
     }
 }
 
-Entry &Row::operator [](const std::string &name)
+std::unique_ptr<Entry> &Row::operator [](const std::string &name)
 {
-    return *m_entries[name];
-}
-
-void Row::Constructor::integer_entry(int i)
-{
-    auto entry = std::make_unique<IntegerEntry>(i);
-    m_entries.push_back(std::move(entry));
+    if (m_entries.find(name) == m_entries.end())
+    {
+        // TODO: Error: This column doesn't exist
+        assert (false);
+    }
+    
+    return m_entries[name];
 }
 
 std::ostream &operator<<(std::ostream &stream, const Row& row)

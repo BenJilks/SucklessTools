@@ -15,7 +15,9 @@ int main()
 #if 0
     for (size_t i = 0; i < 2; i++)
     {
-        Table::Constructor tc("Test" + std::to_string(i));
+        auto table_name = "Test" + std::to_string(i);
+        
+        Table::Constructor tc(table_name);
         tc.add_column("ID", DataType::integer());
         tc.add_column("FirstName", DataType::integer());
         tc.add_column("LastName", DataType::integer());
@@ -24,12 +26,21 @@ int main()
         auto &table = db.construct_table(tc);
         for (size_t i = 0; i < 10; i++)
         {
-            Row::Constructor rc;
-            rc.integer_entry(i * 4 + 1);
-            rc.integer_entry(i * 4 + 2);
-            rc.integer_entry(i * 4 + 3);
-            rc.integer_entry(i * 4 + 4);
-            table.add_row(std::move(rc));
+            db.execute_sql("INSERT INTO " + table_name + 
+                " (ID, FirstName, LastName, Age) " + 
+                    "VALUES (" + 
+                    std::to_string(i * 4 + 1) + ", " +
+                    std::to_string(i * 4 + 2) + ", " +
+                    std::to_string(i * 4 + 3) + ", " +
+                    std::to_string(i * 4 + 4) + ")");
+/*
+            auto row = table.make_row();
+            row["ID"] = std::make_unique<IntegerEntry>(i * 4 + 1);
+            row["FirstName"] = std::make_unique<IntegerEntry>(i * 4 + 2);
+            row["LastName"] = std::make_unique<IntegerEntry>(i * 4 + 3);
+            row["Age"] = std::make_unique<IntegerEntry>(i * 4 + 4);
+            table.add_row(std::move(row));
+*/
         }
     }
 #else

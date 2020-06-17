@@ -50,6 +50,7 @@ std::optional<Value> Parser::parse_value()
     switch (peek->type)
     {
         case Lexer::Integer:
+            m_lexer.consume();
             return Value(atoi(peek->data.c_str()));
         default:
             break;

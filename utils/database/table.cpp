@@ -104,14 +104,14 @@ void Table::write_header()
     // m_header.flush();
 }
 
-std::optional<Row> Table::add_row(Row::Constructor constructor)
+void Table::add_row(Row row)
 {
-    const auto &data = constructor.m_entries;
+    auto &data = row.m_entries;
     if (data.size() != m_columns.size())
     {
         // TODO: Error
         assert (false);
-        return std::nullopt;
+        return;
     }
 
     std::shared_ptr<Chunk> active_chunk;
@@ -134,21 +134,24 @@ std::optional<Row> Table::add_row(Row::Constructor constructor)
     
     auto offset = active_chunk->size_in_bytes();
     auto entry_offset = offset;
-    for (size_t i = 0; i < data.size(); i++)
+    for (const auto &column : m_columns)
     {
-        auto &entry = data[i];
-        if (entry->type() != m_columns[i].m_data_type)
+        auto &entry = data[column.name()];
+        if (entry->type() != column.m_data_type)
         {
             // TODO: Error
             assert (false);
-            return std::nullopt;
+            return;
         }
         
         entry->write(*active_chunk, entry_offset);
         entry_offset += entry->type().size();
     }
+}
 
-    return Row(std::move(constructor), m_columns);
+Row Table::make_row()
+{
+    return Row(m_columns);
 }
 
 std::tuple<std::shared_ptr<Chunk>, size_t> Table::find_chunk_and_offset_for_row(size_t row)
@@ -192,7 +195,7 @@ std::optional<Row> Table::get_row(size_t index)
 {
     auto [chunk, offset] = find_chunk_and_offset_for_row(index);
 
-    Row row;
+    Row row(m_columns);
     auto entry_offset = offset;
     for (const auto &column : m_columns)
     {

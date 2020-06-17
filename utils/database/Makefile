@@ -8,7 +8,8 @@ OBJ=main.o \
     entry.o \
     sql/lexer.o \
     sql/parser.o \
-    sql/select.o
+    sql/select.o \
+    sql/insert.o
 
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
