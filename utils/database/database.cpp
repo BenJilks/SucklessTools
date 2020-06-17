@@ -7,6 +7,8 @@
 #include <filesystem>
 using namespace DB;
 
+// #define DEBUG_CHUNKS
+
 Chunk::Chunk(DB::DataBase& db, size_t header_offset)
     : m_db(db)
     , m_header_offset(header_offset)
@@ -105,10 +107,12 @@ std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_
     write_int(chunk->m_header_offset + 4, 0);
 
     chunk->m_data_offset = m_end_of_data_pointer;
+#ifdef DEBUG_CHUNKS
     std::cout << "New chunk { type = " << type <<
         ", header_offset = " << chunk->m_header_offset <<
         ", data_offset = " << chunk->m_data_offset <<
         ", owner = " << (int)chunk->m_owner_id << " }\n";
+#endif
 
     m_chunks.push_back(chunk);
     m_active_chunk = m_chunks.back();
@@ -156,13 +160,17 @@ DataBase::DataBase(FILE *file)
 
         if (chunk->type() == "RM")
         {
+#ifdef DEBUG_CHUNKS
             std::cout << "Dropped chunk " <<
                 "at: " << chunk->data_offset() <<
                 " of size: " << chunk->size_in_bytes() << "\n";
+#endif
             continue;
         }
 
+#ifdef DEBUG_CHUNKS
         std::cout << "Loaded " << *chunk << "\n";
+#endif
         if (chunk->type() == "TH")
         {
             // TableHeader
