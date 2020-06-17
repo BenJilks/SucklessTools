@@ -115,13 +115,14 @@ void Table::add_row(Row row)
         return;
     }
 
+    // Find or create the active chunk
     std::shared_ptr<Chunk> active_chunk;
     auto new_chunk = [&]() {
         auto chunk = m_db.new_chunk("RD", m_id, find_next_row_chunk_index());
         m_row_data_chunks.push_back(chunk);
         return chunk;
     };
-    
+
     if (m_row_data_chunks.size() <= 0)
     {
         active_chunk = new_chunk();
@@ -132,9 +133,14 @@ void Table::add_row(Row row)
         if (!active_chunk->is_active())
             active_chunk = new_chunk();
     }
-    
+
+    // Write the row to disk
     auto offset = active_chunk->size_in_bytes();
     row.write(*active_chunk, offset);
+
+    // Update row count
+    m_row_count += 1;
+    m_header->write_int(m_row_count_offset, m_row_count);
 }
 
 Row Table::make_row()

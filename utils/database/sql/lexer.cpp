@@ -109,6 +109,10 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Into };
     else if (lower == "values")
         return { buffer, Type::Values };
+    else if (lower == "create")
+        return { buffer, Type::Create };
+    else if (lower == "table")
+        return { buffer, Type::Table };
     return { buffer, Type::Name };
 }
 

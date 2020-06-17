@@ -24,6 +24,9 @@ public:
         CloseBrace,
         Values,
 
+        Create,
+        Table,
+
         Integer,
 
         Star,

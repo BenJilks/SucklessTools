@@ -107,7 +107,8 @@ std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_
     chunk->m_data_offset = m_end_of_data_pointer;
     std::cout << "New chunk { type = " << type <<
         ", header_offset = " << chunk->m_header_offset <<
-        ", data_offset = " << chunk->m_data_offset << " }\n";
+        ", data_offset = " << chunk->m_data_offset <<
+        ", owner = " << (int)chunk->m_owner_id << " }\n";
 
     m_chunks.push_back(chunk);
     m_active_chunk = m_chunks.back();
@@ -152,11 +153,11 @@ DataBase::DataBase(FILE *file)
     {
         auto chunk = std::shared_ptr<Chunk>(new Chunk(*this, offset));
         offset += 8 + chunk->size_in_bytes();
-        
+
         if (chunk->type() == "RM")
         {
-            std::cout << "Dropped chunk " << 
-                "at: " << chunk->data_offset() << 
+            std::cout << "Dropped chunk " <<
+                "at: " << chunk->data_offset() <<
                 " of size: " << chunk->size_in_bytes() << "\n";
             continue;
         }
@@ -193,7 +194,7 @@ DataBase::DataBase(FILE *file)
 SqlResult DataBase::execute_sql(const std::string &query)
 {
     std::cout << "DataBase: Executing SQL '" << query << "'\n";
-    
+
     auto statement = Sql::Parser::parse(query);
     assert (statement);
 
@@ -291,10 +292,10 @@ bool DataBase::drop_table(const std::string &name)
             break;
         }
     }
-    
+
     if (table_index == m_tables.end())
         return false;
-    
+
     table_index->drop();
     m_tables.erase(table_index);
     return true;

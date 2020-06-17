@@ -14,6 +14,7 @@ namespace DB::Sql
         {
             Select,
             Insert,
+            CreateTable,
         };
 
         virtual SqlResult execute(DataBase&) const = 0;
