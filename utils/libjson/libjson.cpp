@@ -1,17 +1,8 @@
 #include "libjson.hpp"
-#include "allocator.hpp"
-#include "allocatorcustom.hpp"
-#include <assert.h>
 #include <iostream>
-#include <sstream>
-
-//#define DEBUG_PARSER
-
 using namespace Json;
 
-AllocatorCustom null_allocator;
-Null Null::s_null_value_impl(null_allocator);
-Value *Value::s_null_value = &Null::s_null_value_impl;
+//#define DEBUG_PARSER
 
 #define ENUMARATE_STATES                   \
     __ENUMARATE_STATE(Invalid)             \
@@ -73,23 +64,20 @@ bool is_one_of(uint32_t rune, Args... args)
     return false;
 }
 
-Document::~Document()
+Value Value::null() { return Value(Null); }
+Value Value::object() { return Value(Object); }
+Value Value::array() { return Value(Array); }
+Value Value::string(const std::string& str) { return Value(str); }
+Value Value::number(double n) { return Value(n); }
+Value Value::boolean(bool b) { return Value(b); }
+Value Value::parse(std::istream &&stream)
 {
-#ifdef DEBUG_ALLOCATOR
-    m_allocator->report_usage();
-#endif
-}
-
-Document Document::parse(std::istream&& stream)
-{
-    Document doc(std::make_unique<AllocatorCustom>());
     if (!stream.good())
-        return doc;
+        return {};
 
-    auto &allocator = *doc.m_allocator;
     State state = State::Initial;
     std::vector<State> return_stack { State::Done };
-    std::vector<Value*> value_stack;
+    std::vector<Value> value_stack;
     std::vector<char> buffer(1024);
     size_t buffer_pointer = 0;
 
@@ -99,12 +87,10 @@ Document Document::parse(std::istream&& stream)
 
     size_t line = 1;
     size_t column = 1;
-    auto emit_error = [&line, &column, &doc](std::string_view message) {
-        Error error;
-        error.line = line;
-        error.column = column;
-        error.message = message;
-        doc.emit_error(std::move(error));
+    auto emit_error = [&line, &column](std::string_view message)
+    {
+        // TODO: Make this better
+        std::cout << "[Error " << line << ":" << column << "] " << message << "\n";
     };
 
     bool should_reconsume = false;
@@ -164,7 +150,7 @@ Document Document::parse(std::istream&& stream)
 
             if (rune == '{')
             {
-                value_stack.push_back(allocator.make_object());
+                value_stack.push_back(Value::object());
                 state = State::ObjectStart;
                 break;
             }
@@ -177,7 +163,7 @@ Document Document::parse(std::istream&& stream)
 
             if (rune == '[')
             {
-                value_stack.push_back(allocator.make_array());
+                value_stack.push_back(Value::array());
                 state = State::ArrayStart;
                 break;
             }
@@ -189,7 +175,7 @@ Document Document::parse(std::istream&& stream)
                 break;
             }
 
-            if (value_stack.back()->is_array() && rune == ']')
+            if (value_stack.back().is_array() && rune == ']')
             {
                 emit_error("Trainling ',' on end of array");
                 return_stack.pop_back();
@@ -199,8 +185,8 @@ Document Document::parse(std::istream&& stream)
             }
 
             if (rune == '}' && value_stack.size() >= 2
-                && value_stack[value_stack.size() - 1]->is_string()
-                && value_stack[value_stack.size() - 2]->is_object())
+                && value_stack[value_stack.size() - 1].is_string()
+                && value_stack[value_stack.size() - 2].is_object())
             {
                 emit_error("Trainling ':' on end of object");
                 value_stack.pop_back();
@@ -216,8 +202,8 @@ Document Document::parse(std::istream&& stream)
         case State::String:
             if (rune == '"')
             {
-                auto str = std::string_view(buffer.data(), buffer_pointer);
-                value_stack.push_back(allocator.make_string(str));
+                auto str = std::string(buffer.data(), buffer_pointer);
+                value_stack.push_back(Value::string(std::move(str)));
                 buffer_pointer = 0;
 
                 state = return_stack.back();
@@ -373,7 +359,7 @@ Document Document::parse(std::istream&& stream)
             auto str = std::string_view(buffer.data(), buffer_pointer);
             buffer[buffer_pointer] = '\0';
 
-            value_stack.push_back(allocator.make_number(atof(str.data())));
+            value_stack.push_back(Value::number(atof(str.data())));
             buffer_pointer = 0;
 
             should_reconsume = true;
@@ -447,9 +433,9 @@ Document Document::parse(std::istream&& stream)
             auto key = std::move(value_stack.back());
             value_stack.pop_back();
 
-            auto& object = value_stack.back();
-            assert (object->is_object());
-            object->add(key->to_string(), value);
+            auto &object = value_stack.back();
+            assert (object.is_object());
+            object[key.as_string()] = value;
 
             if (rune == ',')
             {
@@ -502,8 +488,8 @@ Document Document::parse(std::istream&& stream)
             value_stack.pop_back();
 
             auto& array = value_stack.back();
-            assert (array->is_array());
-            array->append(std::move(value));
+            assert (array.is_array());
+            array.append(std::move(value));
 
             if (rune == ',')
             {
@@ -528,192 +514,238 @@ Document Document::parse(std::istream&& stream)
     if (value_stack.size() != 1)
     {
         emit_error("There can only be one root value");
-        return doc;
+        return {};
     }
-    doc.set_root(std::move(value_stack[0]));
-    return doc;
+
+    return value_stack[0];
 }
 
-void Document::log_errors(std::ostream& stream)
+Value &Value::operator[] (const std::string &name)
 {
-    for (const auto& error : m_errors)
+    // TODO: Decide the best thing to do here
+    static auto null = Value::null();
+    if (m_type != Object)
+        return null;
+
+    return m_members[name];
+}
+
+const Value &Value::operator[] (const std::string &name) const
+{
+    // Delegate this to the non const version
+    if (m_type != Object || m_members.find(name) == m_members.end())
+        return (*const_cast<Value*>(this))[name];
+
+    return m_members.at(name);
+}
+
+Value &Value::append(Value value)
+{
+    static auto null = Value::null();
+    if (m_type != Array)
+        return null;
+
+    m_elements.push_back(value);
+    return m_elements.back();
+}
+
+void Value::clear()
+{
+    switch(m_type)
     {
-        stream << "Error(" << error.line << ", " << error.column << ")";
-        stream << ": " << error.message << "\n";
+        case Object:
+            m_members.clear();
+            break;
+        case Array:
+            m_elements.clear();
+            break;
+        default:
+            break;
     }
 }
 
-static std::string print_indent(int indent)
+std::vector<std::pair<std::string, Value>> Value::as_key_value_pairs() const
+{
+    if (m_type != Object)
+        return {};
+
+    std::vector<std::pair<std::string, Value>> members;
+    for (auto &it : m_members)
+        members.push_back(it);
+    return members;
+}
+
+std::vector<Value> Value::as_array() const
+{
+    if (m_type != Array)
+        return {};
+
+    return m_elements;
+}
+
+std::string Value::as_string(bool include_quotes) const
+{
+    switch (m_type)
+    {
+        case Null:
+            return "null";
+        case Object:
+        {
+            std::string out = "{ ";
+            bool is_first = true;
+            for (const auto &it : m_members)
+            {
+                if (!is_first)
+                    out += ", ";
+                is_first = false;
+
+                out += "\"" + it.first + "\": " + it.second.as_string(true);
+            }
+            return out + " }";
+        }
+        case Array:
+        {
+            std::string out = "[ ";
+            bool is_first = true;
+            for (const auto &element : m_elements)
+            {
+                if (!is_first)
+                    out += ", ";
+                is_first = false;
+
+                out += element.as_string(true);
+            }
+            return out + " }";
+        }
+        case String:
+            if (include_quotes)
+                return "\"" + m_string + "\"";
+            return m_string;
+        case Number:
+            return std::to_string(m_number);
+        case Boolean:
+            return m_boolean ? "true" : "false";
+        default:
+            assert (false);
+    }
+}
+
+std::string Value::pretty_print(int indent) const
 {
     std::string out;
-    for (int i = 0; i < indent; i++)
-        out += "\t";
-    return out;
-}
-
-static std::string serialize(const Value& value, int options, int indent = 0);
-static std::string serialize_object(const Object& object, int options, int indent = 0)
-{
-    std::string out = "{";
-
-    bool is_first = true;
-    int new_indent = indent + ((int)options & (int)PrintOption::PrettyPrint ? 1 : 0);
-    for (const auto& it : object)
+    auto print_indents = [&](int offset = 0)
     {
-        if (!is_first)
-            out += ", ";
+        for (int i = 0; i < indent + offset; i++)
+            out += "\t";
+    };
+    print_indents();
 
-        if ((int)options & (int)PrintOption::PrettyPrint)
-            out += "\n";
-
-        out += print_indent(new_indent);
-        out += "\"" + it.first + "\": ";
-
-        if ((int)options & (int)PrintOption::PrettyPrint
-            && (it.second->is_object() || it.second->is_array()))
+    switch (m_type)
+    {
+        case Object:
         {
-            out += "\n" + print_indent(new_indent);
-        }
+            out += "{\n";
+            bool is_first = true;
+            for (const auto &it : m_members)
+            {
+                if (!is_first)
+                    out += ",\n";
+                is_first = false;
 
-        out += serialize(*it.second, options | (int)PrintOption::Serialize, new_indent);
+                print_indents(1);
+                out += "\"" + it.first + "\": ";
 
-        is_first = false;
-    }
+                if (it.second.is_object() || it.second.is_array())
+                    out += "\n" + it.second.pretty_print(indent + 1);
+                else
+                    out += it.second.as_string(true);
+            }
 
-    if ((int)options & (int)PrintOption::PrettyPrint)
-        out += "\n" + print_indent(indent);
-
-    return out + "}";
-}
-
-static std::string serialize_array(const Array& array, int options, int indent = 0)
-{
-    std::string out = "[";
-
-    bool is_first = true;
-    int new_indent = indent + ((int)options & (int)PrintOption::PrettyPrint ? 1 : 0);
-    for (const auto& item : array)
-    {
-        if (!is_first)
-            out += ", ";
-
-        if ((int)options & (int)PrintOption::PrettyPrint)
             out += "\n";
+            print_indents();
+            out += "}";
+            break;
+        }
+        case Array:
+        {
+            out += "[\n";
+            bool is_first = true;
+            for (const auto &element : m_elements)
+            {
+                if (!is_first)
+                    out += ",\n";
+                is_first = false;
+                out += element.pretty_print(indent + 1);
+            }
 
-        out += print_indent(new_indent);
-        out += serialize(*item, options | (int)PrintOption::Serialize, new_indent);
-
-        is_first = false;
+            out += "\n";
+            print_indents();
+            out += "]";
+            break;
+        }
+        default:
+            out += as_string(true);
+            break;
     }
 
-    if ((int)options & (int)PrintOption::PrettyPrint)
-        out += "\n" + print_indent(indent);
-
-    return out + "]";
-}
-
-static std::string serialize_string(const String& string, int options)
-{
-    if (options & (int)PrintOption::Serialize)
-        return "\"" + std::string(string.get_str()) + "\"";
-    return std::string(string.get_str());
-}
-
-static std::string serialize_number(const Number& number)
-{
-    std::stringstream stream;
-    stream << std::noshowpoint << number.to_double();
-    return stream.str();
-}
-
-static std::string serialize_boolean(const Boolean& boolean)
-{
-    return boolean.to_bool() ? "true" : "false";
-}
-
-static std::string serialize(const Value& value, int options, int indent)
-{
-    if (value.is_string())
-        return serialize_string(static_cast<const String&>(value), options);
-
-    else if (value.is_number())
-        return serialize_number(static_cast<const Number&>(value));
-
-    if (value.is_boolean())
-        return serialize_boolean(static_cast<const Boolean&>(value));
-
-    if (value.is_object())
-        return serialize_object(static_cast<const Object&>(value), options, indent);
-
-    if (value.is_array())
-        return serialize_array(static_cast<const Array&>(value), options, indent);
-
-    return "null";
-}
-
-std::string Value::to_string(PrintOption options) const
-{
-    return serialize(*this, (int)options);
-}
-std::string Null::to_string(PrintOption) const
-{
-    return "null";
-}
-std::string Object::to_string(PrintOption options) const
-{
-    return serialize_object(*this, (int)options);
-}
-std::string Array::to_string(PrintOption options) const
-{
-    return serialize_array(*this, (int)options);
-}
-std::string String::to_string(PrintOption options) const
-{
-    return serialize_string(*this, (int)options);
-}
-std::string Number::to_string(PrintOption) const
-{
-    return serialize_number(*this);
-}
-std::string Boolean::to_string(PrintOption) const
-{
-    return serialize_boolean(*this);
-}
-
-void Object::add(const std::string& name, const std::string str)
-{
-    m_data[name] = m_allocator.make_string(str);
-}
-
-void Object::add(const std::string& name, const char* str)
-{
-    m_data[name] = m_allocator.make_string(std::string(str));
-}
-
-void Object::add(const std::string& name, double number)
-{
-    m_data[name] = m_allocator.make_number(number);
-}
-
-void Object::add(const std::string& name, bool boolean)
-{
-    m_data[name] = m_allocator.make_boolean(boolean);
-}
-
-std::ostream& Json::operator<<(std::ostream& out, const Value &value)
-{
-    out << value.to_string();
     return out;
 }
 
-std::ostream& Json::operator<<(std::ostream& out, Value *value)
+std::ostream &operator<< (std::ostream &stream, const Json::Value &value)
 {
-    if (!value)
+    stream << value.as_string();
+    return stream;
+}
+
+double Value::as_number() const
+{
+    switch (m_type)
     {
-        out << "<Null value>";
-        return out;
+        case Null:
+            return 0;
+        case Object:
+            return 0;
+        case Array:
+            return 0;
+        case String:
+            return atoi(m_string.c_str());
+        case Number:
+            return m_number;
+        case Boolean:
+            return m_boolean ? 1 : 0;
+    }
+}
+
+bool Value::as_boolean() const
+{
+    switch (m_type)
+    {
+        case Null:
+            return false;
+        case Object:
+            return m_members.size() > 0;
+        case Array:
+            return m_elements.size() > 0;
+        case String:
+            return !m_string.empty();
+        case Number:
+            return m_number == 0 ? false : true;
+        case Boolean:
+            return m_boolean;
+    }
+}
+
+Value &Value::otherwise(Value &&other)
+{
+    if (m_type == Null)
+    {
+        m_type = other.m_type;
+        m_members = std::move(other.m_members);
+        m_elements = std::move(other.m_elements);
+        m_string = other.m_string;
+        m_number = other.m_number;
+        m_boolean = other.m_boolean;
     }
 
-    out << *value;
-    return out;
+    return *this;
 }

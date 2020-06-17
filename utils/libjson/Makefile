@@ -1,8 +1,7 @@
 CC=c++
 AR=ar
 CXXFLAGS=-std=c++17 -g
-OBJ=libjson.o \
-    allocatorcustom.o
+OBJ=libjson.o
 
 ifeq ($(PREFIX),)
     PREFIX := /usr/local
@@ -12,7 +11,7 @@ endif
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
-#	$(CC) -o test $^ $(CXXFLAGS) main.cpp
+#	$(CC) -o test $^ $(CXXFLAGS) test.cpp
 	$(AR) rs libjson.a $(OBJ)
 
 clean:
@@ -23,7 +22,6 @@ install:
 	mkdir -p $(PREFIX)/include/libjson
 	install -m 644 libjson.a $(PREFIX)/lib/
 	install -m 644 libjson.hpp $(PREFIX)/include/libjson/
-	install -m 644 allocator.hpp $(PREFIX)/include/libjson/
 	install -m 644 forward.hpp $(PREFIX)/include/libjson/
 
 uninstall:

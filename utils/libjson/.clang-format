@@ -1,8 +1,0 @@
-﻿---
-BasedOnStyle: WebKit
-BreakBeforeBraces: Allman
-Language: Cpp
-NamespaceIndentation: All
-UseTab: Never
-
-...
