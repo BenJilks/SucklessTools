@@ -203,8 +203,10 @@ SqlResult DataBase::execute_sql(const std::string &query)
 {
     std::cout << "DataBase: Executing SQL '" << query << "'\n";
 
-    auto statement = Sql::Parser::parse(query);
-    assert (statement);
+    Sql::Parser parser(query);
+    auto statement = parser.run();
+    if (!parser.good())
+        return parser.errors_as_result();
 
     return statement->execute(*this);
 }

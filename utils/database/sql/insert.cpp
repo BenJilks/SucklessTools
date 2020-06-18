@@ -8,12 +8,12 @@ SqlResult InsertStatement::execute(DataBase& db) const
     if (m_columns.size() != m_values.size())
     {
         assert (false);
-        return {};
+        return SqlResult::error("Column and value counts do not match");
     }
     
     auto table = db.get_table(m_table);
     if (!table)
-        return {};
+        return SqlResult::error("No table with the name '" + m_table + "' found");
     
     auto row = table->make_row();
     for (int i = 0; i < m_columns.size(); i++)
@@ -33,5 +33,5 @@ SqlResult InsertStatement::execute(DataBase& db) const
     }
     
     table->add_row(std::move(row));
-    return {};
+    return SqlResult::ok();
 }

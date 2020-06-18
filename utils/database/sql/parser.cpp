@@ -6,6 +6,7 @@
 #include <cassert>
 #include <iostream>
 #include <memory>
+using namespace DB;
 using namespace DB::Sql;
 
 Parser::Parser(const std::string &query)
@@ -13,9 +14,30 @@ Parser::Parser(const std::string &query)
 {
 }
 
+SqlResult Parser::errors_as_result()
+{
+    SqlResult result;
+    result.m_errors = m_errors;
+    return result;
+}
+
+void Parser::expected(const std::string &name)
+{
+    auto token = m_lexer.consume();
+    m_errors.push_back("Expected token '" + 
+        name + "', got '" + 
+        token->data + "' instead");    
+}
+
+void Parser::match(Lexer::Type type, const std::string &name)
+{
+    if (!m_lexer.consume(type))
+        expected(name);
+}
+
 void Parser::parse_list(std::function<void()> callback)
 {
-    assert (m_lexer.consume(Lexer::OpenBrace));
+    match(Lexer::OpenBrace, "(");
     for (;;)
     {
         if (!m_lexer.peek() || m_lexer.peek()->type == Lexer::CloseBrace)
@@ -26,12 +48,12 @@ void Parser::parse_list(std::function<void()> callback)
         if (!m_lexer.consume(Lexer::Comma))
             break;
     }
-    assert (m_lexer.consume(Lexer::CloseBrace));
+    match(Lexer::CloseBrace, ")");
 }
 
 std::shared_ptr<Statement> Parser::parse_select()
 {
-    assert (m_lexer.consume(Lexer::Select));
+    match(Lexer::Select, "select");
 
     auto select = std::shared_ptr<SelectStatement>(new SelectStatement());
     if (m_lexer.consume(Lexer::Star))
@@ -43,7 +65,11 @@ std::shared_ptr<Statement> Parser::parse_select()
         for (;;)
         {
             auto token = m_lexer.consume(Lexer::Name);
-            assert (token);
+            if (!token)
+            {
+                expected("column name");
+                continue;
+            }
 
             select->m_columns.push_back(token->data);
             if (!m_lexer.consume(Lexer::Comma))
@@ -51,9 +77,13 @@ std::shared_ptr<Statement> Parser::parse_select()
         }
     }
 
-    assert (m_lexer.consume(Lexer::From));
+    match(Lexer::From, "from");
     auto table = m_lexer.consume(Lexer::Name);
-    assert (table);
+    if (!table)
+    {
+        expected("table name");
+        return nullptr;
+    }
 
     select->m_table = table->data;
     return select;
@@ -78,54 +108,73 @@ std::optional<Value> Parser::parse_value()
 
 std::shared_ptr<Statement> Parser::parse_insert()
 {
-    assert (m_lexer.consume(Lexer::Insert));
-    assert (m_lexer.consume(Lexer::Into));
+    match(Lexer::Insert, "instert");
+    match(Lexer::Into, "into");
 
     auto insert = std::shared_ptr<InsertStatement>(new InsertStatement());
     auto table = m_lexer.consume(Lexer::Name);
-    assert (table);
+    if (!table)
+    {
+        expected("table name");
+        return nullptr;
+    }
 
     insert->m_table = table->data;
-    assert (m_lexer.consume(Lexer::OpenBrace));
+    match(Lexer::OpenBrace, ")");
     parse_list([&]()
     {
         auto column = m_lexer.consume(Lexer::Name);
-        assert (column);
-
-        insert->m_columns.push_back(column->data);
+        if (!column)
+            expected("column name");
+        else
+            insert->m_columns.push_back(column->data);
     });
-    assert (m_lexer.consume(Lexer::CloseBrace));
+    match(Lexer::CloseBrace, ")");
 
-    assert (m_lexer.consume(Lexer::Values));
-    assert (m_lexer.consume(Lexer::OpenBrace));
+    match(Lexer::Values, "values");
+    match(Lexer::OpenBrace, "(");
     parse_list([&]()
     {
         auto value = parse_value();
-        assert (value);
-
-        insert->m_values.push_back(*value);
+        if (!value)
+            expected("value");
+        else
+            insert->m_values.push_back(*value);
     });
-    assert (m_lexer.consume(Lexer::CloseBrace));
+    match(Lexer::CloseBrace, ")");
 
     return std::move(insert);
 }
 
 std::shared_ptr<Statement> Parser::parse_create_table()
 {
-    assert (m_lexer.consume(Lexer::Create));
-    assert (m_lexer.consume(Lexer::Table));
+    match(Lexer::Create, "create");
+    match(Lexer::Table, "table");
 
     auto create_table = std::shared_ptr<CreateTableStatement>(new CreateTableStatement());
     auto table_name = m_lexer.consume(Lexer::Name);
-    assert (table_name);
+    if (!table_name)
+    {
+        expected("table name");
+        return nullptr;
+    }
 
     create_table->m_name = table_name->data;
     parse_list([&]()
     {
         auto column_name = m_lexer.consume(Lexer::Name);
+        if (!column_name)
+        {
+            expected("column name");
+            return;
+        }
+        
         auto column_type = m_lexer.consume(Lexer::Name);
-        assert (column_name);
-        assert (column_type);
+        if (!column_type)
+        {
+            expected("column type");
+            return;
+        }
 
         create_table->m_columns.push_back({column_name->data, column_type->data});
     });
@@ -151,10 +200,4 @@ std::shared_ptr<Statement> Parser::run()
             // TODO: Error
             assert (false);
     }
-}
-
-std::shared_ptr<Statement> Parser::parse(const std::string &query)
-{
-    Parser parser(query);
-    return parser.run();
 }

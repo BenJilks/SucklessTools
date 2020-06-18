@@ -10,12 +10,17 @@ namespace DB::Sql
     class Parser
     {
     public:
-        static std::shared_ptr<Statement> parse(const std::string &query);
+        Parser(const std::string &query);
+        
+        std::shared_ptr<Statement> run();
+        
+        inline bool good() const { return m_errors.size() == 0; }
+        SqlResult errors_as_result();
 
     private:
-        Parser(const std::string &query);
 
-        std::shared_ptr<Statement> run();
+        void expected(const std::string &name);
+        void match(Lexer::Type, const std::string &name);
         std::shared_ptr<Statement> parse_select();
         std::shared_ptr<Statement> parse_insert();
         std::shared_ptr<Statement> parse_create_table();
@@ -24,6 +29,7 @@ namespace DB::Sql
         void parse_list(std::function<void()>);
 
         Lexer m_lexer;
+        std::vector<std::string> m_errors;
     };
 
 }

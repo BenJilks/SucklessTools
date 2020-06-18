@@ -8,6 +8,9 @@ using namespace DB::Sql;
 
 SqlResult CreateTableStatement::execute(DataBase& db) const
 {
+    if (db.get_table(m_name))
+        return SqlResult::error("Table with the name '" + m_name + "' already exists");
+    
     Table::Constructor tc(m_name);
     for (const auto &column : m_columns)
     {
@@ -26,5 +29,5 @@ SqlResult CreateTableStatement::execute(DataBase& db) const
     }
 
     db.construct_table(tc);
-    return {};
+    return SqlResult::ok();
 }

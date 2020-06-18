@@ -7,7 +7,8 @@ using namespace DB::Sql;
 SqlResult SelectStatement::execute(DataBase& db) const
 {
     auto table = db.get_table(m_table);
-    assert (table);
+    if (!table)
+        return SqlResult::error("No table with the name '" + m_table + "' found");
 
     SqlResult result;
     for (size_t i = 0; i < table->row_count(); i++)
