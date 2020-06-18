@@ -27,11 +27,10 @@ int main()
         {
             db.execute_sql(
                 "INSERT INTO " + table_name +
-                    "(ID, FirstName, LastName, Age) " +
+                    "(ID, FirstName, Age) " +
                     "VALUES (" +
                     std::to_string(i * 4 + 1) + ", " +
                     std::to_string(i * 4 + 2) + ", " +
-                    std::to_string(i * 4 + 3) + ", " +
                     std::to_string(i * 4 + 4) + ")");
         }
     }

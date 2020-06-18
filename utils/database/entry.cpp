@@ -13,18 +13,36 @@ DataType DataType::integer()
     return DataType(Integer, 4, 1);
 }
 
-void IntegerEntry::write(Chunk &chunk, size_t offset)
+void Entry::read(Chunk &chunk, size_t offset)
+{
+    m_is_null = chunk.read_byte(offset);
+    read_data(chunk, offset + 1);    
+}
+
+void Entry::write(Chunk &chunk, size_t offset)
+{
+    chunk.write_byte(offset, m_is_null);
+    write_data(chunk, offset + 1);
+}
+
+void IntegerEntry::write_data(Chunk &chunk, size_t offset)
 {
     chunk.write_int(offset, m_i);
 }
 
-void IntegerEntry::read(Chunk &chunk, size_t offset)
+void IntegerEntry::read_data(Chunk &chunk, size_t offset)
 {
     m_i = chunk.read_int(offset);
 }
 
 std::ostream &operator<< (std::ostream &stream, const DB::Entry& entry)
 {
+    if (entry.is_null())
+    {
+        stream << "NULL";
+        return stream;
+    }
+    
     switch (entry.type().primitive())
     {
         case DataType::Integer:

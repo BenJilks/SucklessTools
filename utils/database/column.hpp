@@ -16,6 +16,7 @@ namespace DB
         inline DataType data_type() const { return m_data_type; }
         
         std::unique_ptr<Entry> read(Chunk &chunk, size_t offset) const;
+        std::unique_ptr<Entry> null() const;
 
     private:
         Column(std::string name, DataType data_type)

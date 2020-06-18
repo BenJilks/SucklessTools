@@ -1,6 +1,8 @@
 #include "createtable.hpp"
 #include "../table.hpp"
 #include "../database.hpp"
+#include <algorithm>
+#include <cassert>
 using namespace DB;
 using namespace DB::Sql;
 

@@ -11,7 +11,7 @@ Row::Row(const std::vector<Column> &columns)
     size_t entry_offset = 0;
     for (const auto &column : columns)
     {
-        m_entities.push_back({ column, entry_offset, nullptr });
+        m_entities.push_back({ column, entry_offset, column.null() });
         entry_offset += column.data_type().size();
     }
 }

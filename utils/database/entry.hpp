@@ -21,8 +21,12 @@ namespace DB
         static DataType integer();
 
         inline Primitive primitive() const { return m_primitive; }
-        inline size_t size() const { return m_size; }
         inline size_t length() const { return m_length; }
+        inline size_t size() const 
+        { 
+            // NOTE: All types start with an 'is null' flag
+            return 1 + m_size; 
+        }
 
         bool operator== (const DataType &other) const;
         bool operator!= (const DataType &other) const { return !(*this == other); }
@@ -39,15 +43,24 @@ namespace DB
         friend Column;
 
     public:
-        Entry(DataType type)
-            : m_type(type) {}
+        Entry(DataType type, bool is_null = false)
+            : m_is_null(is_null)
+            , m_type(type) {}
         virtual ~Entry() = default;
 
         const DataType &type() const { return m_type; }
-        virtual void read(Chunk &chunk, size_t offset) = 0;
-        virtual void write(Chunk &chunk, size_t offset) = 0;
-
+        void read(Chunk &chunk, size_t offset);
+        void write(Chunk &chunk, size_t offset);
+        
+        inline bool is_null() const { return m_is_null; }
+    
+    protected:
+        bool m_is_null;        
+        
     private:
+        virtual void read_data(Chunk &chunk, size_t offset) = 0;
+        virtual void write_data(Chunk &chunk, size_t offset) = 0;
+
         DataType m_type;
 
     };
@@ -66,12 +79,17 @@ namespace DB
         IntegerEntry(int i)
             : Entry(DataType::integer())
             , m_i(i) {}
+        
+        // Null constructor
+        IntegerEntry()
+            : Entry(DataType::integer(), true) {}
 
         inline int data() const { return m_i; }
-        virtual void read(Chunk &chunk, size_t offset) override;
-        virtual void write(Chunk &chunk, size_t offset) override;
 
     private:
+        virtual void read_data(Chunk &chunk, size_t offset) override;
+        virtual void write_data(Chunk &chunk, size_t offset) override;
+
         int m_i;
 
     };
