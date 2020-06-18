@@ -24,9 +24,9 @@ SqlResult Parser::errors_as_result()
 void Parser::expected(const std::string &name)
 {
     auto token = m_lexer.consume();
-    m_errors.push_back("Expected token '" + 
-        name + "', got '" + 
-        token->data + "' instead");    
+    m_errors.push_back("Expected token '" +
+        name + "', got '" +
+        token->data + "' instead");
 }
 
 void Parser::match(Lexer::Type type, const std::string &name)
@@ -49,6 +49,53 @@ void Parser::parse_list(std::function<void()> callback)
             break;
     }
     match(Lexer::CloseBrace, ")");
+}
+
+std::unique_ptr<Value> Parser::parse_condition(std::unique_ptr<Value> left)
+{
+    auto peek = m_lexer.peek();
+    if (!peek)
+        return left;
+
+    ValueCondition::Operation operation;
+    std::unique_ptr<Value> right;
+    switch (peek->type)
+    {
+        case Lexer::MoreThan:
+            m_lexer.consume();
+            right = parse_value();
+            operation = ValueCondition::MoreThan;
+        default:
+            break;
+    }
+
+    if (!right)
+        return left;
+
+    return std::make_unique<ValueCondition>(
+        std::move(left), operation, std::move(right));
+}
+
+std::unique_ptr<Value> Parser::parse_value()
+{
+    auto peek = m_lexer.peek();
+    if (!peek)
+        return nullptr;
+
+    std::unique_ptr<Value> value;
+    switch (peek->type)
+    {
+        case Lexer::Integer:
+            m_lexer.consume();
+            value = std::make_unique<ValueInteger>(atoi(peek->data.c_str()));
+        default:
+            break;
+    }
+
+    if (!value)
+        return nullptr;
+
+    return parse_condition(std::move(value));
 }
 
 std::shared_ptr<Statement> Parser::parse_select()
@@ -85,25 +132,11 @@ std::shared_ptr<Statement> Parser::parse_select()
         return nullptr;
     }
 
+    if (m_lexer.consume(Lexer::Where))
+        select->m_where = parse_value();
+
     select->m_table = table->data;
     return select;
-}
-
-std::optional<Value> Parser::parse_value()
-{
-    auto peek = m_lexer.peek();
-    assert (peek);
-
-    switch (peek->type)
-    {
-        case Lexer::Integer:
-            m_lexer.consume();
-            return Value(atoi(peek->data.c_str()));
-        default:
-            break;
-    }
-
-    return std::nullopt;
 }
 
 std::shared_ptr<Statement> Parser::parse_insert()
@@ -120,7 +153,6 @@ std::shared_ptr<Statement> Parser::parse_insert()
     }
 
     insert->m_table = table->data;
-    match(Lexer::OpenBrace, ")");
     parse_list([&]()
     {
         auto column = m_lexer.consume(Lexer::Name);
@@ -129,19 +161,16 @@ std::shared_ptr<Statement> Parser::parse_insert()
         else
             insert->m_columns.push_back(column->data);
     });
-    match(Lexer::CloseBrace, ")");
 
     match(Lexer::Values, "values");
-    match(Lexer::OpenBrace, "(");
     parse_list([&]()
     {
         auto value = parse_value();
         if (!value)
             expected("value");
         else
-            insert->m_values.push_back(*value);
+            insert->m_values.push_back(std::move(value));
     });
-    match(Lexer::CloseBrace, ")");
 
     return std::move(insert);
 }
@@ -168,7 +197,7 @@ std::shared_ptr<Statement> Parser::parse_create_table()
             expected("column name");
             return;
         }
-        
+
         auto column_type = m_lexer.consume(Lexer::Name);
         if (!column_type)
         {

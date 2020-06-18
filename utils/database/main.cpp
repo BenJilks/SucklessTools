@@ -12,7 +12,7 @@ int main()
 
     auto &db = *db_or_error;
 
-#if 0
+#if 1
     for (size_t i = 0; i < 2; i++)
     {
         auto table_name = "Test" + std::to_string(i);
@@ -34,11 +34,12 @@ int main()
                     std::to_string(i * 4 + 4) + ")");
         }
     }
-#else
-    auto result = db.execute_sql("SELECT * FROM Test1");
+
+//#else
+    auto result = db.execute_sql("SELECT * FROM Test1 WHERE ID > 17");
     if (!result.good())
         result.output_errors();
-    
+
     for (const auto &row : result)
         std::cout << row << "\n";
 

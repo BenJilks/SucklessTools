@@ -1,5 +1,8 @@
 #pragma once
+#include "../forward.hpp"
 #include <cassert>
+#include <memory>
+#include <type_traits>
 
 namespace DB::Sql
 {
@@ -7,24 +10,73 @@ namespace DB::Sql
     class Value
     {
     public:
+        virtual ~Value() {}
+
         enum Type
         {
-            Integer
+            Integer,
+            Boolean,
+            Column,
+            Condition
         };
 
-        Value(int i)
-            : m_type(Integer)
-            , m_i(i) {}
-
         inline Type type() const { return m_type; }
-        inline int as_int() const { assert(m_type == Integer); return m_i; }
+
+        virtual std::unique_ptr<Value> evaluate() const = 0;
+        std::unique_ptr<Entry> as_entry() const;
+
+    protected:
+        explicit Value(Type type)
+            : m_type(type) {}
 
     private:
         Type m_type;
-        union
+
+    };
+
+    template<typename T, Value::Type literal_type>
+    class ValueLiteral : public Value
+    {
+    public:
+        explicit ValueLiteral(T data)
+            : Value(literal_type)
+            , m_data(data)
+        {}
+
+        std::unique_ptr<Value> evaluate() const override
         {
-            int m_i;
+            return std::make_unique<ValueLiteral<T, literal_type>>(m_data);
+        }
+
+        inline T data() const { return m_data; }
+
+    private:
+        T m_data;
+
+    };
+
+    typedef ValueLiteral<int, Value::Integer> ValueInteger;
+    typedef ValueLiteral<bool, Value::Boolean> ValueBoolean;
+
+    class ValueCondition : public Value
+    {
+    public:
+        enum Operation
+        {
+            MoreThan
         };
+
+        ValueCondition(std::unique_ptr<Value> left, Operation, std::unique_ptr<Value> right);
+
+        virtual std::unique_ptr<Value> evaluate() const override;
+
+    private:
+        template<typename Left, typename Right>
+        std::unique_ptr<Value> operation() const;
+
+        std::unique_ptr<Value> m_left;
+        std::unique_ptr<Value> m_right;
+        Operation m_operation;
 
     };
 

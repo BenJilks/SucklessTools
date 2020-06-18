@@ -11,9 +11,9 @@ namespace DB::Sql
     {
     public:
         Parser(const std::string &query);
-        
+
         std::shared_ptr<Statement> run();
-        
+
         inline bool good() const { return m_errors.size() == 0; }
         SqlResult errors_as_result();
 
@@ -25,7 +25,8 @@ namespace DB::Sql
         std::shared_ptr<Statement> parse_insert();
         std::shared_ptr<Statement> parse_create_table();
 
-        std::optional<Value> parse_value();
+        std::unique_ptr<Value> parse_condition(std::unique_ptr<Value> left);
+        std::unique_ptr<Value> parse_value();
         void parse_list(std::function<void()>);
 
         Lexer m_lexer;

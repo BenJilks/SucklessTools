@@ -1,8 +1,12 @@
 #include "select.hpp"
+#include "value.hpp"
 #include "../database.hpp"
 #include <cassert>
 using namespace DB;
 using namespace DB::Sql;
+
+SelectStatement::SelectStatement()
+    : Statement(Type::Select) {}
 
 SqlResult SelectStatement::execute(DataBase& db) const
 {

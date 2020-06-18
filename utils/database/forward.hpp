@@ -18,6 +18,7 @@ namespace DB
         class SelectStatement;
         class InsertStatement;
         class CreateTableStatement;
+        class Value;
 
     };
 

@@ -57,6 +57,8 @@ std::optional<Lexer::Token> Lexer::next()
                         return Token { "(", Type::OpenBrace };
                     case ')':
                         return Token { ")", Type::CloseBrace };
+                    case '>':
+                        return Token { ">", Type::MoreThan };
                     default:
                         break;
                 }
@@ -113,6 +115,8 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Create };
     else if (lower == "table")
         return { buffer, Type::Table };
+    else if (lower == "where")
+        return { buffer, Type::Where };
     return { buffer, Type::Name };
 }
 

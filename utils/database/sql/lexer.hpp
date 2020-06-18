@@ -17,6 +17,7 @@ public:
 
         Select,
         From,
+        Where,
 
         Insert,
         Into,
@@ -28,6 +29,8 @@ public:
         Table,
 
         Integer,
+
+        MoreThan,
 
         Star,
         Comma,

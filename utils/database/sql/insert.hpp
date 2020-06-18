@@ -18,7 +18,7 @@ namespace DB::Sql
 
         std::string m_table;
         std::vector<std::string> m_columns;
-        std::vector<Value> m_values;
+        std::vector<std::unique_ptr<Value>> m_values;
     };
 
 }
