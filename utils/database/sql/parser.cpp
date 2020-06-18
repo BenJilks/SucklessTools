@@ -87,34 +87,24 @@ std::shared_ptr<Statement> Parser::parse_insert()
 
     insert->m_table = table->data;
     assert (m_lexer.consume(Lexer::OpenBrace));
-    for (;;)
+    parse_list([&]()
     {
-        if (!m_lexer.peek() || m_lexer.peek()->type == Lexer::CloseBrace)
-            break;
-
         auto column = m_lexer.consume(Lexer::Name);
         assert (column);
 
         insert->m_columns.push_back(column->data);
-        if (!m_lexer.consume(Lexer::Comma))
-            break;
-    }
+    });
     assert (m_lexer.consume(Lexer::CloseBrace));
 
     assert (m_lexer.consume(Lexer::Values));
     assert (m_lexer.consume(Lexer::OpenBrace));
-    for (;;)
+    parse_list([&]()
     {
-        if (!m_lexer.peek() || m_lexer.peek()->type == Lexer::CloseBrace)
-            break;
-
         auto value = parse_value();
         assert (value);
 
         insert->m_values.push_back(*value);
-        if (!m_lexer.consume(Lexer::Comma))
-            break;
-    }
+    });
     assert (m_lexer.consume(Lexer::CloseBrace));
 
     return std::move(insert);
