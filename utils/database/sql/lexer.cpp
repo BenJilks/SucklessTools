@@ -123,6 +123,8 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Update };
     else if (lower == "set")
         return { buffer, Type::Set };
+    else if (lower == "delete")
+        return { buffer, Type::Delete };
     return { buffer, Type::Name };
 }
 

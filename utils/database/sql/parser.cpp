@@ -3,6 +3,7 @@
 #include "insert.hpp"
 #include "createtable.hpp"
 #include "update.hpp"
+#include "delete.hpp"
 #include "../entry.hpp"
 #include <cassert>
 #include <iostream>
@@ -283,6 +284,32 @@ std::shared_ptr<Statement> Parser::parse_update()
     return update;
 }
 
+std::shared_ptr<Statement> Parser::parse_delete()
+{
+    match(Lexer::Delete, "delete");
+    match(Lexer::From, "from");
+    
+    auto delete_ = std::shared_ptr<DeleteStatement>(new DeleteStatement());
+    auto table = m_lexer.consume(Lexer::Name);
+    if (!table)
+    {
+        expected("table name");
+        return nullptr;
+    }
+    delete_->m_table = table->data;
+    
+    match(Lexer::Where, "where");
+    auto where = parse_value();
+    if (!where)
+    {
+        expected("condition");
+        return nullptr;
+    }
+    delete_->m_where = std::move(where);
+    
+    return delete_;
+}
+
 std::shared_ptr<Statement> Parser::run()
 {
     auto peek = m_lexer.peek();
@@ -298,6 +325,7 @@ std::shared_ptr<Statement> Parser::run()
         case Lexer::Insert: return parse_insert();
         case Lexer::Create: return parse_create_table();
         case Lexer::Update: return parse_update();
+        case Lexer::Delete: return parse_delete();
         default:
             // TODO: Error
             assert (false);

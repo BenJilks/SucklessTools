@@ -12,6 +12,7 @@ OBJ=main.o \
     sql/insert.o \
     sql/createtable.o \
     sql/update.o \
+    sql/delete.o \
     sql/value.o
 
 %.o: %.cpp

@@ -18,18 +18,16 @@ public:
         Select,
         From,
         Where,
-
         Insert,
         Into,
         OpenBrace,
         CloseBrace,
         Values,
-
         Create,
         Table,
-        
         Update,
         Set,
+        Delete,
 
         Integer,
 

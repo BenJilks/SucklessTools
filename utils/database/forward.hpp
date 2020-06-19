@@ -20,6 +20,7 @@ namespace DB
         class InsertStatement;
         class CreateTableStatement;
         class UpdateStatement;
+        class DeleteStatement;
         class Value;
 
     };
