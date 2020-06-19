@@ -68,8 +68,6 @@ namespace DB
         size_t m_row_size { 0 };
         size_t m_row_count { 0 };
 
-        static int constexpr s_row_header_size = 4;
-
     };
 
 }

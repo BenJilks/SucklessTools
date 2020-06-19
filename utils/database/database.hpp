@@ -23,8 +23,8 @@ namespace DB
         inline size_t padding_in_bytes() const { return m_padding_in_bytes; }
         inline size_t owner_id() const { return m_owner_id; }
         inline size_t index() const { return m_index; }
-        inline size_t header_size() const { return 20; }
         inline void increment_index(int by) { m_index += by; }
+        size_t header_size() const;
         bool is_active() const;
 
         uint8_t read_byte(size_t offset);
@@ -89,6 +89,7 @@ namespace DB
         void write_byte(size_t offset, char);
         void write_int(size_t offset, int);
         void write_string(size_t offset, const std::string&);
+        void write_version_chunk();
         void flush();
 
         uint8_t read_byte(size_t offset);
@@ -101,6 +102,7 @@ namespace DB
         std::vector<Table> m_tables;
         std::vector<std::shared_ptr<Chunk>> m_chunks;
         std::shared_ptr<Chunk> m_active_chunk { nullptr };
+        std::shared_ptr<Chunk> m_version_chunk { nullptr };
 
     };
 

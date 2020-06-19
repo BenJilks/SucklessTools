@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "row.hpp"
 #include "entry.hpp"
 #include "column.hpp"
@@ -8,7 +9,7 @@ using namespace DB;
 
 Row::Row(const std::vector<Column> &columns)
 {
-    size_t entry_offset = 0;
+    size_t entry_offset = Config::row_header_size;
     for (const auto &column : columns)
     {
         m_entities.push_back({ column, entry_offset, column.null() });
@@ -39,7 +40,7 @@ std::unique_ptr<Entry> &Row::operator [](const std::string &name)
         if (entity.column.name() == name)
             return entity.entry;
     }
-    
+
     // TODO: Error: This column doesn't exist
     assert (false);
 }
@@ -51,7 +52,7 @@ const std::unique_ptr<Entry> &Row::operator [](const std::string &name) const
         if (entity.column.name() == name)
             return entity.entry;
     }
-    
+
     // TODO: Error: This column doesn't exist
     assert (false);
 }
@@ -86,5 +87,5 @@ void Row::write(Chunk &chunk, size_t row_offset)
         auto offset = row_offset + entitiy.offset_in_row;
         if (entry)
             entry->write(chunk, offset);
-    }    
+    }
 }

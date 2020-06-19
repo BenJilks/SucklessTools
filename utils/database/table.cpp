@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "table.hpp"
 #include "database.hpp"
 #include <algorithm>
@@ -12,7 +13,7 @@ Table::Table(DataBase& db, Constructor constructor)
     m_id = db.generate_table_id();
     m_name = constructor.m_name;
     m_header = db.new_chunk("TH", m_id, 0xCD);
-    m_row_size = s_row_header_size;
+    m_row_size = Config::row_header_size;
     for (const auto &it : constructor.m_columns)
     {
         m_columns.push_back(Column(it.first, it.second));
@@ -42,7 +43,7 @@ Table::Table(DataBase &db, std::shared_ptr<Chunk> header)
     m_row_count = header->read_int(offset + 1);
     offset += 1 + sizeof(int);
 
-    m_row_size = s_row_header_size;
+    m_row_size = Config::row_header_size;
     for (size_t i = 0; i < column_count; i++)
     {
         // Column name

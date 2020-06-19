@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include "database.hpp"
 #include "sql/parser.hpp"
 #include <algorithm>
@@ -6,8 +7,6 @@
 #include <fstream>
 #include <filesystem>
 using namespace DB;
-
-// #define DEBUG_CHUNKS
 
 Chunk::Chunk(DB::DataBase& db, size_t header_offset)
     : m_db(db)
@@ -18,7 +17,12 @@ Chunk::Chunk(DB::DataBase& db, size_t header_offset)
     m_index = db.read_byte(header_offset + 3);
     m_size_in_bytes = db.read_int(header_offset + 4);
     m_padding_in_bytes = db.read_int(header_offset + 8);
-    m_data_offset = header_offset + header_size();
+    m_data_offset = header_offset + Config::chunk_header_size;
+}
+
+size_t Chunk::header_size() const
+{
+    return Config::chunk_header_size;
 }
 
 bool Chunk::is_active() const
@@ -120,7 +124,7 @@ std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_
     write_int(chunk->m_header_offset + 4, 0);
     write_int(chunk->m_header_offset + 8, 0);
 
-    chunk->m_data_offset = chunk->m_header_offset + chunk->header_size();
+    chunk->m_data_offset = chunk->m_header_offset + Config::chunk_header_size;
 #ifdef DEBUG_CHUNKS
     std::cout << "New chunk { type = " << type <<
         ", header_offset = " << chunk->m_header_offset <<
@@ -209,10 +213,25 @@ DataBase::DataBase(FILE *file)
             // TODO: Error, no table found
             assert (did_find_table);
         }
+        else if (chunk->type() == "VR")
+        {
+            // Version
+            m_version_chunk = chunk;
+        }
 
         m_chunks.push_back(chunk);
         m_active_chunk = chunk;
     }
+
+    if (!m_version_chunk)
+        write_version_chunk();
+}
+
+void DataBase::write_version_chunk()
+{
+    m_version_chunk = new_chunk("VR", 0xCD, 0xCD);
+    m_version_chunk->write_byte(0, Config::major_version);
+    m_version_chunk->write_byte(1, Config::minor_version);
 }
 
 SqlResult DataBase::execute_sql(const std::string &query)
