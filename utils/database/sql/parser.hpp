@@ -24,6 +24,7 @@ namespace DB::Sql
         std::shared_ptr<Statement> parse_select();
         std::shared_ptr<Statement> parse_insert();
         std::shared_ptr<Statement> parse_create_table();
+        std::shared_ptr<Statement> parse_update();
 
         std::unique_ptr<Value> parse_condition(std::unique_ptr<Value> left);
         std::unique_ptr<Value> parse_value();

@@ -143,6 +143,12 @@ void Table::add_row(Row row)
     m_header->write_int(m_row_count_offset, m_row_count);
 }
 
+void Table::update_row(size_t index, Row row)
+{
+    auto [chunk, offset] = find_chunk_and_offset_for_row(index);
+    row.write(*chunk, offset);
+}
+
 Row Table::make_row()
 {
     return Row(m_columns);

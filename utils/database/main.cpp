@@ -36,12 +36,20 @@ int main()
     }
 
 //#else
-    auto result = db.execute_sql("SELECT * FROM Test1 WHERE ID = 17");
-    if (!result.good())
-        result.output_errors();
+    {
+        auto result = db.execute_sql("UPDATE Test1 SET Age = 69 WHERE ID = 17");
+        if (!result.good())
+            result.output_errors();
+    }
 
-    for (const auto &row : result)
-        std::cout << row << "\n";
+    {
+        auto result = db.execute_sql("SELECT * FROM Test1");
+        if (!result.good())
+            result.output_errors();
+
+        for (const auto &row : result)
+            std::cout << row << "\n";
+    }
 
 #endif
 

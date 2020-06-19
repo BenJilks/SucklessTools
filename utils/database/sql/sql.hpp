@@ -15,6 +15,7 @@ namespace DB
         friend Sql::SelectStatement;
         friend Sql::InsertStatement;
         friend Sql::CreateTableStatement;
+        friend Sql::UpdateStatement;
 
     public:
         const auto begin() const { return m_rows.begin(); }

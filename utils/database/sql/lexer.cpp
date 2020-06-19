@@ -119,6 +119,10 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Table };
     else if (lower == "where")
         return { buffer, Type::Where };
+    else if (lower == "update")
+        return { buffer, Type::Update };
+    else if (lower == "set")
+        return { buffer, Type::Set };
     return { buffer, Type::Name };
 }
 

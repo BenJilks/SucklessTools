@@ -2,6 +2,7 @@
 #include "select.hpp"
 #include "insert.hpp"
 #include "createtable.hpp"
+#include "update.hpp"
 #include "../entry.hpp"
 #include <cassert>
 #include <iostream>
@@ -231,6 +232,57 @@ std::shared_ptr<Statement> Parser::parse_create_table()
     return std::move(create_table);
 }
 
+std::shared_ptr<Statement> Parser::parse_update()
+{
+    match(Lexer::Update, "update");
+    
+    auto update = std::shared_ptr<UpdateStatement>(new UpdateStatement());
+    auto table = m_lexer.consume(Lexer::Name);
+    if (!table)
+    {
+        expected("table name");
+        return nullptr;
+    }
+    
+    update->m_table = table->data;
+    match(Lexer::Set, "set");
+    for (;;)
+    {
+        auto column = m_lexer.consume(Lexer::Name);
+        if (!column)
+        {
+            expected("column name");
+            return nullptr;
+        }
+        
+        match(Lexer::Equals, "=");
+        auto value = parse_value();
+        if (!value)
+        {
+            expected("value");
+            return nullptr;            
+        }
+        
+        update->m_columns.push_back({column->data, std::move(value)});
+        if (!m_lexer.consume(Lexer::Comma))
+            break;
+    }
+    
+    if (m_lexer.consume(Lexer::Where))
+    {
+        auto where = parse_value();
+        if (!where)
+        {
+            expected("value");
+            return nullptr;            
+        }
+        
+        update->m_where = std::move(where);
+    }
+    
+    return update;
+}
+
 std::shared_ptr<Statement> Parser::run()
 {
     auto peek = m_lexer.peek();
@@ -245,6 +297,7 @@ std::shared_ptr<Statement> Parser::run()
         case Lexer::Select: return parse_select();
         case Lexer::Insert: return parse_insert();
         case Lexer::Create: return parse_create_table();
+        case Lexer::Update: return parse_update();
         default:
             // TODO: Error
             assert (false);

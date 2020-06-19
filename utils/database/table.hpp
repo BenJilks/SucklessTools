@@ -42,6 +42,7 @@ namespace DB
         inline size_t row_count() const { return m_row_count; }
 
         std::optional<Row> get_row(size_t index);
+        void update_row(size_t index, Row);
         void add_row(Row);
         Row make_row();
         void drop();

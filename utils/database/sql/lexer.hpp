@@ -27,6 +27,9 @@ public:
 
         Create,
         Table,
+        
+        Update,
+        Set,
 
         Integer,
 
