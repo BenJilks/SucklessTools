@@ -65,6 +65,12 @@ std::unique_ptr<Value> Parser::parse_condition(std::unique_ptr<Value> left)
             m_lexer.consume();
             right = parse_value();
             operation = ValueCondition::MoreThan;
+            break;
+        case Lexer::Equals:
+            m_lexer.consume();
+            right = parse_value();
+            operation = ValueCondition::Equals;
+            break;
         default:
             break;
     }

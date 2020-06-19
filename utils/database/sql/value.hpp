@@ -74,7 +74,8 @@ namespace DB::Sql
     public:
         enum Operation
         {
-            MoreThan
+            MoreThan,
+            Equals
         };
 
         ValueCondition(std::unique_ptr<Value> left, Operation, std::unique_ptr<Value> right);

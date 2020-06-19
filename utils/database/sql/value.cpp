@@ -64,6 +64,7 @@ std::unique_ptr<Value> ValueCondition::operation() const
     switch(m_operation)
     {
         case MoreThan: return make_result(left > right);
+        case Equals: return make_result(left == right);
         default:
             assert (false);
     }

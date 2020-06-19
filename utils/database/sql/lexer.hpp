@@ -31,6 +31,7 @@ public:
         Integer,
 
         MoreThan,
+        Equals,
 
         Star,
         Comma,

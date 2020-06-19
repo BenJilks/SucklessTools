@@ -59,6 +59,8 @@ std::optional<Lexer::Token> Lexer::next()
                         return Token { ")", Type::CloseBrace };
                     case '>':
                         return Token { ">", Type::MoreThan };
+                    case '=':
+                        return Token { "=", Type::Equals };
                     default:
                         break;
                 }

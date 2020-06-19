@@ -36,7 +36,7 @@ int main()
     }
 
 //#else
-    auto result = db.execute_sql("SELECT * FROM Test1 WHERE ID > 17");
+    auto result = db.execute_sql("SELECT * FROM Test1 WHERE ID = 17");
     if (!result.good())
         result.output_errors();
 
