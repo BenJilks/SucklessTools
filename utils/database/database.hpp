@@ -23,7 +23,7 @@ namespace DB
         inline size_t padding_in_bytes() const { return m_padding_in_bytes; }
         inline size_t owner_id() const { return m_owner_id; }
         inline size_t index() const { return m_index; }
-        inline size_t header_size() const { return 12; }
+        inline size_t header_size() const { return 20; }
         inline void increment_index(int by) { m_index += by; }
         bool is_active() const;
 

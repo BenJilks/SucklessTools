@@ -3,6 +3,7 @@
 #include <cassert>
 #include <memory>
 #include <type_traits>
+#include <string>
 
 namespace DB::Sql
 {
@@ -63,19 +64,19 @@ namespace DB::Sql
     public:
         explicit ValueColumn(const std::string &data)
             : ValueLiteral(data) {}
-        
+
         virtual std::unique_ptr<Value> evaluate(const DB::Row&) const override;
-        
+
     private:
     };
-    
+
     class ValueCondition : public Value
     {
     public:
         enum Operation
         {
             MoreThan,
-            Equals
+            Equals,
         };
 
         ValueCondition(std::unique_ptr<Value> left, Operation, std::unique_ptr<Value> right);

@@ -18,7 +18,7 @@ Chunk::Chunk(DB::DataBase& db, size_t header_offset)
     m_index = db.read_byte(header_offset + 3);
     m_size_in_bytes = db.read_int(header_offset + 4);
     m_padding_in_bytes = db.read_int(header_offset + 8);
-    m_data_offset = header_offset + 12;
+    m_data_offset = header_offset + header_size();
 }
 
 bool Chunk::is_active() const
@@ -88,10 +88,10 @@ void Chunk::shrink_to(size_t offset)
 {
     m_padding_in_bytes = m_size_in_bytes - offset;
     m_size_in_bytes = offset;
-    
+
     m_db.write_int(m_header_offset + 4, m_size_in_bytes);
     m_db.write_int(m_header_offset + 8, m_padding_in_bytes);
-    
+
     for (size_t i = m_size_in_bytes; i < m_padding_in_bytes; i++)
         write_byte(i, 0xCD);
 }
@@ -120,7 +120,7 @@ std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_
     write_int(chunk->m_header_offset + 4, 0);
     write_int(chunk->m_header_offset + 8, 0);
 
-    chunk->m_data_offset = m_end_of_data_pointer;
+    chunk->m_data_offset = chunk->m_header_offset + chunk->header_size();
 #ifdef DEBUG_CHUNKS
     std::cout << "New chunk { type = " << type <<
         ", header_offset = " << chunk->m_header_offset <<
@@ -170,8 +170,8 @@ DataBase::DataBase(FILE *file)
     while (offset < m_end_of_data_pointer)
     {
         auto chunk = std::shared_ptr<Chunk>(new Chunk(*this, offset));
-        offset += chunk->header_size() + 
-            chunk->size_in_bytes() + 
+        offset += chunk->header_size() +
+            chunk->size_in_bytes() +
             chunk->padding_in_bytes();
 
         if (chunk->type() == "RM")

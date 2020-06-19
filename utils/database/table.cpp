@@ -12,6 +12,7 @@ Table::Table(DataBase& db, Constructor constructor)
     m_id = db.generate_table_id();
     m_name = constructor.m_name;
     m_header = db.new_chunk("TH", m_id, 0xCD);
+    m_row_size = s_row_header_size;
     for (const auto &it : constructor.m_columns)
     {
         m_columns.push_back(Column(it.first, it.second));
@@ -41,6 +42,7 @@ Table::Table(DataBase &db, std::shared_ptr<Chunk> header)
     m_row_count = header->read_int(offset + 1);
     offset += 1 + sizeof(int);
 
+    m_row_size = s_row_header_size;
     for (size_t i = 0; i < column_count; i++)
     {
         // Column name
@@ -152,7 +154,7 @@ void Table::update_row(size_t index, Row row)
 void Table::remove_row(size_t index)
 {
     auto [chunk, offset] = find_chunk_and_offset_for_row(index);
-    
+
     // Insert a new chunk inbetween the one this row is in and the rest
     auto new_chunk = m_db.new_chunk("RD", m_id, chunk->index() + 1);
     for (auto &it : m_row_data_chunks)
@@ -160,21 +162,21 @@ void Table::remove_row(size_t index)
         if (it->index() > chunk->index())
             it->increment_index(1);
     }
-    
+
     // Copy data to knew chunk
     for (size_t i = offset + m_row_size; i < chunk->size_in_bytes(); i++)
         new_chunk->write_byte(i - (offset + m_row_size), chunk->read_byte(i));
-    
+
     // Shrink chunk to before the deleted row
     chunk->shrink_to(offset);
-    
+
     // Re-sort chunks
     m_row_data_chunks.push_back(new_chunk);
     std::sort(m_row_data_chunks.begin(), m_row_data_chunks.end(), [](const auto &a, const auto &b)
     {
         return a->index() < b->index();
     });
-    
+
     // Update row count
     m_row_count -= 1;
     m_header->write_int(m_row_count_offset, m_row_count);

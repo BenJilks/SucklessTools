@@ -17,7 +17,7 @@ namespace DB
     public:
         Table(const Table&) = default;
         Table operator=(const Table&& table) { return Table(std::move(table)); };
-        
+
         class Constructor
         {
             friend Table;
@@ -67,6 +67,8 @@ namespace DB
         std::vector<Column> m_columns;
         size_t m_row_size { 0 };
         size_t m_row_count { 0 };
+
+        static int constexpr s_row_header_size = 4;
 
     };
 
