@@ -24,6 +24,7 @@ namespace DB
         inline size_t owner_id() const { return m_owner_id; }
         inline size_t index() const { return m_index; }
         inline size_t header_size() const { return 12; }
+        inline void increment_index(int by) { m_index += by; }
         bool is_active() const;
 
         uint8_t read_byte(size_t offset);
@@ -34,6 +35,7 @@ namespace DB
         void write_int(size_t offset, int);
         void write_string(size_t offset, const std::string&);
         void drop();
+        void shrink_to(size_t offset);
 
     private:
         Chunk(DataBase&, size_t header_offset);

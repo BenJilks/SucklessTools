@@ -43,6 +43,7 @@ namespace DB
 
         std::optional<Row> get_row(size_t index);
         void update_row(size_t index, Row);
+        void remove_row(size_t index);
         void add_row(Row);
         Row make_row();
         void drop();

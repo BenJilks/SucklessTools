@@ -149,6 +149,37 @@ void Table::update_row(size_t index, Row row)
     row.write(*chunk, offset);
 }
 
+void Table::remove_row(size_t index)
+{
+    auto [chunk, offset] = find_chunk_and_offset_for_row(index);
+    
+    // Insert a new chunk inbetween the one this row is in and the rest
+    auto new_chunk = m_db.new_chunk("RD", m_id, chunk->index() + 1);
+    for (auto &it : m_row_data_chunks)
+    {
+        if (it->index() > chunk->index())
+            it->increment_index(1);
+    }
+    
+    // Copy data to knew chunk
+    for (size_t i = offset + m_row_size; i < chunk->size_in_bytes(); i++)
+        new_chunk->write_byte(i - (offset + m_row_size), chunk->read_byte(i));
+    
+    // Shrink chunk to before the deleted row
+    chunk->shrink_to(offset);
+    
+    // Re-sort chunks
+    m_row_data_chunks.push_back(new_chunk);
+    std::sort(m_row_data_chunks.begin(), m_row_data_chunks.end(), [](const auto &a, const auto &b)
+    {
+        return a->index() < b->index();
+    });
+    
+    // Update row count
+    m_row_count -= 1;
+    m_header->write_int(m_row_count_offset, m_row_count);
+}
+
 Row Table::make_row()
 {
     return Row(m_columns);
@@ -194,6 +225,7 @@ int Table::find_next_row_chunk_index()
 std::optional<Row> Table::get_row(size_t index)
 {
     auto [chunk, offset] = find_chunk_and_offset_for_row(index);
+    assert (chunk);
 
     Row row(m_columns);
     row.read(*chunk, offset);

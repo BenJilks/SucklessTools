@@ -49,7 +49,7 @@ std::string Chunk::read_string(size_t offset, size_t len)
 
 void Chunk::check_size(size_t size)
 {
-    if (size >= m_size_in_bytes)
+    if (size >= m_size_in_bytes + m_padding_in_bytes)
     {
         m_db.check_is_active_chunk(this);
         m_size_in_bytes = size;
@@ -82,6 +82,18 @@ void Chunk::drop()
 {
     m_db.write_string(m_header_offset, "RM");
     m_has_been_dropped = true;
+}
+
+void Chunk::shrink_to(size_t offset)
+{
+    m_padding_in_bytes = m_size_in_bytes - offset;
+    m_size_in_bytes = offset;
+    
+    m_db.write_int(m_header_offset + 4, m_size_in_bytes);
+    m_db.write_int(m_header_offset + 8, m_padding_in_bytes);
+    
+    for (size_t i = m_size_in_bytes; i < m_padding_in_bytes; i++)
+        write_byte(i, 0xCD);
 }
 
 std::ostream &operator <<(std::ostream &stream, const Chunk &chunk)

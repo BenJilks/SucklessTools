@@ -12,7 +12,7 @@ int main()
 
     auto &db = *db_or_error;
 
-#if 1
+#if 0
     for (size_t i = 0; i < 2; i++)
     {
         auto table_name = "Test" + std::to_string(i);
@@ -35,13 +35,20 @@ int main()
         }
     }
 
-//#else
     {
         auto result = db.execute_sql("UPDATE Test1 SET Age = 69 WHERE ID = 17");
         if (!result.good())
             result.output_errors();
     }
+    
+    {
+        auto table = db.get_table("Test1");
+        assert (table);
+        
+        table->remove_row(2);
+    }
 
+#else
     {
         auto result = db.execute_sql("SELECT * FROM Test1");
         if (!result.good())
