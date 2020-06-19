@@ -17,7 +17,8 @@ Chunk::Chunk(DB::DataBase& db, size_t header_offset)
     m_owner_id = db.read_byte(header_offset + 2);
     m_index = db.read_byte(header_offset + 3);
     m_size_in_bytes = db.read_int(header_offset + 4);
-    m_data_offset = header_offset + 8;
+    m_padding_in_bytes = db.read_int(header_offset + 8);
+    m_data_offset = header_offset + 12;
 }
 
 bool Chunk::is_active() const
@@ -105,6 +106,7 @@ std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_
     write_byte(chunk->m_header_offset + 2, owner_id);
     write_byte(chunk->m_header_offset + 3, index);
     write_int(chunk->m_header_offset + 4, 0);
+    write_int(chunk->m_header_offset + 8, 0);
 
     chunk->m_data_offset = m_end_of_data_pointer;
 #ifdef DEBUG_CHUNKS
@@ -156,7 +158,9 @@ DataBase::DataBase(FILE *file)
     while (offset < m_end_of_data_pointer)
     {
         auto chunk = std::shared_ptr<Chunk>(new Chunk(*this, offset));
-        offset += 8 + chunk->size_in_bytes();
+        offset += chunk->header_size() + 
+            chunk->size_in_bytes() + 
+            chunk->padding_in_bytes();
 
         if (chunk->type() == "RM")
         {

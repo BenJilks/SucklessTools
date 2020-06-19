@@ -20,8 +20,10 @@ namespace DB
         inline std::string_view type() const { return std::string_view(m_type, 2); }
         inline size_t data_offset() const { return m_data_offset; }
         inline size_t size_in_bytes() const { return m_size_in_bytes; }
+        inline size_t padding_in_bytes() const { return m_padding_in_bytes; }
         inline size_t owner_id() const { return m_owner_id; }
         inline size_t index() const { return m_index; }
+        inline size_t header_size() const { return 12; }
         bool is_active() const;
 
         uint8_t read_byte(size_t offset);
@@ -46,6 +48,7 @@ namespace DB
 
         char m_type[2];
         size_t m_size_in_bytes { 0 };
+        size_t m_padding_in_bytes { 0 };
         uint8_t m_owner_id { 0xCD };
         uint8_t m_index { 0xCD };
         bool m_has_been_dropped { false };
