@@ -19,6 +19,15 @@ SqlResult SelectStatement::execute(DataBase& db) const
     {
         auto row = table->get_row(i);
         assert (row);
+        
+        if (m_where)
+        {
+            auto result = m_where->evaluate(*row);
+            assert (result);
+            
+            if (!static_cast<const ValueBoolean&>(*result).data())
+                continue;
+        }
 
         if (m_all)
         {

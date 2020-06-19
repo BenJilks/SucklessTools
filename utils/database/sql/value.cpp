@@ -1,25 +1,45 @@
 #include "value.hpp"
 #include "../entry.hpp"
+#include "../row.hpp"
 using namespace DB;
 using namespace DB::Sql;
 
 template<typename T>
-static auto get_literal_value(const Value &value)
+static auto value_of(const Value &value)
 {
     return static_cast<const T&>(value).data();
 }
 
 template<typename EntryType, typename ValueType>
-static auto make_literal(const Value &value)
+static auto entry_from_literal(const Value &value)
 {
-    return std::make_unique<EntryType>(get_literal_value<ValueType>(value));
+    return std::make_unique<EntryType>(value_of<ValueType>(value));
+}
+
+template<typename ValueType, typename EntryType>
+static auto literal_from_entry(const Entry &value)
+{
+    return std::make_unique<ValueType>(static_cast<const EntryType&>(value).data());
 }
 
 std::unique_ptr<Entry> Value::as_entry() const
 {
     switch (m_type)
     {
-        case Integer: return make_literal<IntegerEntry, ValueInteger>(*this);
+        case Integer: return entry_from_literal<IntegerEntry, ValueInteger>(*this);
+        default:
+            assert (false);
+    }
+}
+
+std::unique_ptr<Value> ValueColumn::evaluate(const Row &row) const
+{
+    const auto &entry = row[data()];
+    
+    switch (entry->type().primitive())
+    {
+        case DataType::Integer:
+            return literal_from_entry<ValueInteger, IntegerEntry>(*entry);
         default:
             assert (false);
     }
@@ -49,8 +69,16 @@ std::unique_ptr<Value> ValueCondition::operation() const
     }
 }
 
-std::unique_ptr<Value> ValueCondition::evaluate() const
+std::unique_ptr<Value> ValueCondition::evaluate(const Row &row) const
 {
+    if (m_left->type() == Value::Column || m_right->type() == Value::Column)
+    {
+        auto sub_condition = ValueCondition(
+            m_left->evaluate(row), m_operation, m_right->evaluate(row));
+        
+        return sub_condition.evaluate(row);
+    }
+            
     switch(m_left->type())
     {
         case Value::Integer:
@@ -61,6 +89,7 @@ std::unique_ptr<Value> ValueCondition::evaluate() const
                 default:
                     assert (false);
             }
+            break;
         default:
             assert (false);
     }

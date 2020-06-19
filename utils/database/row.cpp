@@ -44,6 +44,18 @@ std::unique_ptr<Entry> &Row::operator [](const std::string &name)
     assert (false);
 }
 
+const std::unique_ptr<Entry> &Row::operator [](const std::string &name) const
+{
+    for (const auto &entity : m_entities)
+    {
+        if (entity.column.name() == name)
+            return entity.entry;
+    }
+    
+    // TODO: Error: This column doesn't exist
+    assert (false);
+}
+
 std::ostream &operator<<(std::ostream &stream, const Row& row)
 {
     stream << "Row: { ";

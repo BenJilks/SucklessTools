@@ -7,6 +7,7 @@ namespace DB
     class Chunk;
     class Table;
     class Column;
+    class Row;
     class Entry;
 
     namespace Sql

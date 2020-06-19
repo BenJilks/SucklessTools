@@ -88,6 +88,11 @@ std::unique_ptr<Value> Parser::parse_value()
         case Lexer::Integer:
             m_lexer.consume();
             value = std::make_unique<ValueInteger>(atoi(peek->data.c_str()));
+            break;
+        case Lexer::Name:
+            m_lexer.consume();
+            value = std::make_unique<ValueColumn>(peek->data);
+            break;
         default:
             break;
     }
@@ -133,7 +138,16 @@ std::shared_ptr<Statement> Parser::parse_select()
     }
 
     if (m_lexer.consume(Lexer::Where))
-        select->m_where = parse_value();
+    {
+        auto condition = parse_value();
+        if (!condition)
+        {
+            expected("condition");
+            return nullptr;
+        }
+        
+        select->m_where = std::move(condition);
+    }
 
     select->m_table = table->data;
     return select;

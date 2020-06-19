@@ -22,7 +22,7 @@ namespace DB::Sql
 
         inline Type type() const { return m_type; }
 
-        virtual std::unique_ptr<Value> evaluate() const = 0;
+        virtual std::unique_ptr<Value> evaluate(const Row&) const = 0;
         std::unique_ptr<Entry> as_entry() const;
 
     protected:
@@ -43,7 +43,7 @@ namespace DB::Sql
             , m_data(data)
         {}
 
-        std::unique_ptr<Value> evaluate() const override
+        virtual std::unique_ptr<Value> evaluate(const DB::Row&) const override
         {
             return std::make_unique<ValueLiteral<T, literal_type>>(m_data);
         }
@@ -58,6 +58,17 @@ namespace DB::Sql
     typedef ValueLiteral<int, Value::Integer> ValueInteger;
     typedef ValueLiteral<bool, Value::Boolean> ValueBoolean;
 
+    class ValueColumn : public ValueLiteral<std::string, Value::Column>
+    {
+    public:
+        explicit ValueColumn(const std::string &data)
+            : ValueLiteral(data) {}
+        
+        virtual std::unique_ptr<Value> evaluate(const DB::Row&) const override;
+        
+    private:
+    };
+    
     class ValueCondition : public Value
     {
     public:
@@ -68,7 +79,7 @@ namespace DB::Sql
 
         ValueCondition(std::unique_ptr<Value> left, Operation, std::unique_ptr<Value> right);
 
-        virtual std::unique_ptr<Value> evaluate() const override;
+        virtual std::unique_ptr<Value> evaluate(const DB::Row&) const override;
 
     private:
         template<typename Left, typename Right>

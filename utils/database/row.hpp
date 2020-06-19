@@ -41,6 +41,7 @@ namespace DB
         const auto begin() const { return const_itorator(*this, 0); }
         const auto end() const { return const_itorator(*this, m_entities.size()); }
         std::unique_ptr<Entry> &operator [](const std::string &name);
+        const std::unique_ptr<Entry> &operator [](const std::string &name) const;
 
         void read(Chunk &chunk, size_t row_offset);
         void write(Chunk &chunk, size_t row_offset);
