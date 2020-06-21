@@ -1,7 +1,7 @@
 #pragma once
 
 // Debugging flags
-// #define DEBUG_CHUNKS
+#define DEBUG_CHUNKS
 
 namespace DB::Config
 {

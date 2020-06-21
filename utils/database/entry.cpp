@@ -129,7 +129,8 @@ void TextEntry::read_data(Chunk &chunk, size_t offset)
     assert (table);
 
     auto dynamic_chunk = table->find_dynamic_chunk(id);
-    assert (dynamic_chunk);
+    if (!dynamic_chunk)
+        return;
     m_dynamic_data = std::make_unique<DynamicData>(dynamic_chunk);
 
     auto buffer = m_dynamic_data->read();

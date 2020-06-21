@@ -1,6 +1,7 @@
 CC=c++
 CXXFLAGS=-std=c++17 -g
 OBJ=main.o \
+    cleaner.o \
     database.o \
     chunk.o \
     dynamicdata.o \

@@ -1,4 +1,5 @@
 #include "database.hpp"
+#include "cleaner.hpp"
 #include <iostream>
 #include <cassert>
 using namespace DB;
@@ -6,8 +7,10 @@ using namespace DB;
 int main()
 {
     std::cout << "Hello, databases!!!\n";
+    Cleaner cleaner("test.db");
+    cleaner.full_clean_up();
 
-    auto db_or_error = DataBase::open("test.db");
+    auto db_or_error = DataBase::open("test_cleaned.db");
     assert (db_or_error);
 
     auto &db = *db_or_error;
@@ -49,7 +52,7 @@ int main()
 
 #else
     {
-        auto result = db.execute_sql("SELECT * FROM Test1");
+        auto result = db.execute_sql("SELECT * FROM Test0");
         if (!result.good())
             result.output_errors();
 
