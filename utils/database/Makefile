@@ -1,4 +1,5 @@
 CC=c++
+AR=ar
 CXXFLAGS=-std=c++17 -g
 OBJ=main.o \
     cleaner.o \
@@ -18,11 +19,43 @@ OBJ=main.o \
     sql/delete.o \
     sql/value.o
 
+HEADER=cleaner.hpp \
+    database.hpp \
+    chunk.hpp \
+    dynamicdata.hpp \
+    table.hpp \
+    column.hpp \
+    row.hpp \
+    entry.hpp \
+    sql/lexer.hpp \
+    sql/parser.hpp \
+    sql/select.hpp \
+    sql/insert.hpp \
+    sql/createtable.hpp \
+    sql/update.hpp \
+    sql/delete.hpp \
+    sql/value.hpp
+
+ifeq ($(PREFIX),)
+    PREFIX := /usr/local
+endif
+
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
-	$(CC) -o database $^ $(CXXFLAGS)
+#	$(CC) -o database $^ $(CXXFLAGS)
+	$(AR) rs libdatabase.a $(OBJ)
+
+install:
+	mkdir -p $(PREFIX)/include/database
+	install -m 644 libdatabase.a $(PREFIX)/lib/
+	install -m 644 $(HEADER) $(PREFIX)/include/database/
+
+uninstall:
+	$(RM) -r $(PREFIX)/include/libdatabase
+	$(RM) $(PREFIX)/lib/libdatabase.a
 
 clean:
-	$(RM) $(OBJ) database
+	$(RM) $(OBJ) 
+	$(RM) database libdatabase.a
