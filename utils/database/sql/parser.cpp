@@ -97,6 +97,10 @@ std::unique_ptr<Value> Parser::parse_value()
             m_lexer.consume();
             value = std::make_unique<ValueInteger>(atoi(peek->data.c_str()));
             break;
+        case Lexer::String:
+            m_lexer.consume();
+            value = std::make_unique<ValueString>(peek->data);
+            break;
         case Lexer::Name:
             m_lexer.consume();
             value = std::make_unique<ValueColumn>(peek->data);
@@ -153,7 +157,7 @@ std::shared_ptr<Statement> Parser::parse_select()
             expected("condition");
             return nullptr;
         }
-        
+
         select->m_where = std::move(condition);
     }
 
@@ -227,7 +231,22 @@ std::shared_ptr<Statement> Parser::parse_create_table()
             return;
         }
 
-        create_table->m_columns.push_back({column_name->data, column_type->data});
+        int column_type_length = 1;
+        if (m_lexer.consume(Lexer::OpenBrace))
+        {
+            auto length = m_lexer.consume(Lexer::Integer);
+            if (!length)
+            {
+                expected("type length");
+                return;
+            }
+
+            column_type_length = atoi(length->data.c_str());
+            match(Lexer::CloseBrace, ")");
+        }
+
+        create_table->m_columns.push_back({
+            column_name->data, column_type->data, column_type_length});
     });
 
     return std::move(create_table);
@@ -236,7 +255,7 @@ std::shared_ptr<Statement> Parser::parse_create_table()
 std::shared_ptr<Statement> Parser::parse_update()
 {
     match(Lexer::Update, "update");
-    
+
     auto update = std::shared_ptr<UpdateStatement>(new UpdateStatement());
     auto table = m_lexer.consume(Lexer::Name);
     if (!table)
@@ -244,7 +263,7 @@ std::shared_ptr<Statement> Parser::parse_update()
         expected("table name");
         return nullptr;
     }
-    
+
     update->m_table = table->data;
     match(Lexer::Set, "set");
     for (;;)
@@ -255,32 +274,32 @@ std::shared_ptr<Statement> Parser::parse_update()
             expected("column name");
             return nullptr;
         }
-        
+
         match(Lexer::Equals, "=");
         auto value = parse_value();
         if (!value)
         {
             expected("value");
-            return nullptr;            
+            return nullptr;
         }
-        
+
         update->m_columns.push_back({column->data, std::move(value)});
         if (!m_lexer.consume(Lexer::Comma))
             break;
     }
-    
+
     if (m_lexer.consume(Lexer::Where))
     {
         auto where = parse_value();
         if (!where)
         {
             expected("value");
-            return nullptr;            
+            return nullptr;
         }
-        
+
         update->m_where = std::move(where);
     }
-    
+
     return update;
 }
 
@@ -288,7 +307,7 @@ std::shared_ptr<Statement> Parser::parse_delete()
 {
     match(Lexer::Delete, "delete");
     match(Lexer::From, "from");
-    
+
     auto delete_ = std::shared_ptr<DeleteStatement>(new DeleteStatement());
     auto table = m_lexer.consume(Lexer::Name);
     if (!table)
@@ -297,7 +316,7 @@ std::shared_ptr<Statement> Parser::parse_delete()
         return nullptr;
     }
     delete_->m_table = table->data;
-    
+
     match(Lexer::Where, "where");
     auto where = parse_value();
     if (!where)
@@ -306,7 +325,7 @@ std::shared_ptr<Statement> Parser::parse_delete()
         return nullptr;
     }
     delete_->m_where = std::move(where);
-    
+
     return delete_;
 }
 

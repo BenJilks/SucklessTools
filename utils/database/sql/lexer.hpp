@@ -30,6 +30,7 @@ public:
         Delete,
 
         Integer,
+        String,
 
         MoreThan,
         Equals,
@@ -56,7 +57,8 @@ private:
     {
         Normal,
         Name,
-        Integer
+        Integer,
+        String,
     };
 
     std::optional<Token> next();

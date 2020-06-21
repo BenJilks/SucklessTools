@@ -47,6 +47,12 @@ std::optional<Lexer::Token> Lexer::next()
                     break;
                 }
 
+                if (c == '\'')
+                {
+                    m_state = State::String;
+                    break;
+                }
+
                 switch (c)
                 {
                     case '*':
@@ -85,6 +91,16 @@ std::optional<Lexer::Token> Lexer::next()
                     m_should_reconsume = true;
                     m_state = State::Normal;
                     return Token { buffer, Type::Integer };
+                }
+
+                buffer += c;
+                break;
+
+            case State::String:
+                if (c == '\'')
+                {
+                    m_state = State::Normal;
+                    return Token { buffer, Type::String };
                 }
 
                 buffer += c;

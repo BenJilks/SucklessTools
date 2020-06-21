@@ -19,6 +19,7 @@ namespace DB::Sql
         {
             std::string name;
             std::string type;
+            int length;
         };
 
         std::string m_name;

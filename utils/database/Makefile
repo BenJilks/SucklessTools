@@ -2,6 +2,8 @@ CC=c++
 CXXFLAGS=-std=c++17 -g
 OBJ=main.o \
     database.o \
+    chunk.o \
+    dynamicdata.o \
     table.o \
     column.o \
     row.o \

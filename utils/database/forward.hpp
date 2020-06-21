@@ -5,6 +5,7 @@ namespace DB
 
     class DataBase;
     class Chunk;
+    class DynamicData;
     class Table;
     class Column;
     class Row;

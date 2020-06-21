@@ -20,16 +20,7 @@ SqlResult InsertStatement::execute(DataBase& db) const
     {
         const auto &column = m_columns[i];
         const auto &value = m_values[i];
-
-        switch (value->type())
-        {
-            case Value::Integer:
-                row[column] = value->as_entry();
-                break;
-
-            default:
-                assert (false);
-        }
+        row[column]->set(value->as_entry());
     }
 
     table->add_row(std::move(row));

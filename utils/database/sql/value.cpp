@@ -1,6 +1,7 @@
 #include "value.hpp"
 #include "../entry.hpp"
 #include "../row.hpp"
+#include <iostream>
 using namespace DB;
 using namespace DB::Sql;
 
@@ -27,6 +28,7 @@ std::unique_ptr<Entry> Value::as_entry() const
     switch (m_type)
     {
         case Integer: return entry_from_literal<IntegerEntry, ValueInteger>(*this);
+        case String: return entry_from_literal<CharEntry, ValueString>(*this);
         default:
             assert (false);
     }
@@ -35,8 +37,8 @@ std::unique_ptr<Entry> Value::as_entry() const
 std::unique_ptr<Value> ValueColumn::evaluate(const Row &row) const
 {
     const auto &entry = row[data()];
-    
-    switch (entry->type().primitive())
+
+    switch (entry->data_type().primitive())
     {
         case DataType::Integer:
             return literal_from_entry<ValueInteger, IntegerEntry>(*entry);
@@ -76,10 +78,10 @@ std::unique_ptr<Value> ValueCondition::evaluate(const Row &row) const
     {
         auto sub_condition = ValueCondition(
             m_left->evaluate(row), m_operation, m_right->evaluate(row));
-        
+
         return sub_condition.evaluate(row);
     }
-            
+
     switch(m_left->type())
     {
         case Value::Integer:

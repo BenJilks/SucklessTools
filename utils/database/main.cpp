@@ -12,15 +12,15 @@ int main()
 
     auto &db = *db_or_error;
 
-#if 1
+#if 0
     for (size_t i = 0; i < 2; i++)
     {
         auto table_name = "Test" + std::to_string(i);
         db.execute_sql(
             "CREATE TABLE " + table_name + " (" +
                 "ID INTEGER," +
-                "FirstName INTEGER," +
-                "LastName INTEGER," +
+                "FirstName TEXT," +
+                "LastName CHAR(80)," +
                 "Age INTEGER )");
 
         for (size_t i = 0; i < 10; i++)
@@ -30,24 +30,24 @@ int main()
                     "(ID, FirstName, Age) " +
                     "VALUES (" +
                     std::to_string(i * 4 + 1) + ", " +
-                    std::to_string(i * 4 + 2) + ", " +
+                    "'bob', " +
                     std::to_string(i * 4 + 4) + ")");
         }
     }
 
-//#else
     {
         auto result = db.execute_sql("UPDATE Test1 SET Age = 69 WHERE ID = 17");
         if (!result.good())
             result.output_errors();
     }
-    
+
     {
         auto result = db.execute_sql("DELETE FROM Test1 WHERE ID = 21");
         if (!result.good())
             result.output_errors();
     }
 
+#else
     {
         auto result = db.execute_sql("SELECT * FROM Test1");
         if (!result.good())

@@ -10,7 +10,7 @@ SqlResult CreateTableStatement::execute(DataBase& db) const
 {
     if (db.get_table(m_name))
         return SqlResult::error("Table with the name '" + m_name + "' already exists");
-    
+
     Table::Constructor tc(m_name);
     for (const auto &column : m_columns)
     {
@@ -23,6 +23,10 @@ SqlResult CreateTableStatement::execute(DataBase& db) const
         std::optional<DataType> type;
         if (type_name == "integer")
             type = DataType::integer();
+        else if (type_name == "char")
+            type = DataType::char_(column.length);
+        else if (type_name == "text")
+            type = DataType::text();
 
         assert (type);
         tc.add_column(column.name, *type);

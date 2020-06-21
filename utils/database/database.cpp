@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "chunk.hpp"
 #include "database.hpp"
 #include "sql/parser.hpp"
 #include <algorithm>
@@ -7,108 +8,6 @@
 #include <fstream>
 #include <filesystem>
 using namespace DB;
-
-Chunk::Chunk(DB::DataBase& db, size_t header_offset)
-    : m_db(db)
-    , m_header_offset(header_offset)
-{
-    db.read_string(header_offset, m_type, 2);
-    m_owner_id = db.read_byte(header_offset + 2);
-    m_index = db.read_byte(header_offset + 3);
-    m_size_in_bytes = db.read_int(header_offset + 4);
-    m_padding_in_bytes = db.read_int(header_offset + 8);
-    m_data_offset = header_offset + Config::chunk_header_size;
-}
-
-size_t Chunk::header_size() const
-{
-    return Config::chunk_header_size;
-}
-
-bool Chunk::is_active() const
-{
-    assert (!m_has_been_dropped);
-    return m_db.m_active_chunk.get() == this;
-}
-
-uint8_t Chunk::read_byte(size_t offset)
-{
-    assert (!m_has_been_dropped);
-    return m_db.read_byte(m_data_offset + offset);
-}
-
-int Chunk::read_int(size_t offset)
-{
-    assert (!m_has_been_dropped);
-    return m_db.read_int(m_data_offset + offset);
-}
-
-std::string Chunk::read_string(size_t offset, size_t len)
-{
-    assert (!m_has_been_dropped);
-    std::vector<char> buffer(len);
-    m_db.read_string(m_data_offset + offset, buffer.data(), len);
-    return std::string(buffer.data(), buffer.size());
-}
-
-void Chunk::check_size(size_t size)
-{
-    if (size >= m_size_in_bytes + m_padding_in_bytes)
-    {
-        m_db.check_is_active_chunk(this);
-        m_size_in_bytes = size;
-        m_db.write_int(m_header_offset + 4, m_size_in_bytes);
-    }
-}
-
-void Chunk::write_byte(size_t offset, uint8_t byte)
-{
-    assert (!m_has_been_dropped);
-    check_size(offset + 1);
-    m_db.write_byte(m_data_offset + offset, byte);
-}
-
-void Chunk::write_int(size_t offset, int i)
-{
-    assert (!m_has_been_dropped);
-    check_size(offset + 4);
-    m_db.write_int(m_data_offset + offset, i);
-}
-
-void Chunk::write_string(size_t offset, const std::string &str)
-{
-    assert (!m_has_been_dropped);
-    check_size(offset + str.size());
-    m_db.write_string(m_data_offset + offset, str);
-}
-
-void Chunk::drop()
-{
-    m_db.write_string(m_header_offset, "RM");
-    m_has_been_dropped = true;
-}
-
-void Chunk::shrink_to(size_t offset)
-{
-    m_padding_in_bytes = m_size_in_bytes - offset;
-    m_size_in_bytes = offset;
-
-    m_db.write_int(m_header_offset + 4, m_size_in_bytes);
-    m_db.write_int(m_header_offset + 8, m_padding_in_bytes);
-
-    for (size_t i = m_size_in_bytes; i < m_padding_in_bytes; i++)
-        write_byte(i, 0xCD);
-}
-
-std::ostream &operator <<(std::ostream &stream, const Chunk &chunk)
-{
-    stream << "Chunk { type = " << chunk.type() <<
-        ", data_offset = " << chunk.data_offset() <<
-        ", size = " << chunk.size_in_bytes() <<
-        ", owner_id = " << chunk.owner_id() <<
-        ", index = " << chunk.index() << " }";
-    return stream;
-}
 
 std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_id, uint8_t index)
 {
@@ -199,24 +98,23 @@ DataBase::DataBase(FILE *file)
         else if (chunk->type() == "RD")
         {
             // RowData
-            bool did_find_table = false;
-            for (auto &table : m_tables)
-            {
-                if (table.id() == chunk->owner_id())
-                {
-                    table.add_row_data(chunk);
-                    did_find_table = true;
-                    break;
-                }
-            }
+            auto *table = find_owner(chunk->owner_id());
+            assert (table);
 
-            // TODO: Error, no table found
-            assert (did_find_table);
+            table->add_row_data(chunk);
         }
         else if (chunk->type() == "VR")
         {
             // Version
             m_version_chunk = chunk;
+        }
+        else if (chunk->type() == "DY")
+        {
+            // Dynamic Data
+            auto *table = find_owner(chunk->owner_id());
+            assert (table);
+
+            table->add_dynamic_data(chunk);
         }
 
         m_chunks.push_back(chunk);
@@ -229,7 +127,7 @@ DataBase::DataBase(FILE *file)
 
 void DataBase::write_version_chunk()
 {
-    m_version_chunk = new_chunk("VR", 0xCD, 0xCD);
+    m_version_chunk = new_chunk("VR", 0, 0);
     m_version_chunk->write_byte(0, Config::major_version);
     m_version_chunk->write_byte(1, Config::minor_version);
 }
@@ -313,6 +211,17 @@ Table &DataBase::construct_table(Table::Constructor constructor)
 {
     m_tables.push_back(Table(*this, constructor));
     return m_tables.back();
+}
+
+Table *DataBase::find_owner(uint8_t owner_id)
+{
+    for (auto &table : m_tables)
+    {
+        if (table.id() == owner_id)
+            return &table;
+    }
+
+    return nullptr;
 }
 
 Table *DataBase::get_table(const std::string &name)

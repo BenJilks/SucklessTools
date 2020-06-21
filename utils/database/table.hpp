@@ -13,6 +13,7 @@ namespace DB
     class Table
     {
         friend DataBase;
+        friend TextEntry;
 
     public:
         Table(const Table&) = default;
@@ -53,13 +54,17 @@ namespace DB
         Table(DataBase&, std::shared_ptr<Chunk> header);
 
         std::tuple<std::shared_ptr<Chunk>, size_t> find_chunk_and_offset_for_row(size_t row);
+        std::unique_ptr<DynamicData> new_dynamic_data();
+        std::shared_ptr<Chunk> find_dynamic_chunk(int id);
         int find_next_row_chunk_index();
         void add_row_data(std::shared_ptr<Chunk> data);
+        void add_dynamic_data(std::shared_ptr<Chunk> data);
         void write_header();
 
         DataBase &m_db;
         std::shared_ptr<Chunk> m_header;
         std::vector<std::shared_ptr<Chunk>> m_row_data_chunks;
+        std::vector<std::shared_ptr<Chunk>> m_dynamic_data_chunks;
         size_t m_row_count_offset;
 
         int m_id { 0xCD };

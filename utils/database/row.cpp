@@ -2,6 +2,7 @@
 #include "row.hpp"
 #include "entry.hpp"
 #include "column.hpp"
+#include "chunk.hpp"
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -15,6 +16,8 @@ Row::Row(const std::vector<Column> &columns)
         m_entities.push_back({ column, entry_offset, column.null() });
         entry_offset += column.data_type().size();
     }
+
+    m_row_size = entry_offset;
 }
 
 Row::Row(std::vector<std::string> select_columns, Row &&other)
@@ -27,13 +30,14 @@ Row::Row(std::vector<std::string> select_columns, Row &&other)
         auto index = std::find(select_columns.begin(), select_columns.end(), column.name());
         if (index != select_columns.end())
         {
-            (*this)[column.name()] = std::move(entity.entry);
+            (*this)[column.name()]->set(std::move(entity.entry));
             select_columns.erase(index);
         }
     }
+    m_row_size = other.m_row_size;
 }
 
-std::unique_ptr<Entry> &Row::operator [](const std::string &name)
+std::unique_ptr<Entry> const &Row::operator [](const std::string &name)
 {
     for (auto &entity : m_entities)
     {
@@ -81,6 +85,9 @@ void Row::read(Chunk &chunk, size_t row_offset)
 
 void Row::write(Chunk &chunk, size_t row_offset)
 {
+    for (size_t i = row_offset; i < m_row_size + 1; i++)
+        chunk.write_byte(i, 0xCD);
+
     for (const auto &entitiy : m_entities)
     {
         auto &entry = entitiy.entry;

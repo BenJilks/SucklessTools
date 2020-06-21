@@ -17,8 +17,9 @@ namespace DB::Sql
         {
             Integer,
             Boolean,
+            String,
             Column,
-            Condition
+            Condition,
         };
 
         inline Type type() const { return m_type; }
@@ -58,6 +59,7 @@ namespace DB::Sql
 
     typedef ValueLiteral<int, Value::Integer> ValueInteger;
     typedef ValueLiteral<bool, Value::Boolean> ValueBoolean;
+    typedef ValueLiteral<std::string, Value::String> ValueString;
 
     class ValueColumn : public ValueLiteral<std::string, Value::Column>
     {

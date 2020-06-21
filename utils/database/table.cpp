@@ -1,6 +1,8 @@
 #include "config.hpp"
+#include "chunk.hpp"
 #include "table.hpp"
 #include "database.hpp"
+#include "dynamicdata.hpp"
 #include <algorithm>
 #include <cassert>
 using namespace DB;
@@ -54,14 +56,15 @@ Table::Table(DataBase &db, std::shared_ptr<Chunk> header)
         // Column type
         auto primitive = static_cast<DataType::Primitive>(header->read_byte(offset));
         auto length = header->read_byte(offset + 1);
-        auto type = DataType(primitive, 4, length); // TODO: Use real size, assuming 4, for now
+        auto type = DataType(primitive, DataType::size_from_primitive(primitive), length);
         offset += 1 + 1;
 
 #ifdef DEBUG_TABLE_LOAD
         std::cout << "Loaded Column { " <<
             "name_length = " << column_name_len << ", " <<
             "name = " << column_name << ", " <<
-            "primitive = " << primitive << " }\n";
+            "primitive = " << primitive << ", " <<
+            "offset = " << m_row_size << " }\n";
 #endif
         m_columns.push_back(Column(column_name, type));
         m_row_size += type.size();
@@ -107,6 +110,17 @@ void Table::write_header()
     // m_header.flush();
 }
 
+std::unique_ptr<DynamicData> Table::new_dynamic_data()
+{
+    size_t max_id = 0;
+    for (const auto &chunk : m_dynamic_data_chunks)
+        max_id = std::max(max_id, chunk->index());
+
+    auto chunk = m_db.new_chunk("DY", m_id, max_id + 1);
+    m_dynamic_data_chunks.push_back(chunk);
+    return std::make_unique<DynamicData>(chunk);
+}
+
 void Table::add_row(Row row)
 {
     // TODO: There's much better ways of checking if
@@ -149,6 +163,8 @@ void Table::add_row(Row row)
 void Table::update_row(size_t index, Row row)
 {
     auto [chunk, offset] = find_chunk_and_offset_for_row(index);
+    assert (chunk);
+
     row.write(*chunk, offset);
 }
 
@@ -244,6 +260,22 @@ void Table::add_row_data(std::shared_ptr<Chunk> data)
     {
         return a->index() < b->index();
     });
+}
+
+void Table::add_dynamic_data(std::shared_ptr<Chunk> data)
+{
+    m_dynamic_data_chunks.push_back(std::move(data));
+}
+
+std::shared_ptr<Chunk> Table::find_dynamic_chunk(int id)
+{
+    for (auto &chunk : m_dynamic_data_chunks)
+    {
+        if (chunk->index() == id)
+            return chunk;
+    }
+
+    return nullptr;
 }
 
 void Table::drop()

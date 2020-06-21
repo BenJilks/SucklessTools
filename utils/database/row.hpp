@@ -40,7 +40,7 @@ namespace DB
 
         const auto begin() const { return const_itorator(*this, 0); }
         const auto end() const { return const_itorator(*this, m_entities.size()); }
-        std::unique_ptr<Entry> &operator [](const std::string &name);
+        std::unique_ptr<Entry> const &operator [](const std::string &name);
         const std::unique_ptr<Entry> &operator [](const std::string &name) const;
 
         void read(Chunk &chunk, size_t row_offset);
@@ -59,6 +59,7 @@ namespace DB
             std::unique_ptr<Entry> entry;
         };
         std::vector<Entity> m_entities;
+        size_t m_row_size;
     };
 
 }
