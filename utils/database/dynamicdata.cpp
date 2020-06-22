@@ -1,6 +1,7 @@
 #include "database.hpp"
 #include "dynamicdata.hpp"
 #include "chunk.hpp"
+#include <cassert>
 using namespace DB;
 
 void DynamicData::set(const std::vector<char> &data)

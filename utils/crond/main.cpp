@@ -1,4 +1,5 @@
 #include "cron.hpp"
+#include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <fstream>

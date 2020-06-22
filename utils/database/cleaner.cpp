@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "cleaner.hpp"
+#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <vector>

@@ -1,5 +1,6 @@
 #include "libjson.hpp"
 #include <iostream>
+#include <cassert>
 using namespace Json;
 
 //#define DEBUG_PARSER

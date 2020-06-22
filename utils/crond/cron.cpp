@@ -1,4 +1,5 @@
 #include "cron.hpp"
+#include <cassert>
 #include <chrono>
 #include <fstream>
 #include <libjson/libjson.hpp>

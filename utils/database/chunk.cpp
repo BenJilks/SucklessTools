@@ -1,6 +1,7 @@
 #include "chunk.hpp"
 #include "config.hpp"
 #include "database.hpp"
+#include <cassert>
 using namespace DB;
 
 Chunk::Chunk(DB::DataBase& db, size_t header_offset)

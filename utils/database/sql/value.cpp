@@ -2,6 +2,7 @@
 #include "../entry.hpp"
 #include "../row.hpp"
 #include <iostream>
+#include <cstring>
 using namespace DB;
 using namespace DB::Sql;
 

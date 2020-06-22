@@ -2,6 +2,8 @@
 #include "dynamicdata.hpp"
 #include "chunk.hpp"
 #include "entry.hpp"
+#include <cassert>
+#include <cstring>
 using namespace DB;
 
 bool DataType::operator== (const DataType &other) const

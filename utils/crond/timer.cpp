@@ -1,4 +1,5 @@
 #include "timer.hpp"
+#include <cassert>
 #include <fstream>
 #include <libjson/libjson.hpp>
 #include <database/database.hpp>
