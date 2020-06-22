@@ -223,6 +223,7 @@ static void setup_database(DB::DataBase &db)
         db.execute_sql(std::string(
             "CREATE TABLE History (")
                 + "Name CHAR(80), "
+                + "Date CHAR(80), "
                 + "LastDailyTime INTEGER)");
     }
 }
@@ -241,6 +242,16 @@ static void start_cron(const std::string &cron_path, bool enable_web_interface, 
 
     std::cout << "Loading crons\n";
     load_crons(crons, *log, cron_path);
+
+    // Insert startup message
+    log->execute_sql(std::string("INSERT INTO Log (Date, Time, ExitStatus, Runtime, ID, Name, Output) VALUES (")
+        + "'" + Timer::make_time_stamp() + "', "
+        + "'" + Timer::time_string() + "', "
+        + "0, "
+        + "'0m 0s', "
+        + "'" + std::to_string(rand()) + "', "
+        + "'Start Up', "
+        + "'Started up crond with " + std::to_string(crons.size()) + " job(s)')");
 
     std::thread web;
     if (enable_web_interface)

@@ -18,6 +18,9 @@ std::optional<Cron> Cron::load(const std::string &path, DB::DataBase &log, std::
     if (config.is_null())
         return std::nullopt;
 
+    if (config["disable"].as_boolean())
+        return std::nullopt;
+
     auto &json_name = config["name"];
     auto &json_script = config["script"];
     if (!json_script.is_string())

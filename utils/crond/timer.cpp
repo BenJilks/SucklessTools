@@ -139,6 +139,8 @@ bool Timer::is_day(int index) const
 bool Timer::has_done_daily(const DailyTime& daily_time) const
 {
     auto this_daily_time = (daily_time.hour * 60) + daily_time.minute;
+    auto now = make_time_stamp();
+
     auto result = m_log.execute_sql("SELECT * FROM History WHERE Name = '" + m_name + "'");
     if (!result.good())
     {
@@ -149,12 +151,15 @@ bool Timer::has_done_daily(const DailyTime& daily_time) const
     if (result.begin() != result.end())
     {
         auto &row = *result.begin();
+        auto last_date = row["Date"]->as_string();
         auto last_daily_time = row["LastDailyTime"]->as_int();
-        if (last_daily_time < this_daily_time)
+
+        if (last_daily_time < this_daily_time || last_date != now)
         {
             assert (m_log.execute_sql(std::string("UPDATE History SET ")
-                + "LastDailyTime = " + std::to_string(this_daily_time)
-                + " WHERE Name = " + m_name).good());
+                + "LastDailyTime = " + std::to_string(this_daily_time) + ", "
+                + "Date = '" + now + "' "
+                + "WHERE Name = " + m_name).good());
 
             return false;
         }
@@ -162,8 +167,9 @@ bool Timer::has_done_daily(const DailyTime& daily_time) const
         return true;
     }
 
-    assert (m_log.execute_sql(std::string("INSERT INTO History (Name, LastDailyTime) VALUES (")
+    assert (m_log.execute_sql(std::string("INSERT INTO History (Name, Date, LastDailyTime) VALUES (")
         + "'" + m_name + "', "
+        + "'" + now + "', "
         + std::to_string(this_daily_time) + ")").good());
 
     return false;
