@@ -22,6 +22,8 @@ std::shared_ptr<Chunk> DataBase::new_chunk(std::string_view type, uint8_t owner_
     write_byte(chunk->m_header_offset + 3, index);
     write_int(chunk->m_header_offset + 4, 0);
     write_int(chunk->m_header_offset + 8, 0);
+    write_int(chunk->m_header_offset + 12, 0);
+    write_int(chunk->m_header_offset + 16, 0);
 
     chunk->m_data_offset = chunk->m_header_offset + Config::chunk_header_size;
 #ifdef DEBUG_CHUNKS
@@ -164,13 +166,15 @@ void DataBase::write_byte(size_t offset, char byte)
     check_size(offset + 1);
     fseek(m_file, offset, SEEK_SET);
     fwrite(&byte, 1, 1, m_file);
+    fflush(m_file);
 }
 
 void DataBase::write_int(size_t offset, int i)
 {
-    check_size(offset + sizeof(int));
+    check_size(offset + 4);
     fseek(m_file, offset, SEEK_SET);
-    fwrite((char*)(&i), 1, sizeof(int), m_file);
+    fwrite((char*)(&i), 1, 4, m_file);
+    fflush(m_file);
 }
 
 void DataBase::write_string(size_t offset, const std::string& str)
@@ -178,6 +182,7 @@ void DataBase::write_string(size_t offset, const std::string& str)
     check_size(offset + str.size());
     fseek(m_file, offset, SEEK_SET);
     fwrite(str.data(), 1, str.size(), m_file);
+    fflush(m_file);
 }
 
 void DataBase::flush()

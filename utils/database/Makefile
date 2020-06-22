@@ -27,6 +27,9 @@ HEADER=cleaner.hpp \
     column.hpp \
     row.hpp \
     entry.hpp \
+    forward.hpp
+
+SQL_HEADER=sql/sql.hpp \
     sql/lexer.hpp \
     sql/parser.hpp \
     sql/select.hpp \
@@ -49,8 +52,10 @@ all: $(OBJ)
 
 install:
 	mkdir -p $(PREFIX)/include/database
+	mkdir -p $(PREFIX)/include/database/sql
 	install -m 644 libdatabase.a $(PREFIX)/lib/
 	install -m 644 $(HEADER) $(PREFIX)/include/database/
+	install -m 644 $(SQL_HEADER) $(PREFIX)/include/database/sql/
 
 uninstall:
 	$(RM) -r $(PREFIX)/include/libdatabase

@@ -28,7 +28,11 @@ std::unique_ptr<Entry> Value::as_entry() const
     switch (m_type)
     {
         case Integer: return entry_from_literal<IntegerEntry, ValueInteger>(*this);
-        case String: return entry_from_literal<CharEntry, ValueString>(*this);
+        case String:
+        {
+            auto str = value_of<ValueString>(*this);
+            return std::make_unique<CharEntry>(std::string(str.data(), strlen(str.data())));
+        }
         default:
             assert (false);
     }
@@ -42,6 +46,14 @@ std::unique_ptr<Value> ValueColumn::evaluate(const Row &row) const
     {
         case DataType::Integer:
             return literal_from_entry<ValueInteger, IntegerEntry>(*entry);
+        case DataType::Char:
+        {
+            auto char_entry = static_cast<CharEntry&>(*entry);
+            auto text = char_entry.data();
+            return std::make_unique<ValueString>(std::string(text.data(), strlen(text.data())));
+        }
+        case DataType::Text:
+            return literal_from_entry<ValueString, TextEntry>(*entry);
         default:
             assert (false);
     }
@@ -60,9 +72,11 @@ std::unique_ptr<Value> ValueCondition::operation() const
     auto right = static_cast<Right&>(*m_right).data();
     auto make_result = [&](bool result)
     {
+        std::cout << (result ? "true" : "false") << "\n";
         return std::make_unique<ValueBoolean>(result);
     };
 
+    std::cout << "Compair '" << left << "' with '" << right << "' = ";
     switch(m_operation)
     {
         case MoreThan: return make_result(left > right);
@@ -89,6 +103,15 @@ std::unique_ptr<Value> ValueCondition::evaluate(const Row &row) const
             {
                 case Value::Integer:
                     return operation<ValueInteger, ValueInteger>();
+                default:
+                    assert (false);
+            }
+            break;
+        case Value::String:
+            switch (m_right->type())
+            {
+                case Value::String:
+                    return operation<ValueString, ValueString>();
                 default:
                     assert (false);
             }

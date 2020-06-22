@@ -59,7 +59,15 @@ namespace DB::Sql
 
     typedef ValueLiteral<int, Value::Integer> ValueInteger;
     typedef ValueLiteral<bool, Value::Boolean> ValueBoolean;
-    typedef ValueLiteral<std::string, Value::String> ValueString;
+    class ValueString : public ValueLiteral<std::string, Value::String>
+    {
+    public:
+        ValueString(const std::string &str)
+            : ValueLiteral(str) {}
+
+        ValueString(std::string_view str)
+            : ValueLiteral(std::string(str)) {}
+    };
 
     class ValueColumn : public ValueLiteral<std::string, Value::Column>
     {

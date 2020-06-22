@@ -71,6 +71,9 @@ std::optional<Lexer::Token> Lexer::next()
                         break;
                 }
 
+                if (!c)
+                    return std::nullopt;
+
                 assert (false);
                 break;
 

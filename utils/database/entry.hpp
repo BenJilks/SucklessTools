@@ -57,6 +57,8 @@ namespace DB
         void write(Chunk &chunk, size_t offset);
         virtual void set(std::unique_ptr<Entry>) = 0;
 
+        int as_int() const;
+        std::string as_string() const;
         inline bool is_null() const { return m_is_null; }
 
     protected:

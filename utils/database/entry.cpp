@@ -32,7 +32,30 @@ int DataType::size_from_primitive(Primitive primitive)
         case Integer: return 4;
         case Char: return 1;
         case Text: return 1;
+        default: assert (false);
     }
+}
+
+int Entry::as_int() const
+{
+    assert (m_data_type.primitive() == DataType::Integer);
+    return static_cast<const IntegerEntry&>(*this).data();
+}
+
+std::string Entry::as_string() const
+{
+    auto trim = [&](auto str)
+    {
+        return std::string(str.data(), strlen(str.data()));
+    };
+
+    auto type = m_data_type.primitive();
+    if (type == DataType::Char)
+        return trim(static_cast<const CharEntry&>(*this).data());
+    else if (type == DataType::Text)
+        return trim(static_cast<const TextEntry&>(*this).data());
+
+    assert (false);
 }
 
 void Entry::read(Chunk &chunk, size_t offset)

@@ -7,8 +7,6 @@
 #include <cassert>
 using namespace DB;
 
-// #define DEBUG_TABLE_LOAD
-
 Table::Table(DataBase& db, Constructor constructor)
     : m_db(db)
 {

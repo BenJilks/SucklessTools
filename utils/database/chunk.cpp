@@ -68,6 +68,9 @@ void Chunk::write_int(size_t offset, int i)
     assert (!m_has_been_dropped);
     check_size(offset + 4);
     m_db.write_int(m_data_offset + offset, i);
+
+    std::cout << "data_offset: " << m_data_offset << "\n";
+    std::cout << "absolute offset: " << (m_data_offset + offset) << "\n";
 }
 
 void Chunk::write_string(size_t offset, const std::string &str)
