@@ -4,7 +4,6 @@
 #include <fstream>
 #include <getopt.h>
 #include <iostream>
-#include <libjson/libjson.hpp>
 #include <mutex>
 #include <pwd.h>
 #include <sstream>
@@ -16,11 +15,13 @@
 #include <webinterface/table.hpp>
 #include <webinterface/template.hpp>
 #include <webinterface/webinterface.hpp>
+#include <database/database.hpp>
+#include <string>
 namespace fs = std::filesystem;
 
 static auto g_web_dir = std::string("/usr/local/share/crond/web");
 
-static void load_crons(std::vector<Cron> &crons, const std::string &path)
+static void load_crons(std::vector<Cron> &crons, DB::DataBase &log, const std::string &path)
 {
     crons.clear();
 
@@ -34,7 +35,7 @@ static void load_crons(std::vector<Cron> &crons, const std::string &path)
 
         std::cout << "Loading cron: " << entry.path() << "... ";
         std::cout.flush();
-        auto cron = Cron::load(entry.path(), std::cout);
+        auto cron = Cron::load(entry.path(), log, std::cout);
         if (!cron)
             continue;
 
@@ -43,29 +44,7 @@ static void load_crons(std::vector<Cron> &crons, const std::string &path)
     }
 }
 
-static std::string replace_all(std::string str, const std::string& from, const std::string& to)
-{
-    size_t start_pos = 0;
-    while((start_pos = str.find(from, start_pos)) != std::string::npos)
-    {
-        str.replace(start_pos, from.length(), to);
-        start_pos += to.length();
-    }
-
-    return str;
-}
-
-static std::optional<Json::Document> load_log(const std::string &date, const std::string &cron_path)
-{
-    auto now = Timer::make_time_stamp();
-    if (date == now)
-        return std::nullopt;
-
-    auto doc = Json::Document::parse(std::ifstream(cron_path + "/log/log-" + date + ".json"));
-    return std::move(doc);
-}
-
-static void web_thread(Json::Value *log, std::mutex *log_mutex, const std::string cron_path, int port)
+static void web_thread(DB::DataBase *log, std::mutex *log_mutex, const std::string cron_path, int port)
 {
     Web::Interface interface(port);
     auto log_template_or_error = Web::Template::load_from_file(g_web_dir + "/log.html");
@@ -96,24 +75,30 @@ static void web_thread(Json::Value *log, std::mutex *log_mutex, const std::strin
         if (date.empty())
             date = Timer::make_time_stamp();
 
-        auto this_log = log;
-        auto log_doc = load_log(date, cron_path);
-        if (log_doc)
-            this_log = &log_doc->root();
-
         auto history_or_error = Web::Table::make("Start Time", "Name", "Runtime", "Exit Status");
         auto &history = *history_or_error;
-        for (const auto &entry : this_log->to_array())
+
+        auto result = log->execute_sql("SELECT * FROM Log WHERE Date = '" + date + "'");
+        if (!result.good())
+        {
+            result.output_errors();
+            response.send_text("Error");
+            return;
+        }
+
+        for (const auto &entry_row : result)
         {
             auto &row = history.add_row();
-            auto id = (*entry)["id"].to_string();
-            auto start_time = (*entry)["start_time"].to_string();
-            auto link_start = "<a id=\"" + start_time + "\" href=\"/log_entry?date=" + date + ";id=" + id + "\">";
+            auto id = entry_row["ID"]->as_string();
+            auto start_time = entry_row["Time"]->as_string();
+            auto link_start = "<a id=\"" + start_time
+                + "\" href=\"/log_entry?date=" + date
+                + ";id=" + id + "\">";
 
             row["Start Time"] = link_start + start_time + "</a>";
-            row["Name"] = (*entry)["name"].to_string();
-            row["Runtime"] = (*entry)["runtime"].to_string();
-            row["Exit Status"] = (*entry)["exit_status"].to_string();
+            row["Name"] = entry_row["Name"]->as_string();
+            row["Runtime"] = entry_row["Runtime"]->as_string();
+            row["Exit Status"] = std::to_string(entry_row["ExitStatus"]->as_int());
         }
         history.sort_by("Start Time", Web::Table::SortMode::Descending);
 
@@ -130,34 +115,24 @@ static void web_thread(Json::Value *log, std::mutex *log_mutex, const std::strin
     {
         log_mutex->lock();
         const auto &id = url.query("id");
-        const auto now = Timer::make_time_stamp();
-        const Json::Value *entry_or_error = nullptr;
 
-        for (const auto &it : log->to_array())
+        auto result = log->execute_sql("SELECT * FROM Log WHERE ID = '" + id + "'");
+        if (!result.good() || result.begin() == result.end())
         {
-            if ((*it)["id"].to_string() == id)
-            {
-                entry_or_error = it;
-                break;
-            }
-        }
-
-        if (!entry_or_error)
-        {
-            response.send_text("No log with id " + id);
+            result.output_errors();
+            response.send_text("Error");
             return;
         }
-        const auto &entry = *entry_or_error;
-        auto output = entry["output"].to_string();
-        output = replace_all(output, "\n", "<br>");
 
-        log_entry_template["id"] = id;
-        log_entry_template["date"] = now;
-        log_entry_template["output"] = output;
-        log_entry_template["name"] = entry["name"].to_string();
-        log_entry_template["time"] = entry["start_time"].to_string();
-        log_entry_template["exit_status"] = entry["exit_status"].to_string();
-        log_entry_template["runtime"] = entry["runtime"].to_string();
+        auto &row = *result.begin();
+        log_entry_template["name"] = row["Name"]->as_string();
+        log_entry_template["date"] = row["Date"]->as_string();
+        log_entry_template["time"] = row["Time"]->as_string();
+        log_entry_template["id"] = row["ID"]->as_string();
+        log_entry_template["exit_status"] = std::to_string(row["ExitStatus"]->as_int());
+        log_entry_template["runtime"] = row["Runtime"]->as_string();
+        log_entry_template["output"] = row["Output"]->as_string();
+
         response.send_text(log_entry_template.build());
         log_mutex->unlock();
     });
@@ -226,6 +201,32 @@ static void daemonize()
     // TODO: Make lock
 }
 
+static void setup_database(DB::DataBase &db)
+{
+    auto log_table = db.get_table("Log");
+    if (!log_table)
+    {
+        db.execute_sql(std::string(
+            "CREATE TABLE Log (")
+                + "Date CHAR(80), "
+                + "Time CHAR(80), "
+                + "ExitStatus INTEGER, "
+                + "Runtime CHAR(80), "
+                + "ID CHAR(80), "
+                + "Name CHAR(80), "
+                + "Output TEXT)");
+    }
+
+    auto history_table = db.get_table("History");
+    if (!history_table)
+    {
+        db.execute_sql(std::string(
+            "CREATE TABLE History (")
+                + "Name CHAR(80), "
+                + "LastDailyTime INTEGER)");
+    }
+}
+
 static void start_cron(const std::string &cron_path, bool enable_web_interface, int port)
 {
     auto log_path = cron_path + "/log/log-" + Timer::make_time_stamp() + ".json";
@@ -233,35 +234,24 @@ static void start_cron(const std::string &cron_path, bool enable_web_interface, 
     size_t run_time = 0;
     std::mutex log_mutex;
 
-    auto log_doc = Json::Document::parse(std::ifstream(log_path));
-    auto &log = log_doc.root_or_new_array();
-
-    auto save_log = [&log, &log_path, &log_mutex]()
-    {
-        std::cout << "Saving log file\n";
-        log_mutex.lock();
-        std::ofstream out(log_path);
-        out << log.to_string(Json::PrintOption::PrettyPrint);
-        out.close();
-        log_mutex.unlock();
-    };
+    std::cout << "Setting up database\n";
+    auto log = DB::DataBase::open(cron_path + "/log.db");
+    assert (log);
+    setup_database(*log);
 
     std::cout << "Loading crons\n";
-    load_crons(crons, cron_path);
+    load_crons(crons, *log, cron_path);
 
     std::thread web;
     if (enable_web_interface)
-        web = std::thread(web_thread, &log, &log_mutex, cron_path, port);
+        web = std::thread(web_thread, log.get(), &log_mutex, cron_path, port);
 
     for (;;)
     {
         for (auto &cron : crons)
         {
             if (cron.should_run_and_mark_done(run_time))
-            {
-                cron.run(log, log_mutex);
-                save_log();
-            }
+                cron.run(*log, log_mutex);
         }
 
         run_time += 1;

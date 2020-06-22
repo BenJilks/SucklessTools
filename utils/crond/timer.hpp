@@ -1,5 +1,6 @@
 #pragma once
 #include <libjson/forward.hpp>
+#include <database/forward.hpp>
 #include <memory>
 #include <optional>
 #include <string>
@@ -8,7 +9,7 @@
 class Timer
 {
 public:
-    static std::optional<Timer> parse(const Json::Value &cron, const std::string &log_path, std::ostream&);
+    static std::optional<Timer> parse(const Json::Value &cron, DB::DataBase &log, std::ostream&);
 
     bool should_run_and_mark_done(size_t run_time);
     void make_done();
@@ -19,7 +20,7 @@ public:
     static std::string time_string();
 
 private:
-    Timer(const std::string &log_path);
+    Timer(DB::DataBase &log, std::string name);
 
     enum class Week
     {
@@ -41,12 +42,11 @@ private:
 
     static std::optional<DailyTime> parse_daily_time(const std::string &str, std::ostream&);
     bool should_run(size_t run_time) const;
-    bool has_done_daily(const DailyTime&, const std::string &timestamp) const;
+    bool has_done_daily(const DailyTime&) const;
     bool is_day(int index) const;
 
-    std::unique_ptr<Json::Document> m_log_doc;
-    std::string m_log_path;
-
+    std::string m_name;
+    DB::DataBase &m_log;
     std::optional<DailyTime> m_every_daily_time;
     std::vector<DailyTime> m_daily;
     std::optional<Week> m_weekly;

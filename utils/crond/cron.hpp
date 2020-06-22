@@ -2,15 +2,16 @@
 #include "timer.hpp"
 #include <string>
 #include <libjson/forward.hpp>
+#include <database/forward.hpp>
 #include <mutex>
 
 class Cron
 {
 public:
-    static std::optional<Cron> load(const std::string &path, std::ostream &);
+    static std::optional<Cron> load(const std::string &path, DB::DataBase&, std::ostream &);
 
     bool should_run_and_mark_done(size_t run_time);
-    void run(Json::Value &log, std::mutex &log_mutex);
+    void run(DB::DataBase &log, std::mutex &log_mutex);
 
     inline const std::string &name() const { return m_name; }
 

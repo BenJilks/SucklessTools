@@ -1,18 +1,13 @@
 #include "timer.hpp"
 #include <fstream>
 #include <libjson/libjson.hpp>
+#include <database/database.hpp>
 #include <memory.h>
 
-Timer::Timer(const std::string &log_path)
-    : m_log_path(log_path)
+Timer::Timer(DB::DataBase &log, std::string name)
+    : m_name(name)
+    , m_log(log)
 {
-    std::ifstream stream(log_path);
-    auto doc = Json::Document::parse(std::move(stream));
-    if (doc.has_error())
-        doc.log_errors();
-    doc.root_or_new_object();
-
-    m_log_doc = std::make_unique<Json::Document>(std::move(doc));
 }
 
 std::optional<Timer::DailyTime> Timer::parse_daily_time(const std::string &str, std::ostream& out)
@@ -59,14 +54,14 @@ static std::string &to_lower(std::string &&str)
     return str;
 }
 
-std::optional<Timer> Timer::parse(const Json::Value &cron, const std::string &log_path, std::ostream &out)
+std::optional<Timer> Timer::parse(const Json::Value &cron, DB::DataBase &log, std::ostream &out)
 {
-    Timer timer(log_path);
+    Timer timer(log, cron["name"].as_string());
 
     auto &daily = cron["daily"];
     if (daily.is_string())
     {
-        auto time_str = daily.to_string();
+        auto time_str = daily.as_string();
         auto daily_time = parse_daily_time(time_str, out);
         if (!daily_time)
             return std::nullopt;
@@ -74,9 +69,9 @@ std::optional<Timer> Timer::parse(const Json::Value &cron, const std::string &lo
     }
     else if (daily.is_array())
     {
-        for (const auto item : daily.to_array())
+        for (const auto &item : daily.as_array())
         {
-            auto time_str = item->to_string();
+            auto time_str = item.as_string();
             auto daily_time = parse_daily_time(time_str, out);
             if (!daily_time)
                 return std::nullopt;
@@ -94,12 +89,12 @@ std::optional<Timer> Timer::parse(const Json::Value &cron, const std::string &lo
     if (weekly.is_array())
     {
         int week = (int)Week::None;
-        for (const auto item : weekly.to_array())
+        for (const auto &item : weekly.as_array())
         {
-            if (!item->is_string())
+            if (!item.is_string())
                 assert (false);
 
-            auto str = to_lower(item->to_string());
+            auto str = to_lower(item.as_string());
             if (str == "monday") week |= (int)Week::Monday;
             else if (str == "tuesday") week |= (int)Week::Tuesday;
             else if (str == "wednessday") week |= (int)Week::Wednessday;
@@ -141,33 +136,36 @@ bool Timer::is_day(int index) const
     return false;
 }
 
-bool Timer::has_done_daily(const DailyTime& daily_time, const std::string &now) const
+bool Timer::has_done_daily(const DailyTime& daily_time) const
 {
-    auto serilized =
-        std::to_string(daily_time.hour) + "h" +
-        std::to_string(daily_time.minute) + "m";
-
-    auto &done = m_log_doc->root();
-    auto &daily = done.get_or_new_object("daily");
-
-    auto timestamp = daily["timestamp"].to_string_or("");
-    if (timestamp != now)
+    auto this_daily_time = (daily_time.hour * 60) + daily_time.minute;
+    auto result = m_log.execute_sql("SELECT * FROM History WHERE Name = '" + m_name + "'");
+    if (!result.good())
     {
-        daily.clear();
-        daily.add("timestamp", now);
+        result.output_errors();
+        assert (false);
     }
 
-    auto &done_list = daily.get_or_new_array("done_list");
-    for (const auto &done : done_list.to_array())
+    if (result.begin() != result.end())
     {
-        if (!done->is_string())
-            continue;
+        auto &row = *result.begin();
+        auto last_daily_time = row["LastDailyTime"]->as_int();
+        if (last_daily_time < this_daily_time)
+        {
+            assert (m_log.execute_sql(std::string("UPDATE History SET ")
+                + "LastDailyTime = " + std::to_string(this_daily_time)
+                + " WHERE Name = " + m_name).good());
 
-        if (done->to_string() == serilized)
-            return true;
+            return false;
+        }
+
+        return true;
     }
 
-    done_list.append_new_string(serilized);
+    assert (m_log.execute_sql(std::string("INSERT INTO History (Name, LastDailyTime) VALUES (")
+        + "'" + m_name + "', "
+        + std::to_string(this_daily_time) + ")").good());
+
     return false;
 }
 
@@ -238,7 +236,6 @@ bool Timer::should_run(size_t run_time) const
 {
     const auto now = time(0);
     const auto *date_time = localtime(&now);
-    const auto timestamp = make_time_stamp(date_time);
 
     if (m_weekly)
     {
@@ -251,7 +248,7 @@ bool Timer::should_run(size_t run_time) const
         if (date_time->tm_hour >= daily_time.hour &&
             date_time->tm_min >= daily_time.minute)
         {
-            return !has_done_daily(daily_time, timestamp);
+            return !has_done_daily(daily_time);
         }
     }
 
@@ -267,13 +264,5 @@ bool Timer::should_run(size_t run_time) const
 
 bool Timer::should_run_and_mark_done(size_t run_time)
 {
-    if (should_run(run_time))
-    {
-        std::ofstream stream(m_log_path);
-        stream << m_log_doc->root().to_string(Json::PrintOption::PrettyPrint);
-        stream.close();
-        return true;
-    }
-
-    return false;
+    return should_run(run_time);
 }
