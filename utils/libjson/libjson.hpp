@@ -77,6 +77,13 @@ namespace Json
     {
         return Value::parse(std::move(stream));
     };
+    
+    static Value null() { return Value::null(); }
+    static Value object() { return Value::object(); }
+    static Value array() { return Value::array(); }
+    static Value string(const std::string &str) { return Value::string(str); }
+    static Value number(double num) { return Value::number(num); }
+    static Value boolean(bool b) { return Value::boolean(b); }
 
 }
 

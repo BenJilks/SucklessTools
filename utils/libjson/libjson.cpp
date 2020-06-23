@@ -714,6 +714,8 @@ double Value::as_number() const
             return m_number;
         case Boolean:
             return m_boolean ? 1 : 0;
+        default:
+            assert (false);
     }
 }
 
@@ -733,6 +735,8 @@ bool Value::as_boolean() const
             return m_number == 0 ? false : true;
         case Boolean:
             return m_boolean;
+        default:
+            assert (false);
     }
 }
 
