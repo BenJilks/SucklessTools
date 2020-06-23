@@ -22,10 +22,8 @@ SqlResult SelectStatement::execute(DataBase& db) const
         
         if (m_where)
         {
-            auto result = m_where->evaluate(*row);
-            assert (result);
-            
-            if (!static_cast<const ValueBoolean&>(*result).data())
+            auto where_result = m_where->evaluate(*row);
+            if (!where_result.as_bool())
                 continue;
         }
 

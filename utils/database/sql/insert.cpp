@@ -1,5 +1,6 @@
 #include "insert.hpp"
 #include "../database.hpp"
+#include "value.hpp"
 using namespace DB;
 using namespace DB::Sql;
 
@@ -20,7 +21,7 @@ SqlResult InsertStatement::execute(DataBase& db) const
     {
         const auto &column = m_columns[i];
         const auto &value = m_values[i];
-        row[column]->set(value->as_entry());
+        row[column]->set(value->evaluate(row).as_entry());
     }
 
     table->add_row(std::move(row));

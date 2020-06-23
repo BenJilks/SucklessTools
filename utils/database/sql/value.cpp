@@ -2,121 +2,90 @@
 #include "../entry.hpp"
 #include "../row.hpp"
 #include <iostream>
+#include <cassert>
 #include <cstring>
 using namespace DB;
 using namespace DB::Sql;
-
-template<typename T>
-static auto value_of(const Value &value)
-{
-    return static_cast<const T&>(value).data();
-}
-
-template<typename EntryType, typename ValueType>
-static auto entry_from_literal(const Value &value)
-{
-    return std::make_unique<EntryType>(value_of<ValueType>(value));
-}
-
-template<typename ValueType, typename EntryType>
-static auto literal_from_entry(const Entry &value)
-{
-    return std::make_unique<ValueType>(static_cast<const EntryType&>(value).data());
-}
 
 std::unique_ptr<Entry> Value::as_entry() const
 {
     switch (m_type)
     {
-        case Integer: return entry_from_literal<IntegerEntry, ValueInteger>(*this);
-        case String:
-        {
-            auto str = value_of<ValueString>(*this);
-            return std::make_unique<CharEntry>(std::string(str.data(), strlen(str.data())));
-        }
+        case Integer: return std::make_unique<IntegerEntry>(m_int);
+        case String: return std::make_unique<CharEntry>(m_str);
         default:
             assert (false);
     }
 }
 
-std::unique_ptr<Value> ValueColumn::evaluate(const Row &row) const
+static Value get_entry_value(const std::unique_ptr<Entry> &entry)
 {
-    const auto &entry = row[data()];
-
     switch (entry->data_type().primitive())
     {
-        case DataType::Integer:
-            return literal_from_entry<ValueInteger, IntegerEntry>(*entry);
-        case DataType::Char:
-        {
-            auto char_entry = static_cast<CharEntry&>(*entry);
-            auto text = char_entry.data();
-            return std::make_unique<ValueString>(std::string(text.data(), strlen(text.data())));
-        }
-        case DataType::Text:
-            return literal_from_entry<ValueString, TextEntry>(*entry);
+        case DataType::Integer: return Value(entry->as_int());
+        case DataType::Char: return Value(entry->as_string());
+        case DataType::Text: return Value(entry->as_string());
         default:
             assert (false);
     }
 }
 
-ValueCondition::ValueCondition(std::unique_ptr<Value> left, Operation operation, std::unique_ptr<Value> right)
-    : Value(Condition)
-    , m_left(std::move(left))
-    , m_right(std::move(right))
-    , m_operation(operation) {}
-
-template<typename Left, typename Right>
-std::unique_ptr<Value> ValueCondition::operation() const
+template <typename Callback>
+static Value operation(const Value &lhs, const Value &rhs, Callback callback)
 {
-    auto left = static_cast<Left&>(*m_left).data();
-    auto right = static_cast<Right&>(*m_right).data();
-    auto make_result = [&](bool result)
+    switch (lhs.type())
     {
-        std::cout << (result ? "true" : "false") << "\n";
-        return std::make_unique<ValueBoolean>(result);
-    };
-
-    std::cout << "Compair '" << left << "' with '" << right << "' = ";
-    switch(m_operation)
-    {
-        case MoreThan: return make_result(left > right);
-        case Equals: return make_result(left == right);
+        case Value::Type::Integer:
+            switch (rhs.type())
+            {
+                case Value::Type::Integer:
+                    return Value(callback(lhs.as_int(), rhs.as_int()));
+                default:
+                    assert (false);
+            }
+            break;
+        case Value::Type::String:
+            switch (rhs.type())
+            {
+                case Value::Type::String:
+                    return Value(callback(lhs.as_string(), rhs.as_string()));
+                default:
+                    assert (false);
+            }
         default:
             assert (false);
+            break;
     }
 }
 
-std::unique_ptr<Value> ValueCondition::evaluate(const Row &row) const
+Value ValueNode::evaluate(const Row &row)
 {
-    if (m_left->type() == Value::Column || m_right->type() == Value::Column)
+    switch (m_type)
     {
-        auto sub_condition = ValueCondition(
-            m_left->evaluate(row), m_operation, m_right->evaluate(row));
-
-        return sub_condition.evaluate(row);
-    }
-
-    switch(m_left->type())
-    {
-        case Value::Integer:
-            switch (m_right->type())
-            {
-                case Value::Integer:
-                    return operation<ValueInteger, ValueInteger>();
-                default:
-                    assert (false);
-            }
-            break;
-        case Value::String:
-            switch (m_right->type())
-            {
-                case Value::String:
-                    return operation<ValueString, ValueString>();
-                default:
-                    assert (false);
-            }
-            break;
+        case Type::Value:
+            assert (!m_left);
+            assert (!m_right);
+            return m_value;
+        
+        case Type::Column:
+            assert (m_left);
+            assert (!m_right);
+            return get_entry_value(row[m_left->evaluate(row).as_string()]);
+        
+        case Type::MoreThan:
+            assert (m_left);
+            assert (m_right);
+            return operation(
+                m_left->evaluate(row), m_right->evaluate(row), 
+                [&](auto a, auto b) { return a > b; });
+        
+        case Type::Equals:
+            assert (m_left);
+            assert (m_right);
+            return operation(
+                m_left->evaluate(row), m_right->evaluate(row), 
+                [&](auto a, auto b) { return a == b; });
+        
         default:
             assert (false);
     }

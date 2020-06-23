@@ -14,7 +14,7 @@ SqlResult UpdateStatement::execute(DataBase &db) const
     auto execute_assignments_on_row = [&](size_t index, Row &row)
     {
         for (const auto &column : m_columns)
-            row[column.column]->set(column.value->as_entry());
+            row[column.column]->set(column.value->evaluate(row).as_entry());
 
         table->update_row(index, std::move(row));
     };
@@ -31,9 +31,7 @@ SqlResult UpdateStatement::execute(DataBase &db) const
         }
 
         auto result = m_where->evaluate(*row);
-        assert (result);
-
-        if (static_cast<const ValueBoolean&>(*result).data())
+        if (result.as_bool())
             execute_assignments_on_row(i, *row);
     }
 

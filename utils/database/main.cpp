@@ -7,15 +7,13 @@ using namespace DB;
 int main()
 {
     std::cout << "Hello, databases!!!\n";
-    Cleaner cleaner("test.db");
-    cleaner.full_clean_up();
 
-    auto db_or_error = DataBase::open("test_cleaned.db");
+    auto db_or_error = DataBase::open("test.db");
     assert (db_or_error);
 
     auto &db = *db_or_error;
 
-#if 0
+#if 1
     for (size_t i = 0; i < 2; i++)
     {
         auto table_name = "Test" + std::to_string(i);
@@ -50,9 +48,9 @@ int main()
             result.output_errors();
     }
 
-#else
+//#else
     {
-        auto result = db.execute_sql("SELECT * FROM Test0");
+        auto result = db.execute_sql("SELECT * FROM Test1");
         if (!result.good())
             result.output_errors();
 

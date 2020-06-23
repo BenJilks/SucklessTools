@@ -18,12 +18,12 @@ namespace DB::Sql
         struct Assignment
         {
             std::string column;
-            std::unique_ptr<Value> value;
+            std::unique_ptr<ValueNode> value;
         };
         
         std::string m_table;
         std::vector<Assignment> m_columns;
-        std::unique_ptr<Value> m_where;
+        std::unique_ptr<ValueNode> m_where;
     };
     
 }

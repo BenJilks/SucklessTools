@@ -27,8 +27,8 @@ namespace DB::Sql
         std::shared_ptr<Statement> parse_update();
         std::shared_ptr<Statement> parse_delete();
 
-        std::unique_ptr<Value> parse_condition(std::unique_ptr<Value> left);
-        std::unique_ptr<Value> parse_value();
+        std::unique_ptr<ValueNode> parse_condition(std::unique_ptr<ValueNode> left);
+        std::unique_ptr<ValueNode> parse_value();
         void parse_list(std::function<void()>);
 
         Lexer m_lexer;

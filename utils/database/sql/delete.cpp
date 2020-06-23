@@ -18,7 +18,7 @@ SqlResult DeleteStatement::execute(DataBase &db) const
         assert (row);
         
         auto result = m_where->evaluate(*row);
-        if (static_cast<ValueBoolean&>(*result).data())
+        if (result.as_bool())
             table->remove_row(i);
     }
     

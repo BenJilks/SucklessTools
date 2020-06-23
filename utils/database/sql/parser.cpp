@@ -53,25 +53,25 @@ void Parser::parse_list(std::function<void()> callback)
     match(Lexer::CloseBrace, ")");
 }
 
-std::unique_ptr<Value> Parser::parse_condition(std::unique_ptr<Value> left)
+std::unique_ptr<ValueNode> Parser::parse_condition(std::unique_ptr<ValueNode> left)
 {
     auto peek = m_lexer.peek();
     if (!peek)
         return left;
 
-    ValueCondition::Operation operation;
-    std::unique_ptr<Value> right;
+    ValueNode::Type operation;
+    std::unique_ptr<ValueNode> right;
     switch (peek->type)
     {
         case Lexer::MoreThan:
             m_lexer.consume();
             right = parse_value();
-            operation = ValueCondition::MoreThan;
+            operation = ValueNode::Type::MoreThan;
             break;
         case Lexer::Equals:
             m_lexer.consume();
             right = parse_value();
-            operation = ValueCondition::Equals;
+            operation = ValueNode::Type::Equals;
             break;
         default:
             break;
@@ -80,31 +80,39 @@ std::unique_ptr<Value> Parser::parse_condition(std::unique_ptr<Value> left)
     if (!right)
         return left;
 
-    return std::make_unique<ValueCondition>(
+    return std::make_unique<ValueNode>(
         std::move(left), operation, std::move(right));
 }
 
-std::unique_ptr<Value> Parser::parse_value()
+std::unique_ptr<ValueNode> Parser::parse_value()
 {
     auto peek = m_lexer.peek();
     if (!peek)
         return nullptr;
 
-    std::unique_ptr<Value> value;
+    std::unique_ptr<ValueNode> value;
     switch (peek->type)
     {
         case Lexer::Integer:
+        {
             m_lexer.consume();
-            value = std::make_unique<ValueInteger>(atoi(peek->data.c_str()));
+            auto i = atoi(peek->data.c_str());
+            value = std::make_unique<ValueNode>(Value(i));
             break;
+        }
         case Lexer::String:
+        {
             m_lexer.consume();
-            value = std::make_unique<ValueString>(peek->data);
+            value = std::make_unique<ValueNode>(Value(peek->data));
             break;
+        }
         case Lexer::Name:
+        {
             m_lexer.consume();
-            value = std::make_unique<ValueColumn>(peek->data);
+            auto operand = std::make_unique<ValueNode>(Value(peek->data));
+            value = std::make_unique<ValueNode>(ValueNode::Type::Column, std::move(operand));
             break;
+        }
         default:
             break;
     }

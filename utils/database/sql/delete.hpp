@@ -16,7 +16,7 @@ namespace DB::Sql
             : Statement(Type::Delete) {}
         
         std::string m_table;
-        std::unique_ptr<Value> m_where;
+        std::unique_ptr<ValueNode> m_where;
     };
     
 }

@@ -23,6 +23,7 @@ namespace DB
         class UpdateStatement;
         class DeleteStatement;
         class Value;
+        class ValueNode;
 
     };
 

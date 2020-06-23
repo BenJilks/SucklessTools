@@ -18,7 +18,7 @@ namespace DB::Sql
 
         std::vector<std::string> m_columns;
         std::string m_table;
-        std::unique_ptr<Value> m_where;
+        std::unique_ptr<ValueNode> m_where;
         bool m_all { false };
 
     };

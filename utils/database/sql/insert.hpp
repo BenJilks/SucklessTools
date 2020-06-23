@@ -1,6 +1,5 @@
 #pragma once
 #include "statement.hpp"
-#include "value.hpp"
 
 namespace DB::Sql
 {
@@ -18,7 +17,7 @@ namespace DB::Sql
 
         std::string m_table;
         std::vector<std::string> m_columns;
-        std::vector<std::unique_ptr<Value>> m_values;
+        std::vector<std::unique_ptr<ValueNode>> m_values;
     };
 
 }
