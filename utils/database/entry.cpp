@@ -189,13 +189,13 @@ std::ostream &operator<< (std::ostream &stream, const DB::Entry& entry)
     switch (entry.data_type().primitive())
     {
         case DataType::Integer:
-            stream << static_cast<const IntegerEntry&>(entry).data();
+            stream << entry.as_int();
             break;
         case DataType::Char:
-            stream << static_cast<const CharEntry&>(entry).data();
+            stream << "'" << entry.as_string() << "'";
             break;
         case DataType::Text:
-            stream << static_cast<const TextEntry&>(entry).data();
+            stream << "'" << entry.as_string() << "'";
             break;
         default:
             assert (false);
