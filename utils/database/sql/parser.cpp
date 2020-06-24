@@ -137,13 +137,11 @@ std::shared_ptr<Statement> Parser::parse_select()
         for (;;)
         {
             auto token = m_lexer.consume(Lexer::Name);
-            if (!token)
-            {
+            if (token)
+                select->m_columns.push_back(token->data);
+            else
                 expected("column name");
-                continue;
-            }
-
-            select->m_columns.push_back(token->data);
+            
             if (!m_lexer.consume(Lexer::Comma))
                 break;
         }
@@ -342,8 +340,8 @@ std::shared_ptr<Statement> Parser::run()
     auto peek = m_lexer.peek();
     if (!peek)
     {
-        // TODO: Error
-        assert (false);
+        m_errors.push_back("No statement given");
+        return nullptr;
     }
 
     switch (peek->type)
@@ -354,7 +352,7 @@ std::shared_ptr<Statement> Parser::run()
         case Lexer::Update: return parse_update();
         case Lexer::Delete: return parse_delete();
         default:
-            // TODO: Error
-            assert (false);
+            m_errors.push_back("Unkown statement '" + peek->data + "'");
+            return nullptr;
     }
 }

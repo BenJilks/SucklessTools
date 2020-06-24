@@ -3,6 +3,7 @@
 // Debugging flags
 // #define DEBUG_CHUNKS
 // #define DEBUG_TABLE_LOAD
+// #define DEBUG_SQL
 
 namespace DB::Config
 {

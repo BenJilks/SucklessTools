@@ -68,10 +68,12 @@ Table::Table(DataBase &db, std::shared_ptr<Chunk> header)
         m_row_size += type.size();
     }
 
+#ifdef DEBUG_TABLE_LOAD
     std::cout << "Loaded Table { " <<
         "name = " << m_name <<
         ", column_count = " << (int)column_count <<
         ", row_count = " << m_row_count << " }\n";
+#endif
 }
 
 void Table::write_header()

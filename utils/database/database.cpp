@@ -136,8 +136,10 @@ void DataBase::write_version_chunk()
 
 SqlResult DataBase::execute_sql(const std::string &query)
 {
+#ifdef DEBUG_SQL
     std::cout << "DataBase: Executing SQL '" << query << "'\n";
-
+#endif
+    
     Sql::Parser parser(query);
     auto statement = parser.run();
     if (!parser.good())
