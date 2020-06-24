@@ -1,9 +1,7 @@
 CC=c++
 AR=ar
 CXXFLAGS=-std=c++17 -g
-OBJ=main.o \
-    prompt.o \
-    cleaner.o \
+OBJ=cleaner.o \
     database.o \
     chunk.o \
     dynamicdata.o \
@@ -47,9 +45,11 @@ endif
 %.o: %.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
-all: $(OBJ)
+all: $(OBJ) main.o prompt.o
 	$(CC) -o database $^ $(CXXFLAGS)
-#	$(AR) rs libdatabase.a $(OBJ)
+
+lib: $(OBJ)
+	$(AR) rs libdatabase.a $(OBJ)
 
 install:
 	mkdir -p $(PREFIX)/include/database
@@ -63,5 +63,5 @@ uninstall:
 	$(RM) $(PREFIX)/lib/libdatabase.a
 
 clean:
-	$(RM) $(OBJ) 
+	$(RM) $(OBJ) main.o prompt.o
 	$(RM) database libdatabase.a
