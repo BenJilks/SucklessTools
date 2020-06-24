@@ -170,27 +170,15 @@ void Table::remove_row(size_t index)
 {
     auto [chunk, offset] = find_chunk_and_offset_for_row(index);
 
-    // Insert a new chunk inbetween the one this row is in and the rest
-    auto new_chunk = m_db.new_chunk("RD", m_id, chunk->index() + 1);
-    for (auto &it : m_row_data_chunks)
+    // Copy data up a row
+    for (size_t i = offset; i < chunk->size_in_bytes() - m_row_size; i++)
     {
-        if (it->index() > chunk->index())
-            it->increment_index(1);
+        auto byte = chunk->read_byte(i + m_row_size);
+        chunk->write_byte(i, byte);
     }
 
-    // Copy data to knew chunk
-    for (size_t i = offset + m_row_size; i < chunk->size_in_bytes(); i++)
-        new_chunk->write_byte(i - (offset + m_row_size), chunk->read_byte(i));
-
-    // Shrink chunk to before the deleted row
-    chunk->shrink_to(offset);
-
-    // Re-sort chunks
-    m_row_data_chunks.push_back(new_chunk);
-    std::sort(m_row_data_chunks.begin(), m_row_data_chunks.end(), [](const auto &a, const auto &b)
-    {
-        return a->index() < b->index();
-    });
+    // Shrink chunk by one row
+    chunk->shrink_to(chunk->size_in_bytes() - m_row_size);
 
     // Update row count
     m_row_count -= 1;
