@@ -2,6 +2,7 @@ CC=c++
 AR=ar
 CXXFLAGS=-std=c++17 -g
 OBJ=main.o \
+    prompt.o \
     cleaner.o \
     database.o \
     chunk.o \
@@ -47,8 +48,8 @@ endif
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 all: $(OBJ)
-#	$(CC) -o database $^ $(CXXFLAGS)
-	$(AR) rs libdatabase.a $(OBJ)
+	$(CC) -o database $^ $(CXXFLAGS)
+#	$(AR) rs libdatabase.a $(OBJ)
 
 install:
 	mkdir -p $(PREFIX)/include/database

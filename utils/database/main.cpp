@@ -1,10 +1,55 @@
 #include "database.hpp"
 #include "cleaner.hpp"
+#include "prompt.hpp"
 #include <iostream>
 #include <cassert>
+#include <getopt.h>
 using namespace DB;
 
-int main()
+static struct option cmd_options[] =
+{
+    { "help",       no_argument,        0, 'h' }
+};
+
+void show_help()
+{
+    std::cout << "usage: database [-h] <file>\n";
+    std::cout << "\nManage databases\n";
+    std::cout << "\noptional arguments:\n";
+    std::cout << "  -h, --help\t\tShow this help message and exit\n";
+}
+
+int main(int argc, char *argv[])
+{
+    for (;;)
+    {
+        int option_index;
+        int c = getopt_long(argc, argv, "h",
+            cmd_options, &option_index);
+
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+            case 'h':
+                show_help();
+                return 0;
+        }
+    }
+
+    if (optind != argc - 1)
+    {
+        show_help();
+        return 1;
+    }
+    
+    Prompt prompt(argv[optind]);
+    prompt.run();
+    return 0;
+}
+
+int main_test()
 {
     std::cout << "Hello, databases!!!\n";
 
