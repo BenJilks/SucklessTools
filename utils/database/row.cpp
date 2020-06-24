@@ -22,6 +22,7 @@ Row::Row(const std::vector<Column> &columns)
 
 Row::Row(std::vector<std::string> select_columns, Row &&other)
 {
+    size_t entry_offset = Config::row_header_size;
     for (auto &entity : other.m_entities)
     {
         // Only copy in if it's in the selected columns,
@@ -30,9 +31,11 @@ Row::Row(std::vector<std::string> select_columns, Row &&other)
         auto index = std::find(select_columns.begin(), select_columns.end(), column.name());
         if (index != select_columns.end())
         {
-            (*this)[column.name()]->set(std::move(entity.entry));
+            m_entities.push_back({ column, entry_offset, std::move(entity.entry)});
             select_columns.erase(index);
         }
+        
+        entry_offset += column.data_type().size();
     }
     m_row_size = other.m_row_size;
 }
