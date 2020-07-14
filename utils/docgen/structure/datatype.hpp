@@ -22,6 +22,8 @@ namespace Structure
 			: m_name(name)
 	       		, m_flags(flags) {}
 
+		inline std::string str() const { return m_name; }
+
 	private:
 		std::string m_name;
 		Flags m_flags;
