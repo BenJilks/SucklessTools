@@ -8,11 +8,7 @@ int main()
     
     std::ifstream in("../main.cpp");
     Lexer lexer(in);
-    lexer.add_keyword("include");
-    lexer.add_keyword("return");
-    lexer.add_symbol("::"); 
-    lexer.add_string_type('"');
-    lexer.add_string_type('\'', true);
+    lexer.load("../langs/cpp.json");
 
     for (;;)
     {

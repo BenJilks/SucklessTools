@@ -9,4 +9,6 @@ set(SOURCES
     lexer.cpp
 )
 
+include_directories(/usr/local/include)
+link_libraries(json)
 add_executable(docgen ${SOURCES})

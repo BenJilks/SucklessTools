@@ -27,6 +27,8 @@ public:
 	void add_keyword(const std::string&);
 	void add_symbol(const std::string&);
 	void add_string_type(char dilim, bool single_char = false);
+	void load(const std::string &path);
+	void load(std::istream&&);
 	
 	std::optional<Token> next();
 

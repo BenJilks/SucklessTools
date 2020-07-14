@@ -1,5 +1,7 @@
 #include "lexer.hpp"
+#include <libjson/libjson.hpp>
 #include <cassert>
+#include <fstream>
 
 void Lexer::add_keyword(const std::string &keyword)
 {
@@ -14,6 +16,29 @@ void Lexer::add_symbol(const std::string &symbol)
 void Lexer::add_string_type(char dilim, bool single_char)
 {
 	m_string_types.push_back({ dilim, single_char });
+}
+
+void Lexer::load(const std::string &path)
+{
+	std::ifstream stream(path);
+	load(std::move(stream));
+}
+
+void Lexer::load(std::istream &&stream)
+{
+	auto config = Json::parse(std::move(stream));
+	auto keywords = config["keywords"];
+	auto symbols = config["symbols"];
+	auto string_types = config["string_types"];
+
+	for (const auto &keyword : keywords.as_array())
+		add_keyword(keyword.as_string());
+
+	for (const auto &symbol : symbols.as_array())
+		add_symbol(symbol.as_string());
+
+	for (const auto &string_type : string_types.as_array())
+		add_string_type(string_type["dilim"].as_string()[0]);
 }
 
 std::optional<Lexer::Token> Lexer::next()
