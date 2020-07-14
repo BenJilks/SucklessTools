@@ -8,7 +8,7 @@ int main()
     
     std::ifstream in("../main.cpp");
     Lexer lexer(in);
-    lexer.load("../langs/cpp.json");
+    lexer.load("../syntax/cpp.json");
 
     for (;;)
     {
