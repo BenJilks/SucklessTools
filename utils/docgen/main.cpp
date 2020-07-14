@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include "lexer.hpp"
+#include "structure/codeunit.hpp"
 
 int main()
 {
