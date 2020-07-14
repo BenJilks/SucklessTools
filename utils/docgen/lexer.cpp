@@ -67,8 +67,6 @@ std::optional<Lexer::Token> Lexer::next()
 				{
 					if (m_curr_char == symbol[0])
 					{
-						if (symbol.size() == 1)
-							return Token { symbol, Token::Symbol };
 						m_state = State::CheckSymbol;
 						m_should_reconsume = true;
 					}
@@ -86,6 +84,8 @@ std::optional<Lexer::Token> Lexer::next()
 						break;
 					}
 				}
+				if (m_state != State::Default)
+					break;
 
 				// Check name
 				if (isalpha(m_curr_char))
@@ -114,22 +114,26 @@ std::optional<Lexer::Token> Lexer::next()
 				bool has_partial_match = false;
 				for (const auto &symbol : m_symbols)
 				{
-					// We've got a match
-					if (symbol == buffer)
-					{
-						m_state = State::Default;
-						return Token { buffer, Token::Symbol };
-					}
-
 					// Check for a parial match
-					int index = buffer.size();
+					int index = buffer.size() - 1;
 					if (index < symbol.size() && symbol[index] == m_curr_char)
 						has_partial_match = true;
 				}
 
-				// Don't wanna deal with this now
 				if (!has_partial_match)
 				{
+					buffer.pop_back();
+					for (const auto &symbol : m_symbols)
+					{
+						if (symbol == buffer)
+						{
+							m_state = State::Default;
+							m_should_reconsume = true;
+							return Token { symbol, Token::Symbol };
+						}
+					}
+
+					// Don't wanna deal with this now
 					m_state = State::Default;
 					assert (false);
 					break;
