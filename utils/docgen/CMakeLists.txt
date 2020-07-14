@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(SOURCES
     main.cpp
+    lexer.cpp
 )
 
 add_executable(docgen ${SOURCES})
