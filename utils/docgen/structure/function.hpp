@@ -1,6 +1,7 @@
 #pragma once
 #include "datatype.hpp"
 #include <string>
+#include <vector>
 
 namespace Structure
 {

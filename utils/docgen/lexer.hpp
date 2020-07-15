@@ -6,17 +6,18 @@
 class Lexer
 {
 public:
+	enum Type
+	{
+		None,
+		Identifier,
+		Number,
+		Keyword,
+		Symbol,
+		StringType,
+	};
+
 	struct Token
 	{
-		enum Type
-		{
-			Identifier,
-			Number,
-			Keyword,
-			Symbol,
-			StringType,
-		};
-		
 		std::string data;
 		Type type;
 	};
@@ -29,7 +30,9 @@ public:
 	void add_string_type(char dilim, bool single_char = false);
 	void load(const std::string &path);
 	void load(std::istream&&);
-	
+
+	std::optional<Token> peek(int count = 0);
+	std::optional<Token> consume(Type type = Type::None, const std::string &data = "");
 	std::optional<Token> next();
 
 private:
@@ -49,11 +52,12 @@ private:
 		bool single_char;
 	};
 
-	Token::Type keyword_type(const std::string &buffer) const;
+	Type keyword_type(const std::string &buffer) const;
 
 	State m_state { State::Default };
 	char m_curr_char { 0 };
 	bool m_should_reconsume { false };
+	std::vector<Token> m_peek_queue;
 	std::istream &m_in;
 	
 	std::vector<std::string> m_keywords;

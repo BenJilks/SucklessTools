@@ -15,7 +15,7 @@ void Lexer::add_symbol(const std::string &symbol)
 
 void Lexer::add_string_type(char dilim, bool single_char)
 {
-	m_string_types.push_back({ dilim, single_char });
+	m_string_types.push_back(StringType { dilim, single_char });
 }
 
 void Lexer::load(const std::string &path)
@@ -39,6 +39,35 @@ void Lexer::load(std::istream &&stream)
 
 	for (const auto &string_type : string_types.as_array())
 		add_string_type(string_type["dilim"].as_string()[0]);
+}
+
+std::optional<Lexer::Token> Lexer::peek(int count)
+{
+	while (count >= m_peek_queue.size())
+	{
+		auto token = next();
+		if (!token)
+			return std::nullopt;
+		m_peek_queue.push_back(*token);
+	}
+
+	return m_peek_queue[count];
+}
+
+std::optional<Lexer::Token> Lexer::consume(Type type, const std::string &data)
+{
+	auto token = peek();
+	if (!token)
+		return std::nullopt;
+
+	if (type != Type::None && token->type != type)
+		return std::nullop;
+
+	if (data != "" && token->data != data)
+		return std::nullopt;
+
+	m_peek_queue.pop_front();
+	return token;
 }
 
 std::optional<Lexer::Token> Lexer::next()
@@ -129,7 +158,7 @@ std::optional<Lexer::Token> Lexer::next()
 						{
 							m_state = State::Default;
 							m_should_reconsume = true;
-							return Token { symbol, Token::Symbol };
+							return Token { symbol, Type::Symbol };
 						}
 					}
 
@@ -160,7 +189,7 @@ std::optional<Lexer::Token> Lexer::next()
 				{
 					m_state = State::Default;
 					m_should_reconsume = true;
-					return Token { buffer, Token::Number };					
+					return Token { buffer, Type::Number };					
 				}
 				
 				buffer += m_curr_char;
@@ -182,7 +211,7 @@ std::optional<Lexer::Token> Lexer::next()
 				if (m_curr_char == dilim)
 				{
 					m_state = State::Default;
-					return Token { dilim + buffer + dilim, Token::StringType };
+					return Token { dilim + buffer + dilim, Type::StringType };
 				}
 
 				buffer += m_curr_char;
@@ -199,14 +228,14 @@ std::optional<Lexer::Token> Lexer::next()
 	}
 }
 
-Lexer::Token::Type Lexer::keyword_type(const std::string &buffer) const
+Lexer::Type Lexer::keyword_type(const std::string &buffer) const
 {
 	for (const auto &keyword : m_keywords)
 	{
 		if (keyword == buffer)
-			return Token::Keyword;
+			return Type::Keyword;
 	}
 
-	return Token::Identifier;
+	return Type::Identifier;
 }
 

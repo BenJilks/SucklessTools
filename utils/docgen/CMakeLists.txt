@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(SOURCES
     main.cpp
     lexer.cpp
+    langs/cplusplus.cpp
 )
 
 include_directories(/usr/local/include)
