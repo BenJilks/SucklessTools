@@ -22,10 +22,10 @@ namespace DB::Sql
         Value()
             : m_type(Null) {}
         
-        explicit Value(int i)
+        explicit Value(int64_t i)
             : m_type(Integer)
             , m_int(i) {}
-        
+
         explicit Value(bool b)
             : m_type(Boolean)
             , m_bool(b) {}
@@ -35,7 +35,7 @@ namespace DB::Sql
             , m_str(str) {}
 
         inline Type type() const { return m_type; }
-        inline int as_int() const { assert(m_type == Integer); return m_int; }
+        inline int64_t as_int() const { assert(m_type == Integer); return m_int; }
         inline bool as_bool() const { assert(m_type == Boolean); return m_bool; }
         inline const std::string &as_string() const { assert(m_type == String); return m_str; }
         
@@ -44,7 +44,7 @@ namespace DB::Sql
     private:
         Type m_type;
         
-        int m_int;
+        int64_t m_int;
         bool m_bool;
         std::string m_str;
 

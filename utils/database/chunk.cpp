@@ -39,6 +39,12 @@ int Chunk::read_int(size_t offset)
     return m_db.read_int(m_data_offset + offset);
 }
 
+int64_t Chunk::read_long(size_t offset)
+{
+    assert (!m_has_been_dropped);
+    return m_db.read_long(m_data_offset + offset);
+}
+
 std::string Chunk::read_string(size_t offset, size_t len)
 {
     assert (!m_has_been_dropped);
@@ -69,6 +75,13 @@ void Chunk::write_int(size_t offset, int i)
     assert (!m_has_been_dropped);
     check_size(offset + 4);
     m_db.write_int(m_data_offset + offset, i);
+}
+
+void Chunk::write_long(size_t offset, int64_t l)
+{
+    assert (!m_has_been_dropped);
+    check_size(offset + 8);
+    m_db.write_long(m_data_offset + offset, l);
 }
 
 void Chunk::write_string(size_t offset, const std::string &str)

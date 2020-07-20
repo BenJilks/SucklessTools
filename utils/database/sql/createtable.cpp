@@ -23,6 +23,8 @@ SqlResult CreateTableStatement::execute(DataBase& db) const
         std::optional<DataType> type;
         if (type_name == "integer")
             type = DataType::integer();
+        else if (type_name == "bigint")
+            type = DataType::big_int();
         else if (type_name == "char")
             type = DataType::char_(column.length);
         else if (type_name == "text")

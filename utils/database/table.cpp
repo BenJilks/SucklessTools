@@ -259,7 +259,7 @@ std::shared_ptr<Chunk> Table::find_dynamic_chunk(int id)
 {
     for (auto &chunk : m_dynamic_data_chunks)
     {
-        if (chunk->index() == id)
+        if ((int)chunk->index() == id)
             return chunk;
     }
 

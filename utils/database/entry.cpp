@@ -27,11 +27,17 @@ DataType DataType::text()
     return DataType(Text, 1, 1);
 }
 
+DataType DataType::big_int()
+{
+    return DataType(BigInt, 8, 1);
+}
+
 int DataType::size_from_primitive(Primitive primitive)
 {
     switch (primitive)
     {
         case Integer: return 4;
+        case BigInt: return 8;
         case Char: return 1;
         case Text: return 1;
         default: assert (false);
@@ -42,6 +48,12 @@ int Entry::as_int() const
 {
     assert (m_data_type.primitive() == DataType::Integer);
     return static_cast<const IntegerEntry&>(*this).data();
+}
+
+int64_t Entry::as_long() const
+{
+    assert (m_data_type.primitive() == DataType::BigInt);
+    return static_cast<const BigIntEntry&>(*this).data();
 }
 
 std::string Entry::as_string() const
@@ -89,12 +101,29 @@ void IntegerEntry::read_data(Chunk &chunk, size_t offset)
     m_i = chunk.read_int(offset);
 }
 
+void BigIntEntry::set(std::unique_ptr<Entry> to)
+{
+    assert (to->data_type().primitive() == DataType::BigInt);
+    m_l = static_cast<BigIntEntry&>(*to).m_l;
+    m_is_null = false;
+}
+
+void BigIntEntry::read_data(Chunk &chunk, size_t offset)
+{
+    m_l = chunk.read_long(offset);
+}
+
+void BigIntEntry::write_data(Chunk &chunk, size_t offset)
+{
+    chunk.write_long(offset, m_l);
+}
+
 void CharEntry::set(std::unique_ptr<Entry> to)
 {
     assert (to->data_type().primitive() == DataType::Char);
 
     auto other_str = static_cast<CharEntry&>(*to).data();
-    assert (other_str.size() <= m_size);
+    assert ((int)other_str.size() <= m_size);
 
     memset(m_c.data(), 0, m_size);
     memcpy(m_c.data(), other_str.data(), other_str.size());
@@ -190,6 +219,9 @@ std::ostream &operator<< (std::ostream &stream, const DB::Entry& entry)
     {
         case DataType::Integer:
             stream << entry.as_int();
+            break;
+        case DataType::BigInt:
+            stream << entry.as_long();
             break;
         case DataType::Char:
             stream << "'" << entry.as_string() << "'";

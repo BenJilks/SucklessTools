@@ -96,7 +96,7 @@ std::unique_ptr<ValueNode> Parser::parse_value()
         case Lexer::Integer:
         {
             m_lexer.consume();
-            auto i = atoi(peek->data.c_str());
+            auto i = atol(peek->data.c_str());
             value = std::make_unique<ValueNode>(Value(i));
             break;
         }

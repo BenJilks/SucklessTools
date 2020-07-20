@@ -16,6 +16,7 @@ namespace DB
             Integer = 0,
             Char,
             Text,
+            BigInt,
         };
 
         DataType(Primitive primitive, size_t size, size_t length)
@@ -26,6 +27,7 @@ namespace DB
         static DataType integer();
         static DataType char_(int size);
         static DataType text();
+        static DataType big_int();
         static int size_from_primitive(Primitive);
 
         inline Primitive primitive() const { return m_primitive; }
@@ -59,6 +61,7 @@ namespace DB
         virtual void set(std::unique_ptr<Entry>) = 0;
 
         int as_int() const;
+        int64_t as_long() const;
         std::string as_string() const;
         inline bool is_null() const { return m_is_null; }
 
@@ -99,6 +102,28 @@ namespace DB
 
         int m_i;
 
+    };
+
+    class BigIntEntry : public Entry
+    {
+        friend Column;
+
+    public:
+        BigIntEntry()
+            : Entry(DataType::big_int(), true) {}
+
+        BigIntEntry(int64_t l)
+            : Entry(DataType::big_int())
+            , m_l(l) {}
+
+        virtual void set(std::unique_ptr<Entry>) override;
+        inline int64_t data() const { return m_l; }
+
+    private:
+        virtual void read_data(Chunk &chunk, size_t offset) override;
+        virtual void write_data(Chunk &chunk, size_t offset) override;
+
+        int64_t m_l;
     };
 
     class CharEntry : public Entry

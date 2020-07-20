@@ -17,7 +17,7 @@ SqlResult InsertStatement::execute(DataBase& db) const
         return SqlResult::error("No table with the name '" + m_table + "' found");
 
     auto row = table->make_row();
-    for (int i = 0; i < m_columns.size(); i++)
+    for (int i = 0; i < (int)m_columns.size(); i++)
     {
         const auto &column = m_columns[i];
         const auto &value = m_values[i];

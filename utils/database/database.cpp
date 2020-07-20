@@ -179,6 +179,14 @@ void DataBase::write_int(size_t offset, int i)
     fflush(m_file);
 }
 
+void DataBase::write_long(size_t offset, int64_t l)
+{
+    check_size(offset + 8);
+    fseek(m_file, offset, SEEK_SET);
+    fwrite((char*)(&l), 1, 8, m_file);
+    fflush(m_file);
+}
+
 void DataBase::write_string(size_t offset, const std::string& str)
 {
     check_size(offset + str.size());
@@ -206,6 +214,14 @@ int DataBase::read_int(size_t offset)
     fseek(m_file, offset, SEEK_SET);
     fread(&i, 1, sizeof(int), m_file);
     return i;
+}
+
+int64_t DataBase::read_long(size_t offset)
+{
+    int64_t l;
+    fseek(m_file, offset, SEEK_SET);
+    fread(&l, 1, sizeof(int64_t), m_file);
+    return l;
 }
 
 void DataBase::read_string(size_t offset, char *str, size_t len)

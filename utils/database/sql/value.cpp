@@ -11,7 +11,7 @@ std::unique_ptr<Entry> Value::as_entry() const
 {
     switch (m_type)
     {
-        case Integer: return std::make_unique<IntegerEntry>(m_int);
+        case Integer: return std::make_unique<BigIntEntry>(m_int);
         case String: return std::make_unique<CharEntry>(m_str);
         default:
             assert (false);
@@ -22,7 +22,8 @@ static Value get_entry_value(const std::unique_ptr<Entry> &entry)
 {
     switch (entry->data_type().primitive())
     {
-        case DataType::Integer: return Value(entry->as_int());
+        case DataType::Integer: return Value((int64_t)entry->as_int());
+        case DataType::BigInt: return Value(entry->as_long());
         case DataType::Char: return Value(entry->as_string());
         case DataType::Text: return Value(entry->as_string());
         default:
