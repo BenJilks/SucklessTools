@@ -144,6 +144,12 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Set };
     else if (lower == "delete")
         return { buffer, Type::Delete };
+    else if (lower == "if")
+        return { buffer, Type::If };
+    else if (lower == "not")
+        return { buffer, Type::Not };
+    else if (lower == "exists")
+        return { buffer, Type::Exists };
     return { buffer, Type::Name };
 }
 

@@ -20,6 +20,7 @@ namespace DB
         class SelectStatement;
         class InsertStatement;
         class CreateTableStatement;
+        class CreateTableIfNotExistsStatement;
         class UpdateStatement;
         class DeleteStatement;
         class Value;

@@ -19,6 +19,7 @@ set(SOURCES
     sql/select.cpp
     sql/insert.cpp
     sql/createtable.cpp
+    sql/createtableifnotexists.cpp
     sql/update.cpp
     sql/delete.cpp
     sql/value.cpp

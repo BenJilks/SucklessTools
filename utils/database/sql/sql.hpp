@@ -15,6 +15,7 @@ namespace DB
         friend Sql::SelectStatement;
         friend Sql::InsertStatement;
         friend Sql::CreateTableStatement;
+        friend Sql::CreateTableIfNotExistsStatement;
         friend Sql::UpdateStatement;
         friend Sql::DeleteStatement;
 

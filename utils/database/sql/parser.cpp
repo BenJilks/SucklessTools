@@ -2,6 +2,7 @@
 #include "select.hpp"
 #include "insert.hpp"
 #include "createtable.hpp"
+#include "createtableifnotexists.hpp"
 #include "update.hpp"
 #include "delete.hpp"
 #include "../entry.hpp"
@@ -212,7 +213,21 @@ std::shared_ptr<Statement> Parser::parse_create_table()
     match(Lexer::Create, "create");
     match(Lexer::Table, "table");
 
-    auto create_table = std::shared_ptr<CreateTableStatement>(new CreateTableStatement());
+    std::shared_ptr<CreateTableStatement> create_table;
+    if (m_lexer.consume(Lexer::If))
+    {
+        match(Lexer::Not, "not");
+        match(Lexer::Exists, "exists");
+
+        create_table = std::shared_ptr<CreateTableIfNotExistsStatement>(
+            new CreateTableIfNotExistsStatement());
+    }
+    else
+    {
+        create_table = std::shared_ptr<CreateTableStatement>(
+            new CreateTableStatement());
+    }
+
     auto table_name = m_lexer.consume(Lexer::Name);
     if (!table_name)
     {

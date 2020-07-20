@@ -28,6 +28,9 @@ public:
         Update,
         Set,
         Delete,
+        If,
+        Not,
+        Exists,
 
         Integer,
         String,

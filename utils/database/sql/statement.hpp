@@ -15,6 +15,7 @@ namespace DB::Sql
             Select,
             Insert,
             CreateTable,
+            CreateTableIfNotExists,
             Update,
             Delete,
         };

@@ -11,9 +11,12 @@ namespace DB::Sql
     public:
         virtual SqlResult execute(DataBase&) const override;
 
+    protected:
+        CreateTableStatement(Type type = CreateTable)
+            : Statement(type) {}
+
+        inline const std::string &table_name() const { return m_name; }
     private:
-        CreateTableStatement()
-            : Statement(CreateTable) {}
 
         struct Column
         {
