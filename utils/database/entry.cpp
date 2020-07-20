@@ -86,8 +86,14 @@ void Entry::write(Chunk &chunk, size_t offset)
 
 void IntegerEntry::set(std::unique_ptr<Entry> to)
 {
-    assert (to->data_type().primitive() == DataType::Integer);
-    m_i = static_cast<IntegerEntry&>(*to).m_i;
+    auto type = to->data_type().primitive();
+    if (type == DataType::Integer)
+        m_i = static_cast<IntegerEntry&>(*to).m_i;
+    else if (type == DataType::BigInt)
+        m_i = static_cast<BigIntEntry&>(*to).data();
+    else
+        assert(false);
+
     m_is_null = false;
 }
 
