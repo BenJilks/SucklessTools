@@ -75,9 +75,9 @@ static void add_new_debt(DB::DataBase &db)
         result.output_errors();
 }
 
-static void print_report(DB::DataBase &db)
+static void print_report(DB::DataBase &db, const std::string &condition = "")
 {
-    auto result = db.execute_sql("SELECT * FROM Debts");
+    auto result = db.execute_sql("SELECT * FROM Debts " + condition);
     if (!result.good())
     {
         result.output_errors();
@@ -112,30 +112,34 @@ static struct option cmd_options[] =
 {
     { "help",       no_argument,        0, 'h' },
     { "add",        no_argument,        0, 'a' },
+    { "person",     no_argument,        0, 'p' },
 };
 
 void show_help()
 {
-    std::cout << "usage: debtorsbook [-h]\n";
+    std::cout << "usage: debtorsbook [-h] [-a] [-p <name>]\n";
     std::cout << "\nManage small loans\n";
     std::cout << "\noptional arguments:\n";
     std::cout << "  -h, --help\t\tShow this help message and exit\n";
-    std::cout << "  -a, --help\t\tAdd a new debt\n";
+    std::cout << "  -a, --add\t\tAdd a new debt\n";
+    std::cout << "  -p, --person <name>\t\tShow debts of a person\n";
 }
 
 int main(int argc, char *argv[])
 {
+    std::string option;
     enum class Mode
     {
         Default,
         Add,
+        Person,
     };
 
     auto mode = Mode::Default;
     for (;;)
     {
         int option_index;
-        int c = getopt_long(argc, argv, "ha",
+        int c = getopt_long(argc, argv, "hap:",
             cmd_options, &option_index);
 
         if (c == -1)
@@ -160,6 +164,10 @@ int main(int argc, char *argv[])
             case 'a':
                 set_mode(Mode::Add);
                 break;
+            case 'p':
+                set_mode(Mode::Person);
+                option = optarg;
+                break;
         }
     }
 
@@ -174,6 +182,9 @@ int main(int argc, char *argv[])
             break;
         case Mode::Add:
             add_new_debt(*db);
+            break;
+        case Mode::Person:
+            print_report(*db, "WHERE person='" + option + "'");
             break;
     }
 
