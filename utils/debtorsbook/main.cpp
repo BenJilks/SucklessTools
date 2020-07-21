@@ -2,6 +2,7 @@
 #include <database/database.hpp>
 #include <getopt.h>
 #include <ctime>
+#include <cassert>
 
 static void setup_database(DB::DataBase &db)
 {
@@ -76,7 +77,35 @@ static void add_new_debt(DB::DataBase &db)
 
 static void print_report(DB::DataBase &db)
 {
-    std::cout << "TODO: Implement this function\n";
+    auto result = db.execute_sql("SELECT * FROM Debts");
+    if (!result.good())
+    {
+        result.output_errors();
+        return;
+    }
+
+    int total_i_owe = 0;
+    int total_owed_to_me = 0;
+    printf("-----------------------------------------------------\n");
+    printf("| %-10s | %-20s | %-5s | %-5s |\n", "Person", "Transaction", "Me", "Them");
+    printf("| ---------- | -------------------- | ----- | ----- |\n");
+    for (const auto &row : result)
+    {
+        auto name = row["person"]->as_string();
+        auto transaction = row["transaction"]->as_string();
+        auto amount_owed_by_me = row["owedbyme"]->as_int();
+        auto amount_owed_by_them = row["owedbythem"]->as_int();
+        printf("| %-10s | %-20s | %-5i | %-5i |\n", name.c_str(),
+               transaction.c_str(), amount_owed_by_me, amount_owed_by_them);
+
+        total_i_owe += amount_owed_by_me;
+        total_owed_to_me += amount_owed_by_them;
+    }
+    printf("-----------------------------------------------------\n");
+
+    printf("\n%-20s %-10i\n", "Total I Owe: ", total_i_owe);
+    printf("%-20s %-10i\n", "Total Owed to Me: ", total_owed_to_me);
+    printf("%-20s %-10i\n", "Total Over Due: ", total_owed_to_me - total_i_owe);
 }
 
 static struct option cmd_options[] =
