@@ -3,10 +3,13 @@
 #include <getopt.h>
 #include <ctime>
 #include <cassert>
+#include <unistd.h>
+#include <pwd.h>
 
 static void setup_database(DB::DataBase &db)
 {
     auto result = db.execute_sql("CREATE TABLE IF NOT EXISTS Debts ("
+                   "    id Integer,"
                    "    datetime BigInt,"
                    "    person Text,"
                    "    transaction Text,"
@@ -64,7 +67,9 @@ static void add_new_debt(DB::DataBase &db)
 
     // Add to database
     int64_t datetime = time(0);
-    auto result = db.execute_sql("INSERT INTO Debts (datetime, person, transaction, owedbyme, owedbythem) VALUES ("
+    int id = rand();
+    auto result = db.execute_sql("INSERT INTO Debts (id, datetime, person, transaction, owedbyme, owedbythem) VALUES ("
+                   + std::to_string(id) + ", "
                    + std::to_string(datetime) + ", "
                    + "'" + name + "', "
                    + "'" + transaction + "', "
@@ -108,13 +113,13 @@ static void print_report(DB::DataBase &db, const std::string &condition = "")
     printf("%-20s %-10i\n", "Total Over Due: ", total_owed_to_me - total_i_owe);
 }
 
-static DB::Row *select_row(DB::DataBase &db)
+static std::optional<int> select_row(DB::DataBase &db)
 {
     auto result = db.execute_sql("SELECT * FROM Debts");
     if (!result.good())
     {
         result.output_errors();
-        return nullptr;
+        return std::nullopt;
     }
 
     std::string buffer;
@@ -154,20 +159,26 @@ static DB::Row *select_row(DB::DataBase &db)
         std::cout << "\n";
     };
 
+    std::vector<int> id_index;
     for (;;)
     {
         int id = 0;
+        id_index.clear();
         for (const auto &row : result)
         {
             auto name = row["person"]->as_string();
             auto transaction = row["transaction"]->as_string();
             auto amount_owed_by_me = row["owedbyme"]->as_int();
             auto amount_owed_by_them = row["owedbythem"]->as_int();
-            if ((!name_filter.empty() && name != name_filter) || (!transaction_filter.empty() && transaction != transaction_filter))
+            if ((!name_filter.empty() && name != name_filter)
+                || (!transaction_filter.empty() && transaction != transaction_filter))
+            {
                 continue;
+            }
 
             printf("%-3i: %-10s %-20s %-5i %-5i\n", id, name.c_str(),
                    transaction.c_str(), amount_owed_by_me, amount_owed_by_them);
+            id_index.push_back(row["id"]->as_int());
             id += 1;
         }
 
@@ -182,7 +193,7 @@ static DB::Row *select_row(DB::DataBase &db)
     if (!buffer.empty())
         debt_selected = atoi(buffer.c_str());
 
-    return nullptr;
+    return id_index[debt_selected];
 }
 
 static void pay_off_debt(DB::DataBase &db)
@@ -190,6 +201,11 @@ static void pay_off_debt(DB::DataBase &db)
     auto selected_row = select_row(db);
     if (!selected_row)
         return;
+
+    auto result = db.execute_sql("DELETE FROM Debts WHERE id="
+        + std::to_string(*selected_row));
+    if (!result.good())
+        result.output_errors();
 }
 
 static struct option cmd_options[] =
@@ -213,6 +229,13 @@ void show_help()
 
 int main(int argc, char *argv[])
 {
+    // Initialize random
+    srand(time(0));
+
+    auto *pw = getpwuid(getuid());
+    auto home_dir = pw->pw_dir;
+    auto book_path = std::string(home_dir) + "/.debtors_book.db";
+
     std::string option;
     enum class Mode
     {
@@ -261,7 +284,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    auto db = DB::DataBase::open("debtors_book.db");
+    auto db = DB::DataBase::open(book_path);
     assert (db);
     setup_database(*db);
 

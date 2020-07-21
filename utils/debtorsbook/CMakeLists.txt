@@ -10,3 +10,5 @@ include_directories(/usr/local/include)
 link_directories(/usr/local/lib)
 link_libraries(database)
 add_executable(debtorsbook main.cpp)
+install(TARGETS debtorsbook
+    RUNTIME DESTINATION bin)
