@@ -108,11 +108,96 @@ static void print_report(DB::DataBase &db, const std::string &condition = "")
     printf("%-20s %-10i\n", "Total Over Due: ", total_owed_to_me - total_i_owe);
 }
 
+static DB::Row *select_row(DB::DataBase &db)
+{
+    auto result = db.execute_sql("SELECT * FROM Debts");
+    if (!result.good())
+    {
+        result.output_errors();
+        return nullptr;
+    }
+
+    std::string buffer;
+    std::string name_filter;
+    std::string transaction_filter;
+    int debt_selected = 0;
+
+    auto update_filter = [&]()
+    {
+        std::string filter_by = "?";
+        std::string term;
+
+        for (;;)
+        {
+            std::cout << "\nFilter by [?]: ";
+            std::getline(std::cin, buffer);
+            if (!buffer.empty())
+                filter_by = buffer;
+
+            if (filter_by != "person" && filter_by != "transaction")
+            {
+                std::cout << "Options: person, transaction\n";
+                continue;
+            }
+            break;
+        }
+
+        std::cout << "Term []: ";
+        std::getline(std::cin, buffer);
+        if (!buffer.empty())
+        {
+            if (filter_by == "person")
+                name_filter = buffer;
+            else if (filter_by == "transaction")
+                transaction_filter = buffer;
+        }
+        std::cout << "\n";
+    };
+
+    for (;;)
+    {
+        int id = 0;
+        for (const auto &row : result)
+        {
+            auto name = row["person"]->as_string();
+            auto transaction = row["transaction"]->as_string();
+            auto amount_owed_by_me = row["owedbyme"]->as_int();
+            auto amount_owed_by_them = row["owedbythem"]->as_int();
+            if ((!name_filter.empty() && name != name_filter) || (!transaction_filter.empty() && transaction != transaction_filter))
+                continue;
+
+            printf("%-3i: %-10s %-20s %-5i %-5i\n", id, name.c_str(),
+                   transaction.c_str(), amount_owed_by_me, amount_owed_by_them);
+            id += 1;
+        }
+
+        std::cout << "\nSelect a debt, type 'f' to filter [0]: ";
+        std::getline(std::cin, buffer);
+        if (buffer == "f" || buffer == "F")
+            update_filter();
+        else
+            break;
+    }
+
+    if (!buffer.empty())
+        debt_selected = atoi(buffer.c_str());
+
+    return nullptr;
+}
+
+static void pay_off_debt(DB::DataBase &db)
+{
+    auto selected_row = select_row(db);
+    if (!selected_row)
+        return;
+}
+
 static struct option cmd_options[] =
 {
     { "help",       no_argument,        0, 'h' },
     { "add",        no_argument,        0, 'a' },
-    { "person",     no_argument,        0, 'p' },
+    { "person",     required_argument,  0, 'p' },
+    { "pay",        no_argument,        0, 'd' },
 };
 
 void show_help()
@@ -123,6 +208,7 @@ void show_help()
     std::cout << "  -h, --help\t\tShow this help message and exit\n";
     std::cout << "  -a, --add\t\tAdd a new debt\n";
     std::cout << "  -p, --person <name>\t\tShow debts of a person\n";
+    std::cout << "  -d, --pay\t\tPay off a debt\n";
 }
 
 int main(int argc, char *argv[])
@@ -133,13 +219,14 @@ int main(int argc, char *argv[])
         Default,
         Add,
         Person,
+        Pay,
     };
 
     auto mode = Mode::Default;
     for (;;)
     {
         int option_index;
-        int c = getopt_long(argc, argv, "hap:",
+        int c = getopt_long(argc, argv, "hap:d",
             cmd_options, &option_index);
 
         if (c == -1)
@@ -168,6 +255,9 @@ int main(int argc, char *argv[])
                 set_mode(Mode::Person);
                 option = optarg;
                 break;
+            case 'd':
+                set_mode(Mode::Pay);
+                break;
         }
     }
 
@@ -185,6 +275,9 @@ int main(int argc, char *argv[])
             break;
         case Mode::Person:
             print_report(*db, "WHERE person='" + option + "'");
+            break;
+        case Mode::Pay:
+            pay_off_debt(*db);
             break;
     }
 
