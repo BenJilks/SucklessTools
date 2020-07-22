@@ -11,10 +11,10 @@ static void setup_database(DB::DataBase &db)
     auto result = db.execute_sql("CREATE TABLE IF NOT EXISTS Debts ("
                    "    id Integer,"
                    "    datetime BigInt,"
-                   "    person Text,"
-                   "    transaction Text,"
-                   "    owedbyme Integer,"
-                   "    owedbythem Integer)");
+                   "    person Char(80),"
+                   "    transaction Char(80),"
+                   "    owedbyme Float,"
+                   "    owedbythem Float)");
 
     if (!result.good())
         result.output_errors();
@@ -25,8 +25,8 @@ static void add_new_debt(DB::DataBase &db)
     std::string buffer;
     std::string name = "anon";
     std::string transaction = "donation";
-    int owed_by_me = 0;
-    int owed_by_them = 0;
+    float owed_by_me = 0;
+    float owed_by_them = 0;
 
     // Get input
     for (;;)
@@ -44,12 +44,12 @@ static void add_new_debt(DB::DataBase &db)
         std::cout << "Owed by me [" + std::to_string(owed_by_me) + "]: ";
         std::getline(std::cin, buffer);
         if (!buffer.empty())
-            owed_by_me = atoi(buffer.c_str());
+            owed_by_me = atof(buffer.c_str());
 
         std::cout << "Owed by them [" + std::to_string(owed_by_them) + "]: ";
         std::getline(std::cin, buffer);
         if (!buffer.empty())
-            owed_by_them = atoi(buffer.c_str());
+            owed_by_them = atof(buffer.c_str());
 
         // Varify that's correct
         std::cout << "\n";
@@ -89,28 +89,28 @@ static void print_report(DB::DataBase &db, const std::string &condition = "")
         return;
     }
 
-    int total_i_owe = 0;
-    int total_owed_to_me = 0;
-    printf("-----------------------------------------------------\n");
-    printf("| %-10s | %-20s | %-5s | %-5s |\n", "Person", "Transaction", "Me", "Them");
-    printf("| ---------- | -------------------- | ----- | ----- |\n");
+    float total_i_owe = 0;
+    float total_owed_to_me = 0;
+    printf("-----------------------------------------------------------------\n");
+    printf("| %-10s | %-20s | %-11s | %-11s |\n", "Person", "Transaction", "Me", "Them");
+    printf("| ---------- | -------------------- | ----------- | ----------- |\n");
     for (const auto &row : result)
     {
         auto name = row["person"]->as_string();
         auto transaction = row["transaction"]->as_string();
-        auto amount_owed_by_me = row["owedbyme"]->as_int();
-        auto amount_owed_by_them = row["owedbythem"]->as_int();
-        printf("| %-10s | %-20s | %-5i | %-5i |\n", name.c_str(),
+        auto amount_owed_by_me = row["owedbyme"]->as_float();
+        auto amount_owed_by_them = row["owedbythem"]->as_float();
+        printf("| %-10s | %-20s | £%-10.2f | £%-10.2f |\n", name.c_str(),
                transaction.c_str(), amount_owed_by_me, amount_owed_by_them);
 
         total_i_owe += amount_owed_by_me;
         total_owed_to_me += amount_owed_by_them;
     }
-    printf("-----------------------------------------------------\n");
+    printf("-----------------------------------------------------------------\n");
 
-    printf("\n%-20s %-10i\n", "Total I Owe: ", total_i_owe);
-    printf("%-20s %-10i\n", "Total Owed to Me: ", total_owed_to_me);
-    printf("%-20s %-10i\n", "Total Over Due: ", total_owed_to_me - total_i_owe);
+    printf("\n%-20s £%-10.2f\n", "Total I Owe: ", total_i_owe);
+    printf("%-20s £%-10.2f\n", "Total Owed to Me: ", total_owed_to_me);
+    printf("%-20s £%-10.2f\n", "Total Over Due: ", total_owed_to_me - total_i_owe);
 }
 
 static std::optional<int> select_row(DB::DataBase &db)
