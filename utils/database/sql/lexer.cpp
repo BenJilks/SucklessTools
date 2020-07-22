@@ -89,11 +89,29 @@ std::optional<Lexer::Token> Lexer::next()
                 break;
 
             case State::Integer:
+                if (c == '.')
+                {
+                    buffer += c;
+                    m_state = State::Float;
+                    break;
+                }
+
                 if (!isdigit(c))
                 {
                     m_should_reconsume = true;
                     m_state = State::Normal;
                     return Token { buffer, Type::Integer };
+                }
+
+                buffer += c;
+                break;
+
+            case State::Float:
+                if (!isdigit(c))
+                {
+                    m_should_reconsume = true;
+                    m_state = State::Normal;
+                    return Token { buffer, Type::Float };
                 }
 
                 buffer += c;

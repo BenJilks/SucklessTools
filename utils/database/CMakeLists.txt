@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 project(database LANGUAGES CXX)
 
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES
@@ -31,5 +32,5 @@ add_executable(databaseclt main.cpp ${SOURCES})
 install(TARGETS database
     LIBRARY DESTINATION lib)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}
-    DESTINATION include/database
+    DESTINATION include
     FILES_MATCHING PATTERN "*.hpp")

@@ -25,6 +25,8 @@ SqlResult CreateTableStatement::execute(DataBase& db) const
             type = DataType::integer();
         else if (type_name == "bigint")
             type = DataType::big_int();
+        else if (type_name == "float")
+            type = DataType::float_();
         else if (type_name == "char")
             type = DataType::char_(column.length);
         else if (type_name == "text")

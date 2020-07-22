@@ -88,7 +88,7 @@ void Row::read(Chunk &chunk, size_t row_offset)
 
 void Row::write(Chunk &chunk, size_t row_offset)
 {
-    for (size_t i = row_offset; i < m_row_size + 1; i++)
+    for (size_t i = row_offset; i < m_row_size; i++)
         chunk.write_byte(i, 0xCD);
 
     for (const auto &entitiy : m_entities)

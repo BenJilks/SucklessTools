@@ -12,6 +12,7 @@ std::unique_ptr<Entry> Value::as_entry() const
     switch (m_type)
     {
         case Integer: return std::make_unique<BigIntEntry>(m_int);
+        case Float: return std::make_unique<FloatEntry>(m_float);
         case String: return std::make_unique<CharEntry>(m_str);
         default:
             assert (false);
@@ -24,6 +25,7 @@ static Value get_entry_value(const std::unique_ptr<Entry> &entry)
     {
         case DataType::Integer: return Value((int64_t)entry->as_int());
         case DataType::BigInt: return Value(entry->as_long());
+        case DataType::Float: return Value(entry->as_float());
         case DataType::Char: return Value(entry->as_string());
         case DataType::Text: return Value(entry->as_string());
         default:
@@ -41,6 +43,19 @@ static Value operation(const Value &lhs, const Value &rhs, Callback callback)
             {
                 case Value::Type::Integer:
                     return Value(callback(lhs.as_int(), rhs.as_int()));
+                case Value::Type::Float:
+                    return Value(callback(lhs.as_int(), rhs.as_float()));
+                default:
+                    assert (false);
+            }
+            break;
+        case Value::Type::Float:
+            switch (rhs.type())
+            {
+                case Value::Type::Integer:
+                    return Value(callback(lhs.as_float(), rhs.as_int()));
+                case Value::Type::Float:
+                    return Value(callback(lhs.as_float(), rhs.as_float()));
                 default:
                     assert (false);
             }

@@ -33,6 +33,7 @@ public:
         Exists,
 
         Integer,
+        Float,
         String,
 
         MoreThan,
@@ -61,6 +62,7 @@ private:
         Normal,
         Name,
         Integer,
+        Float,
         String,
     };
 

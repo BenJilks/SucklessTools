@@ -92,7 +92,7 @@ void Cleaner::process_data_base()
     for (;;)
     {
         char c = in.get();
-        if (c == EOF)
+        if (c == (char)EOF)
             break;
 
         Chunk chunk;

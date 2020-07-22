@@ -101,6 +101,13 @@ std::unique_ptr<ValueNode> Parser::parse_value()
             value = std::make_unique<ValueNode>(Value(i));
             break;
         }
+        case Lexer::Float:
+        {
+            m_lexer.consume();
+            float f = atof(peek->data.c_str());
+            value = std::make_unique<ValueNode>(Value(f));
+            break;
+        }
         case Lexer::String:
         {
             m_lexer.consume();

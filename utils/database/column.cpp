@@ -16,6 +16,7 @@ std::unique_ptr<Entry> Column::null() const
     {
         case DataType::Integer: return std::make_unique<IntegerEntry>();
         case DataType::BigInt: return std::make_unique<BigIntEntry>();
+        case DataType::Float: return std::make_unique<FloatEntry>();
         case DataType::Char: return std::make_unique<CharEntry>(m_data_type.length());
         case DataType::Text: return std::make_unique<TextEntry>();
         default:

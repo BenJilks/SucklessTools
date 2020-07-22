@@ -32,12 +32,18 @@ DataType DataType::big_int()
     return DataType(BigInt, 8, 1);
 }
 
+DataType DataType::float_()
+{
+    return DataType(Float, 4, 1);
+}
+
 int DataType::size_from_primitive(Primitive primitive)
 {
     switch (primitive)
     {
         case Integer: return 4;
         case BigInt: return 8;
+        case Float: return 4;
         case Char: return 1;
         case Text: return 1;
         default: assert (false);
@@ -54,6 +60,12 @@ int64_t Entry::as_long() const
 {
     assert (m_data_type.primitive() == DataType::BigInt);
     return static_cast<const BigIntEntry&>(*this).data();
+}
+
+float Entry::as_float() const
+{
+    assert (m_data_type.primitive() == DataType::Float);
+    return static_cast<const FloatEntry&>(*this).data();
 }
 
 std::string Entry::as_string() const
@@ -84,44 +96,41 @@ void Entry::write(Chunk &chunk, size_t offset)
     write_data(chunk, offset + 1);
 }
 
-void IntegerEntry::set(std::unique_ptr<Entry> to)
+template <typename T, DataType::Primitive primitive>
+void TemplateEntry<T, primitive>::set(std::unique_ptr<Entry> entry)
 {
-    auto type = to->data_type().primitive();
-    if (type == DataType::Integer)
-        m_i = static_cast<IntegerEntry&>(*to).m_i;
-    else if (type == DataType::BigInt)
-        m_i = static_cast<BigIntEntry&>(*to).data();
-    else
-        assert(false);
+    switch (entry->data_type().primitive())
+    {
+        case DataType::Integer:
+            m_t = (T)static_cast<IntegerEntry&>(*entry).data();
+            break;
+        case DataType::BigInt:
+            m_t = (T)static_cast<BigIntEntry&>(*entry).data();
+            break;
+        case DataType::Float:
+            m_t = (T)static_cast<FloatEntry&>(*entry).data();
+            break;
+        default:
+            assert (false);
+    }
 
     m_is_null = false;
 }
 
-void IntegerEntry::write_data(Chunk &chunk, size_t offset)
+template <typename T, DataType::Primitive primitive>
+void TemplateEntry<T, primitive>::read_data(Chunk &chunk, size_t offset)
 {
-    chunk.write_int(offset, m_i);
+    char *bytes = (char*)&m_t;
+    for (int i = 0; i < (int)sizeof(T); i++)
+        bytes[i] = chunk.read_byte(offset + i);
 }
 
-void IntegerEntry::read_data(Chunk &chunk, size_t offset)
+template <typename T, DataType::Primitive primitive>
+void TemplateEntry<T, primitive>::write_data(Chunk &chunk, size_t offset)
 {
-    m_i = chunk.read_int(offset);
-}
-
-void BigIntEntry::set(std::unique_ptr<Entry> to)
-{
-    assert (to->data_type().primitive() == DataType::BigInt);
-    m_l = static_cast<BigIntEntry&>(*to).m_l;
-    m_is_null = false;
-}
-
-void BigIntEntry::read_data(Chunk &chunk, size_t offset)
-{
-    m_l = chunk.read_long(offset);
-}
-
-void BigIntEntry::write_data(Chunk &chunk, size_t offset)
-{
-    chunk.write_long(offset, m_l);
+    char *bytes = (char*)&m_t;
+    for (int i = 0; i < (int)sizeof(T); i++)
+        chunk.write_byte(offset + i, bytes[i]);
 }
 
 void CharEntry::set(std::unique_ptr<Entry> to)
@@ -228,6 +237,9 @@ std::ostream &operator<< (std::ostream &stream, const DB::Entry& entry)
             break;
         case DataType::BigInt:
             stream << entry.as_long();
+            break;
+        case DataType::Float:
+            stream << entry.as_float();
             break;
         case DataType::Char:
             stream << "'" << entry.as_string() << "'";

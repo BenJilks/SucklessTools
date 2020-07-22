@@ -17,6 +17,7 @@ namespace DB
             Char,
             Text,
             BigInt,
+            Float,
         };
 
         DataType(Primitive primitive, size_t size, size_t length)
@@ -28,6 +29,7 @@ namespace DB
         static DataType char_(int size);
         static DataType text();
         static DataType big_int();
+        static DataType float_();
         static int size_from_primitive(Primitive);
 
         inline Primitive primitive() const { return m_primitive; }
@@ -62,6 +64,7 @@ namespace DB
 
         int as_int() const;
         int64_t as_long() const;
+        float as_float() const;
         std::string as_string() const;
         inline bool is_null() const { return m_is_null; }
 
@@ -81,50 +84,39 @@ namespace DB
 
     };
 
-    class IntegerEntry : public Entry
+    template <typename T, DataType::Primitive primitive>
+    class TemplateEntry : public Entry
     {
         friend Column;
 
     public:
-        IntegerEntry()
-            : Entry(DataType::integer(), true) {}
+        TemplateEntry()
+            : Entry(DataType(primitive, sizeof(T), 1), true) {}
 
-        IntegerEntry(int i)
-            : Entry(DataType::integer())
-            , m_i(i) {}
+        TemplateEntry(T t)
+            : Entry(DataType(primitive, sizeof(T), 1))
+            , m_t(t) {}
 
         virtual void set(std::unique_ptr<Entry>) override;
-        inline int data() const { return m_i; }
+
+        inline T data() const { return m_t; }
 
     private:
         virtual void read_data(Chunk &chunk, size_t offset) override;
         virtual void write_data(Chunk &chunk, size_t offset) override;
 
-        int m_i;
+        T m_t {};
 
     };
 
-    class BigIntEntry : public Entry
-    {
-        friend Column;
+    template class TemplateEntry<int, DataType::Integer>;
+    typedef TemplateEntry<int, DataType::Integer> IntegerEntry;
 
-    public:
-        BigIntEntry()
-            : Entry(DataType::big_int(), true) {}
+    template class TemplateEntry<int64_t, DataType::BigInt>;
+    typedef TemplateEntry<int64_t, DataType::BigInt> BigIntEntry;
 
-        BigIntEntry(int64_t l)
-            : Entry(DataType::big_int())
-            , m_l(l) {}
-
-        virtual void set(std::unique_ptr<Entry>) override;
-        inline int64_t data() const { return m_l; }
-
-    private:
-        virtual void read_data(Chunk &chunk, size_t offset) override;
-        virtual void write_data(Chunk &chunk, size_t offset) override;
-
-        int64_t m_l;
-    };
+    template class TemplateEntry<float, DataType::Float>;
+    typedef TemplateEntry<float, DataType::Float> FloatEntry;
 
     class CharEntry : public Entry
     {

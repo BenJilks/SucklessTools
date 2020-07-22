@@ -15,6 +15,7 @@ namespace DB::Sql
         {
             Null,
             Integer,
+            Float,
             Boolean,
             String,
         };
@@ -26,6 +27,10 @@ namespace DB::Sql
             : m_type(Integer)
             , m_int(i) {}
 
+        explicit Value(float f)
+            : m_type(Float)
+            , m_float(f) {}
+
         explicit Value(bool b)
             : m_type(Boolean)
             , m_bool(b) {}
@@ -36,6 +41,7 @@ namespace DB::Sql
 
         inline Type type() const { return m_type; }
         inline int64_t as_int() const { assert(m_type == Integer); return m_int; }
+        inline float as_float() const { assert(m_type == Float); return m_float; }
         inline bool as_bool() const { assert(m_type == Boolean); return m_bool; }
         inline const std::string &as_string() const { assert(m_type == String); return m_str; }
         
@@ -45,6 +51,7 @@ namespace DB::Sql
         Type m_type;
         
         int64_t m_int;
+        float m_float;
         bool m_bool;
         std::string m_str;
 
