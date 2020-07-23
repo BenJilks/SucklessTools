@@ -26,20 +26,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
-if(ANDROID)
-  add_library(emails SHARED
+add_executable(emails
     main.cpp
-    emails.cpp
-    emails.h
-    emails.ui
-  )
-else()
-  add_executable(emails
-    main.cpp
-    emails.cpp
-    emails.h
-    emails.ui
-  )
-endif()
+    window.cpp
+    email.cpp
+    email_list.cpp
+    email_viewer.cpp
+)
 
 target_link_libraries(emails PRIVATE Qt5::Widgets)
