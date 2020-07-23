@@ -1,10 +1,14 @@
 #include <iostream>
+#include <fstream>
 #include <database/database.hpp>
+#include <libconfig.hpp>
 #include <getopt.h>
 #include <ctime>
 #include <cassert>
 #include <unistd.h>
 #include <pwd.h>
+
+static std::string g_book = "~/.debtors_book.db";
 
 static void setup_database(DB::DataBase &db)
 {
@@ -20,7 +24,7 @@ static void setup_database(DB::DataBase &db)
         result.output_errors();
 }
 
-static void add_new_debt(DB::DataBase &db)
+static void add_new_debt(DB::DataBase &db, bool multi_mode)
 {
     std::string buffer;
     std::string name = "anon";
@@ -28,56 +32,61 @@ static void add_new_debt(DB::DataBase &db)
     float owed_by_me = 0;
     float owed_by_them = 0;
 
-    // Get input
-    for (;;)
+    do
     {
-        std::cout << "Name [" + name + "]: ";
-        std::getline(std::cin, buffer);
-        if (!buffer.empty())
-            name = buffer;
 
-        std::cout << "Transaction [" + transaction + "]: ";
-        std::getline(std::cin, buffer);
-        if (!buffer.empty())
-            transaction = buffer;
+        // Get input
+        for (;;)
+        {
+            std::cout << "Name [" + name + "]: ";
+            std::getline(std::cin, buffer);
+            if (!buffer.empty())
+                name = buffer;
 
-        std::cout << "Owed by me [" + std::to_string(owed_by_me) + "]: ";
-        std::getline(std::cin, buffer);
-        if (!buffer.empty())
-            owed_by_me = atof(buffer.c_str());
+            std::cout << "Transaction [" + transaction + "]: ";
+            std::getline(std::cin, buffer);
+            if (!buffer.empty())
+                transaction = buffer;
 
-        std::cout << "Owed by them [" + std::to_string(owed_by_them) + "]: ";
-        std::getline(std::cin, buffer);
-        if (!buffer.empty())
-            owed_by_them = atof(buffer.c_str());
+            std::cout << "Owed by me [" + std::to_string(owed_by_me) + "]: ";
+            std::getline(std::cin, buffer);
+            if (!buffer.empty())
+                owed_by_me = atof(buffer.c_str());
 
-        // Varify that's correct
-        std::cout << "\n";
-        std::cout << name << ": " << transaction << "\n";
-        std::cout << "  Owed by me: " << owed_by_me << "\n";
-        std::cout << "  Owed by them: " << owed_by_them << "\n";
-        std::cout << "Is this correct [n]: ";
-        std::getline(std::cin, buffer);
+            std::cout << "Owed by them [" + std::to_string(owed_by_them) + "]: ";
+            std::getline(std::cin, buffer);
+            if (!buffer.empty())
+                owed_by_them = atof(buffer.c_str());
 
-        if (buffer == "y" || buffer == "Y" || buffer == "yes" || buffer == "YES")
-            break;
-        std::cout << "\n";
-    }
-    std::cout << "\nAdding debt\n";
+            // Varify that's correct
+            std::cout << "\n";
+            std::cout << name << ": " << transaction << "\n";
+            std::cout << "  Owed by me: " << owed_by_me << "\n";
+            std::cout << "  Owed by them: " << owed_by_them << "\n";
+            std::cout << "Is this correct [y]: ";
+            std::getline(std::cin, buffer);
 
-    // Add to database
-    int64_t datetime = time(0);
-    int id = rand();
-    auto result = db.execute_sql("INSERT INTO Debts (id, datetime, person, transaction, owedbyme, owedbythem) VALUES ("
-                   + std::to_string(id) + ", "
-                   + std::to_string(datetime) + ", "
-                   + "'" + name + "', "
-                   + "'" + transaction + "', "
-                   + std::to_string(owed_by_me) + ", "
-                   + std::to_string(owed_by_them) + ")");
+            if (buffer != "n" && buffer != "N" && buffer != "no" && buffer != "No")
+                break;
+            std::cout << "\n";
+        }
+        std::cout << "\nAdding debt\n";
 
-    if (!result.good())
-        result.output_errors();
+        // Add to database
+        int64_t datetime = time(0);
+        int id = rand();
+        auto result = db.execute_sql("INSERT INTO Debts (id, datetime, person, transaction, owedbyme, owedbythem) VALUES ("
+                       + std::to_string(id) + ", "
+                       + std::to_string(datetime) + ", "
+                       + "'" + name + "', "
+                       + "'" + transaction + "', "
+                       + std::to_string(owed_by_me) + ", "
+                       + std::to_string(owed_by_them) + ")");
+
+        if (!result.good())
+            result.output_errors();
+
+    } while (multi_mode);
 }
 
 static void print_report(DB::DataBase &db, const std::string &condition = "")
@@ -168,15 +177,15 @@ static std::optional<int> select_row(DB::DataBase &db)
         {
             auto name = row["person"]->as_string();
             auto transaction = row["transaction"]->as_string();
-            auto amount_owed_by_me = row["owedbyme"]->as_int();
-            auto amount_owed_by_them = row["owedbythem"]->as_int();
+            auto amount_owed_by_me = row["owedbyme"]->as_float();
+            auto amount_owed_by_them = row["owedbythem"]->as_float();
             if ((!name_filter.empty() && name != name_filter)
                 || (!transaction_filter.empty() && transaction != transaction_filter))
             {
                 continue;
             }
 
-            printf("%-3i: %-10s %-20s %-5i %-5i\n", id, name.c_str(),
+            printf("%-3i: %-10s %-20s £%-5.2f £%-5.2f\n", id, name.c_str(),
                    transaction.c_str(), amount_owed_by_me, amount_owed_by_them);
             id_index.push_back(row["id"]->as_int());
             id += 1;
@@ -196,16 +205,19 @@ static std::optional<int> select_row(DB::DataBase &db)
     return id_index[debt_selected];
 }
 
-static void pay_off_debt(DB::DataBase &db)
+static void pay_off_debt(DB::DataBase &db, bool multi_mode)
 {
-    auto selected_row = select_row(db);
-    if (!selected_row)
-        return;
+    do
+    {
+        auto selected_row = select_row(db);
+        if (!selected_row)
+            return;
 
-    auto result = db.execute_sql("DELETE FROM Debts WHERE id="
-        + std::to_string(*selected_row));
-    if (!result.good())
-        result.output_errors();
+        auto result = db.execute_sql("DELETE FROM Debts WHERE id="
+            + std::to_string(*selected_row));
+        if (!result.good())
+            result.output_errors();
+    } while (multi_mode);
 }
 
 static struct option cmd_options[] =
@@ -214,6 +226,7 @@ static struct option cmd_options[] =
     { "add",        no_argument,        0, 'a' },
     { "person",     required_argument,  0, 'p' },
     { "pay",        no_argument,        0, 'd' },
+    { "multi",      no_argument,        0, 'm' },
 };
 
 void show_help()
@@ -225,6 +238,7 @@ void show_help()
     std::cout << "  -a, --add\t\tAdd a new debt\n";
     std::cout << "  -p, --person <name>\t\tShow debts of a person\n";
     std::cout << "  -d, --pay\t\tPay off a debt\n";
+    std::cout << "  -m, --multi\t\tDo multiple at a time\n";
 }
 
 int main(int argc, char *argv[])
@@ -232,9 +246,12 @@ int main(int argc, char *argv[])
     // Initialize random
     srand(time(0));
 
-    auto *pw = getpwuid(getuid());
-    auto home_dir = pw->pw_dir;
-    auto book_path = std::string(home_dir) + "/.debtors_book.db";
+    std::string config_path = Config::resolve_home_path("~/.config/debtorsbook.conf");
+    Config::load(config_path, [&](auto name, auto value)
+    {
+        if (name == "book")
+            g_book = value;
+    });
 
     std::string option;
     enum class Mode
@@ -245,11 +262,12 @@ int main(int argc, char *argv[])
         Pay,
     };
 
+    auto multi_mode = false;
     auto mode = Mode::Default;
     for (;;)
     {
         int option_index;
-        int c = getopt_long(argc, argv, "hap:d",
+        int c = getopt_long(argc, argv, "hap:dm",
             cmd_options, &option_index);
 
         if (c == -1)
@@ -281,10 +299,13 @@ int main(int argc, char *argv[])
             case 'd':
                 set_mode(Mode::Pay);
                 break;
+            case 'm':
+                multi_mode = true;
+                break;
         }
     }
 
-    auto db = DB::DataBase::open(book_path);
+    auto db = DB::DataBase::open(Config::resolve_home_path(g_book));
     assert (db);
     setup_database(*db);
 
@@ -293,14 +314,14 @@ int main(int argc, char *argv[])
         case Mode::Default:
             print_report(*db);
             break;
-        case Mode::Add:
-            add_new_debt(*db);
-            break;
         case Mode::Person:
             print_report(*db, "WHERE person='" + option + "'");
             break;
+        case Mode::Add:
+            add_new_debt(*db, multi_mode);
+            break;
         case Mode::Pay:
-            pay_off_debt(*db);
+            pay_off_debt(*db, multi_mode);
             break;
     }
 
