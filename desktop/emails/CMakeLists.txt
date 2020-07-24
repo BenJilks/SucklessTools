@@ -8,7 +8,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # QtCreator supports the following variables for Android, which are identical to qmake Android variables.
@@ -25,6 +25,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 #endif()
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
+find_package(CURL REQUIRED)
 
 add_executable(emails
     main.cpp
@@ -32,6 +33,8 @@ add_executable(emails
     email.cpp
     email_list.cpp
     email_viewer.cpp
+    imap.cpp
 )
 
-target_link_libraries(emails PRIVATE Qt5::Widgets)
+include_directories(${CURL_INCLUDE_DIR})
+target_link_libraries(emails PRIVATE Qt5::Widgets ${CURL_LIBRARIES})
