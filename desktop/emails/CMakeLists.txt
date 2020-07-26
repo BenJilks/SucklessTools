@@ -33,7 +33,9 @@ add_executable(emails
     email.cpp
     email_list.cpp
     email_viewer.cpp
-    imap.cpp
+    imap/imapclient.cpp
+    imap/imapparser.cpp
+    imap/imapcontent.cpp
 )
 
 include_directories(${CURL_INCLUDE_DIR})
