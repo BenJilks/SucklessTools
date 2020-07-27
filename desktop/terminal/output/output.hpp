@@ -22,7 +22,10 @@ public:
 protected:
     virtual void redraw_all() = 0;
     virtual void draw_window() = 0;
-    virtual void scroll(int by) = 0;
+    virtual void draw_scroll(int begin, int end, int by) = 0;
+
+    void resize(int rows, int columns);
+    void scroll(int by);
     void out_rune(uint32_t);
     void out_escape(Escape::Sequence&);
     void set_attribute(const CursorPosition&, TerminalColor::Type, TerminalColor::Named);

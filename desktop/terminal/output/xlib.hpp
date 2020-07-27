@@ -34,7 +34,7 @@ public:
 private:
     virtual void redraw_all() override;
     virtual void draw_window() override;
-    virtual void scroll(int by) override;
+    virtual void draw_scroll(int begin, int end, int by) override;
 
     std::string decode_key_press(XKeyEvent *key_event);
     CursorPosition cursor_position_from_pixels(int x, int y);
@@ -45,6 +45,8 @@ private:
     int m_width { 0 };
     int m_height { 0 };
     int m_depth { 0 };
+    int m_font_width { 0 };
+    int m_font_height { 0 };
     CursorPosition m_mouse_pos;
     
     // Xft

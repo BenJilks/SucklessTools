@@ -16,6 +16,20 @@ class Line
 {
 public:
     Line() {}
+    Line(Line&) = delete;
+    Line(const Line&) = delete;
+
+    Line(Line &&other)
+        : m_data(std::move(other.m_data))
+    {
+        other.clear();
+    }
+
+    inline void operator =(Line &&other)
+    {
+        m_data = std::move(other.m_data);
+        other.clear();
+    }
 
     // Iterator setup methods
     const auto begin() const { return m_data.begin(); }

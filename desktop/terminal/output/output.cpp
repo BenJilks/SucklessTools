@@ -1,32 +1,24 @@
 #include "output.hpp"
 #include <iostream>
 #include <algorithm>
+#include <cassert>
+
+void Output::resize(int rows, int)
+{
+    std::cout << "set size\n";
+    if (m_rows == rows)
+        return;
+
+    m_rows = rows;
+    m_lines.resize(m_rows);
+}
 
 Line &Output::line_at(const CursorPosition &position)
 {
-    if (position.row() <= 0)
-    {
-        if (m_lines.size() == 0)
-            m_lines.push_back(Line());
-        return m_lines[0];
-    }
-    
-    while (position.row() >= m_lines.size())
-    {
-        Line line;
+    if (m_rows != (int)m_lines.size())
+        m_lines.resize(m_rows);
 
-        if (m_lines.size() > 0)
-        {
-            auto &last_line = m_lines.back();
-            if (last_line.length() > 0)
-            {
-                auto attr = last_line[last_line.length() - 1].color;
-                line.set_attribute(0, attr);
-            }
-        }
-        m_lines.push_back(line);
-    }
-    
+    assert (position.row() >= 0 && position.row() < m_rows);
     return m_lines[position.row()];
 }
 
@@ -93,11 +85,14 @@ void Output::out_rune(uint32_t rune)
         m_cursor.move_by(1, 0);
     }
     
-    if (m_cursor.row() > m_curr_frame_index + m_rows - 1)
-        scroll(m_cursor.row() - (m_curr_frame_index + m_rows - 1));
+    if (m_cursor.row() > m_curr_frame_index + m_rows - 2)
+    {
+        scroll(m_cursor.row() - (m_curr_frame_index + m_rows - 2));
+        m_cursor.move_by(0, -1);
+    }
 }
 
-void Output::set_attribute(const CursorPosition& pos, TerminalColor::Type type, TerminalColor::Named color)
+void Output::set_attribute(const CursorPosition&, TerminalColor::Type type, TerminalColor::Named color)
 {
     auto &line = line_at(m_cursor);
     line.set_attribute(m_cursor.coloumn(), type, color);
@@ -189,7 +184,7 @@ void Output::out_escape(Escape::Sequence &escape_sequence)
                 {
                     auto index = m_cursor.coloumn();
                     auto &line = m_lines[m_cursor.row()];
-                    while (index < line.length())
+                    while (index < (int)line.length())
                     {
                         line.set(index, ' ');
                         index += 1;
@@ -218,7 +213,7 @@ void Output::out_escape(Escape::Sequence &escape_sequence)
 
 void Output::out(std::string_view buff)
 {
-    for (int i = 0; i < buff.length(); i++)
+    for (int i = 0; i < (int)buff.length(); i++)
     {
         char c = buff[i];
         if (m_insert_count > 0)
@@ -243,4 +238,22 @@ void Output::out(std::string_view buff)
     }
     
     draw_window();
+}
+
+void Output::scroll(int by)
+{
+    std::cout << "Scroll by: " << by << "\n";
+
+    if (by > 0)
+    {
+        m_lines.erase(m_lines.begin(), m_lines.begin() + by);
+        m_lines.resize(m_rows);
+        for (int i = m_rows - by - 2; i < m_rows; i++)
+            m_lines[i].mark_dirty();
+        draw_scroll(0, m_rows, by);
+    }
+    else if (by < 0)
+    {
+        assert (false);
+    }
 }

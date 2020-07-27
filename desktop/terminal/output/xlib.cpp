@@ -69,6 +69,10 @@ void XLibOutput::load_font(const std::string &&name, int size)
         std::cerr << "terminal: xft: Couln't load font\n";
         return;
     }
+
+    // NOTE: We're assuming monospaced fonts for now
+    m_font_width = m_font->max_advance_width;
+    m_font_height = m_font->height;
     
     // Helper lambda for loading Xft colors
     auto load_color = [&](XftColor &color, const std::string &hex)
@@ -107,7 +111,7 @@ void XLibOutput::load_font(const std::string &&name, int size)
 CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
 {
     int curr_y = 0;
-    for (int row = m_curr_frame_index; row < m_curr_frame_index + m_rows; row++)
+    for (int row = 0; row < m_rows; row++)
     {
         if (y >= curr_y && y <= curr_y + m_font->height)
         {
@@ -115,7 +119,7 @@ CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
             auto &line = line_at(CursorPosition(0, row));
             int curr_x = 0;
             
-            for (int coloumn = 0; coloumn < line.length(); coloumn++)
+            for (int coloumn = 0; coloumn < (int)line.length(); coloumn++)
             {
                 auto rune = line[coloumn];
                 
@@ -170,13 +174,11 @@ std::string XLibOutput::update()
                         break;
                     
                     case Button4:
-                        // Scroll up
-                        scroll(-1);
+                        // TODO: Scrollback up
                         break;
 
                     case Button5:
-                        // Scroll down
-                        scroll(1);
+                        // TODO: Scrollback down
                         break;
                 }
                 break;
@@ -213,20 +215,23 @@ std::string XLibOutput::update()
                 {
                     m_width = event.xconfigure.width;
                     m_height = event.xconfigure.height;
-                    m_rows = m_height / m_font->height;
-                    
+                    auto rows = m_height / m_font->height;
+                    auto columns = m_width / m_font->max_advance_width;
+
                     if (on_resize)
                     {
                         // Tell the terminal program that we've resized
                         struct winsize size;
-                        size.ws_row = m_rows;
-                        size.ws_col = m_width / m_font->max_advance_width;
+                        size.ws_row = rows;
+                        size.ws_col = columns;
                         size.ws_xpixel = m_width;
                         size.ws_ypixel = m_height;
 
                         m_cursor.move_to_begging_of_line();
                         line_at(m_cursor).clear();
+
                         on_resize(size);
+                        resize(rows, columns);
                     }
 
                     // Create a new back buffer with the new size
@@ -290,11 +295,8 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
     return std::string(buf, len);
 }
 
-void XLibOutput::scroll(int by)
+void XLibOutput::draw_scroll(int begin, int end, int by)
 {
-    if (m_curr_frame_index + by < 0)
-        by = -m_curr_frame_index;
-    
     auto by_pixels = by * m_font->height;
     XCopyArea(m_display, m_pixel_buffer, m_pixel_buffer, m_gc, 
         0, 0, m_width, m_height, 0, -by_pixels);
@@ -305,13 +307,7 @@ void XLibOutput::scroll(int by)
         // Down
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_pixel_buffer, m_gc, 
-            0, m_height - by_pixels, m_width, by_pixels);
-        
-        for (int i = m_curr_frame_index - by - 1; i < m_curr_frame_index + 1; i++)
-        {
-            if (i >= 0)
-                m_lines[i].mark_dirty();
-        }
+            0, ((m_rows - 1) * m_font->height) - by_pixels, m_width, by_pixels);
     }
     else
     {
@@ -319,15 +315,8 @@ void XLibOutput::scroll(int by)
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_pixel_buffer, m_gc, 
             0, 0, m_width, -by_pixels);
-
-        for (int i = m_curr_frame_index + m_rows - 1; i < m_curr_frame_index + m_rows - by; i++)
-        {
-            if (i < m_lines.size())
-                m_lines[i].mark_dirty();
-        }
     }
 
-    m_curr_frame_index += by;
     draw_window();
 }
 
@@ -359,11 +348,8 @@ void XLibOutput::draw_window()
         return;
     }
     
-    int y = m_font->height;
-    for (int row = m_curr_frame_index; row < m_curr_frame_index + m_rows; row++)
+    for (int row = 0; row < m_rows; row++)
     {
-        if (row >= m_lines.size())
-            break;
         auto &line = m_lines[row];
         auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
         
@@ -378,16 +364,16 @@ void XLibOutput::draw_window()
                 line.mark_in_selection();
                 selection_start = line_selection_start(row);
                 selection_end = line_selection_end(row);
-                if (selection_start == 0 && selection_end == line.length())
+                if (selection_start == 0 && selection_end == (int)line.length())
                     background_color = color.foreground_int();
             }
 
-            int x = m_font->max_advance_width;
+            auto y = (row + 1) * m_font_height;
             XSetForeground(m_display, m_gc, background_color);
             XFillRectangle(m_display, m_pixel_buffer,
                 m_gc, 0, y - m_font->height + 4, m_width, m_font->height);
             
-            for (int column = 0; column < line.length(); column++)
+            for (int column = 0; column < (int)line.length(); column++)
             {
                 const auto &rune = line[column];
                 color = rune.color;
@@ -403,33 +389,26 @@ void XLibOutput::draw_window()
                     effective_color = color.inverted();
                 
                 auto c = rune.value;
-                XGlyphInfo extents;
-                XftTextExtentsUtf8(m_display, m_font, 
-                    (const FcChar8 *)&c, 1, &extents);
-                
+                auto x = (column + 1) * m_font_width;
                 XSetForeground(m_display, m_gc, effective_color.background_int());
                 XFillRectangle(m_display, m_pixel_buffer, m_gc, 
-                    x, y - m_font->height + 4, extents.xOff, m_font->height);
+                    x, y - m_font_height + 4, m_font_width, m_font_height);
                 
                 XftDrawStringUtf8(m_draw, &text_color_from_terminal(effective_color), 
                     m_font, x, y, 
                     (const FcChar8 *)&c, 1);
-                
-                x += extents.xOff;
             }
             
-            if (m_cursor.row() == row && m_cursor.coloumn() == line.length())
+            if (m_cursor.row() == row && m_cursor.coloumn() == (int)line.length())
             {
                 XSetForeground(m_display, m_gc, color.foreground_int());
                 XFillRectangle(m_display, m_pixel_buffer, m_gc, 
-                    x, y - m_font->height + 4, 
+                    (line.length() + 1) * m_font_width, y - m_font->height + 4,
                     m_font->max_advance_width, m_font->height);
             }
             
             line.unmark_dirty();
         }
-        
-        y += m_font->height;
     }
 
     swap_buffers();

@@ -4,6 +4,7 @@ project(terminal LANGUAGES CXX)
 find_package(Freetype REQUIRED)
 find_package(X11 REQUIRED)
 
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES
