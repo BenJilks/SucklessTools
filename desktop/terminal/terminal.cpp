@@ -1,10 +1,15 @@
 #include "terminal.hpp"
-#include <pty.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <string>
 #include <iostream>
+
+#if __FreeBSD__
+#include <libutil.h>
+#else
+#include <pty.h>
+#endif
 
 static bool wait_flag = false;
 
@@ -57,7 +62,7 @@ void Terminal::init()
         close(m_master);
     
         setenv("TERM", "st", 1);
-        if (execl("/usr/bin/bash", "bash", nullptr) < 0)
+        if (execl("/usr/local/bin/bash", "bash", nullptr) < 0)
             perror("system()");
         exit(-1);
     }

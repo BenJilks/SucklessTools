@@ -36,6 +36,8 @@ protected:
     */
 
     Rune &rune_at(const CursorPosition &position);
+    void move_cursor_to(int column, int row);
+    void move_cursor_by(int column, int row);
 
     inline const CursorPosition &cursor() const { return m_cursor; }
     inline int rows() const { return m_rows; }
@@ -52,11 +54,6 @@ private:
 
     Decoder m_decoder;
     int m_insert_count { 0 };
-
-    bool m_in_selection { false };
-    bool m_has_selection { false };
-    CursorPosition m_selection_start;
-    CursorPosition m_selection_end;
 
     void resize_buffer(int rows, int columns);
     void out_rune(uint32_t);

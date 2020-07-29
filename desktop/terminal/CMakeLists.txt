@@ -27,6 +27,6 @@ target_link_libraries(terminal
 
 target_include_directories(terminal PRIVATE
     ${FREETYPE_INCLUDE_DIRS}
-    ${X11_INCLUDE_DIRS}
+    ${X11_X11_INCLUDE_PATH}
     ${X11_Xft_INCLUDE_DIRS}
 )

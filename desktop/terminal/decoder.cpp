@@ -30,7 +30,7 @@ Decoder::Result Decoder::parse(char c)
                         };
                     
                     default:
-                        return { Result::Rune, c, {} };
+                        return { Result::Rune, (uint32_t)c, {} };
                 }
                 break;
             

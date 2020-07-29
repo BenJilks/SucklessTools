@@ -33,7 +33,7 @@ void Output::resize(int rows, int columns)
     m_scroll_region_top = 0;
     m_scroll_region_bottom = rows - 1;
 
-    m_cursor.move_to(0, m_cursor.row());
+    move_cursor_to(0, m_cursor.row());
     clear_row(m_cursor.row());
 
     redraw_all();
@@ -45,10 +45,28 @@ Rune &Output::rune_at(const CursorPosition &position)
     if (!m_buffer)
         resize_buffer(m_rows, m_columns);
 
-    assert (position.row() >= 0 && position.row() < m_rows &&
-            position.coloumn() >= 0 && position.coloumn() < m_columns);
+    if (!(position.row() >= 0 && position.row() < m_rows &&
+            position.coloumn() >= 0 && position.coloumn() < m_columns))
+    {
+        std::cout << "Invalid access {row=" << position.row() << ", column=" << position.coloumn() << "}\n";
+        assert(false);
+    }
 
     return m_buffer[position.row() * m_columns + position.coloumn()];
+}
+
+void Output::move_cursor_to(int column, int row)
+{
+    m_cursor.move_to(
+        std::clamp(column, 0, m_columns - 1),
+        std::clamp(row, 0, m_rows));
+}
+
+void Output::move_cursor_by(int column, int row)
+{
+    m_cursor.move_to(
+        std::clamp(m_cursor.coloumn() + column, 0, m_columns - 1),
+        std::clamp(m_cursor.row() + row, 0, m_rows));
 }
 
 void Output::clear_row(int row)
@@ -64,17 +82,17 @@ void Output::out_rune(uint32_t rune)
     
     if (rune == '\n')
     {
-        m_cursor.move_to(0, m_cursor.row() + 1);
+        move_cursor_to(0, m_cursor.row() + 1);
     }
     else
     {
         rune_at(m_cursor).value = rune;
         draw_rune(m_cursor);
-        m_cursor.move_by(1, 0);
+        move_cursor_by(1, 0);
     }
     
     if (m_cursor.row() < m_scroll_region_top)
-        scroll(-(m_scroll_region_top - m_cursor.row()));
+        scroll(m_cursor.row() - m_scroll_region_top);
 
     if (m_cursor.row() > m_scroll_region_bottom)
         scroll(m_cursor.row() - m_scroll_region_bottom);
@@ -106,10 +124,10 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
         }
         
-        case 'A': m_cursor.move_by(0, arg_len ? -escape.args[0] : -1); break;
-        case 'B': m_cursor.move_by(0, arg_len ? escape.args[0] : 1); break;
-        case 'C': m_cursor.move_by(arg_len ? escape.args[0] : 1, 0); break;
-        case 'D': m_cursor.move_by(arg_len ? -escape.args[0] : -1, 0); break;
+        case 'A': move_cursor_by(0, arg_len ? -escape.args[0] : -1); break;
+        case 'B': move_cursor_by(0, arg_len ? escape.args[0] : 1); break;
+        case 'C': move_cursor_by(arg_len ? escape.args[0] : 1, 0); break;
+        case 'D': move_cursor_by(arg_len ? -escape.args[0] : -1, 0); break;
         
         case 'H':
         {
@@ -117,7 +135,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             auto row =  arg_len >= 1 ? escape.args[0] : 1;
             auto column =  arg_len >= 2 ? escape.args[1] : 1;
 
-            m_cursor.move_to(column - 1, row - 1);
+            move_cursor_to(column - 1, row - 1);
             break;
         }
         
@@ -159,7 +177,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
             for (int i = 0; i < m_rows; i++)
                 clear_row(i);
-            m_cursor.move_to(0, 0);
+            move_cursor_to(0, 0);
             redraw_all();
             break;
         }
@@ -250,6 +268,6 @@ void Output::scroll(int by)
     //draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
 
     redraw_all();
-    m_cursor.move_by(0, -by);
+    move_cursor_by(0, -by);
     m_last_cursor = m_cursor;
 }

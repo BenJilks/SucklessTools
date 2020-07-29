@@ -20,7 +20,7 @@ public:
         m_coloumn = coloumn;
         m_row = row;
     }
-    inline void move_by(int coloumn, int row) 
+    inline void move_by(int coloumn, int row)
     {
         m_coloumn += coloumn;
         m_row += row;
