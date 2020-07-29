@@ -54,6 +54,16 @@ public:
         else m_flags &= ~(int)flag;
     }
 
+    inline Named &from_type(Type type)
+    {
+        switch (type)
+        {
+            case Foreground: return m_foreground;
+            case Background: return m_background;
+            default: assert (false);
+        }
+    }
+
     int foreground_int() const;
     int background_int() const;
     std::string name() const;

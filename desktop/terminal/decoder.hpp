@@ -1,8 +1,10 @@
 #pragma once
+#include "color.hpp"
 #include <stdint.h>
 #include <variant>
 #include <string>
 #include <vector>
+#include <functional>
 
 class Decoder
 {
@@ -38,7 +40,10 @@ public:
         uint32_t value;
         EscapeSequence escape;
     };
-    
+
+    static void parse_attribute_code(int code,
+        std::function<void(TerminalColor::Type, TerminalColor::Named)> on_color_callback);
+
     Decoder() {}
     
     Result parse(char c);

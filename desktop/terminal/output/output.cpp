@@ -55,20 +55,6 @@ void Output::out_rune(uint32_t rune)
         scroll(m_cursor.row() - m_scroll_region_bottom);
 }
 
-/*
-void Output::set_attribute(const CursorPosition&, TerminalColor::Type type, TerminalColor::Named color)
-{
-    auto &line = line_at(m_cursor);
-    line.set_attribute(m_cursor.coloumn(), type, color);
-}
-
-void Output::set_attribute(const CursorPosition&, TerminalColor::Flags flag, bool value)
-{
-    auto &line = line_at(m_cursor);
-    line.set_attribute(m_cursor.coloumn(), flag, value);
-}
-*/
-
 void Output::out_escape(Decoder::EscapeSequence &escape)
 {
     int arg_len = escape.args.size();
@@ -77,7 +63,8 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
     {
         case 'm':
         {
-            // TODO: Set attribute
+            for (int attr_code : escape.args)
+                m_buffer.set_attributes(m_cursor, attr_code);
             break;
         }
         

@@ -61,7 +61,7 @@ void Terminal::init()
         close(slave);
         close(m_master);
     
-        setenv("TERM", "st", 1);
+        setenv("TERM", "xterm", 1);
         if (execl("/usr/local/bin/bash", "bash", nullptr) < 0)
             perror("system()");
         exit(-1);

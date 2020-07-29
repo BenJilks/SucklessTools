@@ -20,6 +20,7 @@ public:
     void resize(int rows, int columns);
     void clear_row(int row);
     void scroll(int top, int botton, int by);
+    void set_attributes(const CursorPosition&, int attr_code);
     Rune &rune_at(const CursorPosition&);
     const Rune &rune_at(const CursorPosition&) const;
 

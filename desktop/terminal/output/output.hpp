@@ -29,11 +29,6 @@ protected:
     void resize(int rows, int columns);
     void scroll(int by);
 
-    /*
-    void set_attribute(const CursorPosition&, TerminalColor::Type, TerminalColor::Named);
-    void set_attribute(const CursorPosition&, TerminalColor::Flags, bool);
-    */
-
     void move_cursor_to(int column, int row);
     void move_cursor_by(int column, int row);
 

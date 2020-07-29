@@ -1,5 +1,60 @@
 #include "decoder.hpp"
+#include "color.hpp"
 #include <optional>
+#include <iostream>
+
+void Decoder::parse_attribute_code(int code,
+    std::function<void(TerminalColor::Type, TerminalColor::Named)> on_color_callback)
+{
+    auto original_code = code;
+
+    // Reset all attributes
+    if (code == 0)
+    {
+        on_color_callback(TerminalColor::Background, TerminalColor::DefaultBackground);
+        on_color_callback(TerminalColor::Foreground, TerminalColor::DefaultForeground);
+        return;
+    }
+
+    auto type = TerminalColor::Foreground;
+    auto color = TerminalColor::DefaultForeground;
+    if (code >= 90)
+    {
+        // TODO: Bright
+        code -= 60;
+    }
+
+    code -= 30;
+    if (code >= 10)
+    {
+        type = TerminalColor::Background;
+        code -= 10;
+    }
+
+    switch (code)
+    {
+        case 0: color = TerminalColor::Black; break;
+        case 1: color = TerminalColor::Red; break;
+        case 2: color = TerminalColor::Green; break;
+        case 3: color = TerminalColor::Yellow; break;
+        case 4: color = TerminalColor::Blue; break;
+        case 5: color = TerminalColor::Magenta; break;
+        case 6: color = TerminalColor::Cyan; break;
+        case 7: color = TerminalColor::White; break;
+        case 8:
+        case 9:
+            if (type == TerminalColor::Background)
+                color = TerminalColor::DefaultBackground;
+            else
+                color = TerminalColor::DefaultForeground;
+            break;
+        default:
+            std::cout << "Invalid attribute: " << original_code << "\n";
+            return;
+    }
+
+    on_color_callback(type, color);
+}
 
 Decoder::Result Decoder::parse(char c)
 {
