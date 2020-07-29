@@ -20,17 +20,17 @@ Decoder::Result Decoder::parse(char c)
                         break;
                     
                     case 7:
-                        return { Result::Escape, Escape::Bell() };
+                        return { Result::Bell, 0, {} };
 
                     case 8:
                         return
                         {
-                            Result::Escape,
-                            Escape::Cursor(Escape::Cursor::Left, 1)
+                            Result::Escape, 0,
+                            { 'D', { 1 }, false }
                         };
                     
                     default:
-                        return { Result::Rune, c };
+                        return { Result::Rune, c, {} };
                 }
                 break;
             
@@ -83,16 +83,11 @@ Decoder::Result Decoder::parse(char c)
             {
                 m_state = State::Ascii;
                 
-                auto sequence = Escape::interpret_sequence(
-                    c, m_current_args, 
-                    m_current_is_private);
-                if (!sequence)
-                    break;
-                
-                return { Result::Escape, std::move(*sequence) };
+                auto sequence = EscapeSequence { c, m_current_args, m_current_is_private };
+                return { Result::Escape, 0, sequence };
             }
         }
     } while (!should_consume);
     
-    return { Result::Incomplete };
+    return { Result::Incomplete, 0, {} };
 }

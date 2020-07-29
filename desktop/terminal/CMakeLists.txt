@@ -12,7 +12,6 @@ set(SOURCES
     terminal.cpp
     color.cpp
     decoder.cpp
-    escapes.cpp
     line.cpp
     output/output.cpp
     output/xlib.cpp

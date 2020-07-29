@@ -1,6 +1,7 @@
 #include "line.hpp"
 #include <iostream>
 
+/*
 const Rune &Line::operator[](int index)
 {
     if (index >= m_data.size())
@@ -111,3 +112,4 @@ void Line::set_attribute(int column, TerminalColor color)
         attr.set_flag(TerminalColor::Clear, color.is(TerminalColor::Clear));
     });
 }
+*/
