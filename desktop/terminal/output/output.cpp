@@ -120,12 +120,11 @@ void Output::out_rune(uint32_t rune)
         m_cursor.move_by(1, 0);
     }
     
+    if (m_cursor.row() < m_scroll_region_top)
+        scroll(-(m_scroll_region_top - m_cursor.row()));
+
     if (m_cursor.row() > m_scroll_region_bottom)
-    {
-        auto amount = m_cursor.row() - m_scroll_region_bottom;
-        m_cursor.move_by(0, -amount);
-        scroll(amount);
-    }
+        scroll(m_cursor.row() - m_scroll_region_bottom);
 }
 
 /*
@@ -217,10 +216,20 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             assert (arg_len == 2);
             m_scroll_region_top = escape.args[0] - 1;
             m_scroll_region_bottom = escape.args[1] - 1;
+            break;
+        }
+
+        case 'L':
+        {
+            assert (arg_len == 0);
+            scroll(-1);
+            break;
         }
 
         default:
-#if 0
+            if (escape.command == 'l' || escape.command == 'h')
+                break;
+#if 1
             std::cout << "Unkown Escape: " << escape.command << "(";
             for (int arg : escape.args)
                 std::cout << arg << ", ";
@@ -267,16 +276,27 @@ void Output::scroll(int by)
 {
     draw_rune(m_last_cursor);
 
+    auto start_index = m_scroll_region_top * m_columns;
+    auto end_index = (m_scroll_region_bottom + 1) * m_columns;
+    auto by_index = by * m_columns;
     if (by > 0)
     {
-        memmove(m_buffer, m_buffer + by * m_columns, (m_rows - by) * m_columns);
-        for (int i = m_rows - by - 1; i < m_rows; i++)
+        for (int i = start_index; i < end_index - start_index - by; i++)
+            m_buffer[i] = m_buffer[i + by_index];
+        for (int i = m_scroll_region_bottom - by + 1; i < m_scroll_region_bottom + 1; i++)
             clear_row(i);
-
-        draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
     }
     else if (by < 0)
     {
-        assert (false);
+        for (int i = end_index - start_index; i > start_index - by; i--)
+            m_buffer[i] = m_buffer[i + by_index];
+        for (int i = m_scroll_region_top; i < m_scroll_region_top - by; i++)
+            clear_row(i);
     }
+
+    //draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
+
+    redraw_all();
+    m_cursor.move_by(0, -by);
+    m_last_cursor = m_cursor;
 }

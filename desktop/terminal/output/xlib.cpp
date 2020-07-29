@@ -299,8 +299,11 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
 void XLibOutput::draw_scroll(int begin, int end, int by)
 {
     auto by_pixels = by * m_font_height;
+    auto top_of_buffer = begin * m_font_height + by_pixels;
+    auto bottom_of_buffer = (end + 1) * m_font_height;
+    auto height_of_buffer = bottom_of_buffer - top_of_buffer;
     XCopyArea(m_display, m_pixel_buffer, m_pixel_buffer, m_gc, 
-        0, 0, m_width, m_height, 0, -by_pixels);
+        0, top_of_buffer, m_width, height_of_buffer, 0, top_of_buffer - by_pixels);
 
     auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
     if (by > 0)
@@ -308,14 +311,14 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         // Down
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_pixel_buffer, m_gc, 
-            0, (rows() * m_font_height) - by_pixels, m_width, by_pixels);
+            0, bottom_of_buffer - by_pixels, m_width, by_pixels);
     }
     else
     {
         // Up
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_pixel_buffer, m_gc, 
-            0, 0, m_width, -by_pixels);
+            0, 0, m_width, top_of_buffer - by_pixels);
     }
 }
 
