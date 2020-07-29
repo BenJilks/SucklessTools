@@ -210,6 +210,13 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
     }
 }
 
+void Output::out_tab()
+{
+    int length = 8 - (m_cursor.coloumn() % 8);
+    for (int i = 0; i < length; i++)
+        out_rune(' ');
+}
+
 void Output::out(std::string_view buff)
 {
     for (int i = 0; i < (int)buff.length(); i++)
@@ -233,6 +240,7 @@ void Output::out(std::string_view buff)
             case Decoder::Result::Rune: out_rune(result.value); break;
             case Decoder::Result::Bell: std::cout << "BELL!\n"; break;
             case Decoder::Result::Escape: out_escape(result.escape); break;
+            case Decoder::Result::Tab: out_tab(); break;
             default: break;
         }
     }

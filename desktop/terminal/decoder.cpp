@@ -28,6 +28,9 @@ Decoder::Result Decoder::parse(char c)
                             Result::Escape, 0,
                             { 'D', { 1 }, false }
                         };
+
+                    case '\t':
+                        return { Result::Tab, 0, {} };
                     
                     default:
                         return { Result::Rune, (uint32_t)c, {} };

@@ -58,5 +58,6 @@ private:
     void resize_buffer(int rows, int columns);
     void out_rune(uint32_t);
     void out_escape(Decoder::EscapeSequence&);
+    void out_tab();
 
 };

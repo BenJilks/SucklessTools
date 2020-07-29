@@ -31,6 +31,7 @@ public:
             Rune,
             Escape,
             Bell,
+            Tab,
         };
 
         Type type;
