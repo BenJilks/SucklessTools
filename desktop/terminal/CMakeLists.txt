@@ -12,7 +12,7 @@ set(SOURCES
     terminal.cpp
     color.cpp
     decoder.cpp
-    line.cpp
+    buffer.cpp
     output/output.cpp
     output/xlib.cpp
 )

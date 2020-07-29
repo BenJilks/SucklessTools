@@ -1,5 +1,5 @@
 #pragma once
-#include "../line.hpp"
+#include "../buffer.hpp"
 #include "../cursor.hpp"
 #include "../decoder.hpp"
 #include <string>
@@ -28,34 +28,30 @@ protected:
 
     void resize(int rows, int columns);
     void scroll(int by);
-    void clear_row(int row);
 
     /*
     void set_attribute(const CursorPosition&, TerminalColor::Type, TerminalColor::Named);
     void set_attribute(const CursorPosition&, TerminalColor::Flags, bool);
     */
 
-    Rune &rune_at(const CursorPosition &position);
     void move_cursor_to(int column, int row);
     void move_cursor_by(int column, int row);
 
     inline const CursorPosition &cursor() const { return m_cursor; }
-    inline int rows() const { return m_rows; }
-    inline int columns() const { return m_columns; }
+    inline const Buffer &buffer() const { return m_buffer; }
+    inline int rows() const { return m_buffer.rows(); }
+    inline int columns() const { return m_buffer.columns(); }
 
 private:
-    Rune *m_buffer { nullptr };
+    Buffer m_buffer;
     CursorPosition m_cursor;
     CursorPosition m_last_cursor;
-    int m_rows { 80 };
-    int m_columns { 80 };
     int m_scroll_region_top { 0 };
     int m_scroll_region_bottom { 79 };
 
     Decoder m_decoder;
     int m_insert_count { 0 };
 
-    void resize_buffer(int rows, int columns);
     void out_rune(uint32_t);
     void out_escape(Decoder::EscapeSequence&);
     void out_tab();

@@ -1,6 +1,5 @@
 #pragma once
 #include "output/output.hpp"
-#include "line.hpp"
 #include "cursor.hpp"
 #include <vector>
 

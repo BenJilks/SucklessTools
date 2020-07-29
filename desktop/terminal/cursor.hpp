@@ -10,6 +10,8 @@ public:
     CursorPosition()
         : m_coloumn(0), m_row(0) {}
     
+    inline CursorPosition column_offset(int column) const { return CursorPosition(column, m_row); }
+
     inline int& coloumn() { return m_coloumn; }
     inline int& row() { return m_row; }
     inline int coloumn() const { return m_coloumn; }

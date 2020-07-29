@@ -120,7 +120,7 @@ CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
             
             for (int coloumn = 0; coloumn < columns(); coloumn++)
             {
-                auto rune = rune_at(CursorPosition(coloumn, row));
+                auto rune = buffer().rune_at(CursorPosition(coloumn, row));
                 
                 XGlyphInfo extents;
                 XftTextExtentsUtf8(m_display, m_font, 
@@ -246,7 +246,7 @@ void XLibOutput::redraw_all()
         for (int column = 0; column < columns(); column++)
         {
             auto pos = CursorPosition(column, row);
-            if (!isspace(rune_at(pos).value))
+            if (!isspace(buffer().rune_at(pos).value))
                 draw_rune(pos);
         }
     }
@@ -328,7 +328,7 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
 
 void XLibOutput::draw_rune(const CursorPosition &pos)
 {
-    auto &rune = rune_at(pos);
+    auto &rune = buffer().rune_at(pos);
     auto color = rune.color;
 
     auto c = rune.value;
@@ -348,7 +348,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos)
 
 void XLibOutput::draw_cursor()
 {
-    auto &rune = rune_at(cursor());
+    auto &rune = buffer().rune_at(cursor());
     auto color = rune.color.inverted();
 
     auto c = rune.value;
