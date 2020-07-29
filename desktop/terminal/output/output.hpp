@@ -36,9 +36,6 @@ protected:
     */
 
     Rune &rune_at(const CursorPosition &position);
-//    bool line_in_selection(int row);
-//    int line_selection_start(int row);
-//    int line_selection_end(int row);
 
     inline const CursorPosition &cursor() const { return m_cursor; }
     inline int rows() const { return m_rows; }

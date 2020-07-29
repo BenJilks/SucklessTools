@@ -51,53 +51,6 @@ Rune &Output::rune_at(const CursorPosition &position)
     return m_buffer[position.row() * m_columns + position.coloumn()];
 }
 
-/*
-int Output::line_selection_start(int row)
-{
-    auto start = m_selection_start;
-    auto end = m_selection_end;
-    if (end.row() < start.row())
-        std::swap(start, end);
-    
-    if (row == start.row() && row == end.row())
-        return std::min(start.coloumn(), end.coloumn());
-    
-    if (row == start.row())
-        return start.coloumn();
-    
-    return 0;
-}
-
-int Output::line_selection_end(int row)
-{
-    auto start = m_selection_start;
-    auto end = m_selection_end;
-    if (end.row() < start.row())
-        std::swap(start, end);
-    
-    if (row == start.row() && row == end.row())
-        return std::max(start.coloumn(), end.coloumn());
-    
-    if (row == end.row())
-        return end.coloumn();
-    
-    return line_at(CursorPosition(0, row)).length();
-}
-
-bool Output::line_in_selection(int row)
-{
-    if (!m_has_selection)
-        return false;
-    
-    auto start = m_selection_start.row();
-    auto end = m_selection_end.row();
-    if (end < start)
-        std::swap(start, end);
-    
-    return row >= start && row <= end;
-}
-*/
-
 void Output::clear_row(int row)
 {
     for (int i = 0; i < m_columns; i++)

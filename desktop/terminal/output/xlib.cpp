@@ -160,16 +160,7 @@ std::string XLibOutput::update()
                 switch (event.xbutton.button)
                 {
                     case Button1:
-                        // Start a new selection
-                        /*m_selection_start = m_mouse_pos;
-                        m_in_selection = true;
-                        if (m_has_selection)
-                        {
-                            // If there already is one, remove it so that clicking 
-                            // without moving the mouse will unselect all
-                            m_has_selection = false;
-                            draw_window();
-                        }*/
+                        // TODO: Start a new selection
                         break;
                     
                     case Button4:
@@ -186,7 +177,7 @@ std::string XLibOutput::update()
                 switch (event.xbutton.button)
                 {
                     case Button1:
-                        //m_in_selection = false;
+                        // TODO: End selection
                         break;
                 }
                 break;
@@ -197,14 +188,7 @@ std::string XLibOutput::update()
                 auto y = event.xmotion.y;
                 m_mouse_pos = cursor_position_from_pixels(x, y);
                 
-                /*if (m_in_selection)
-                {
-                    // If we're in a selction, update it
-                    m_has_selection = true;
-                    m_selection_end = m_mouse_pos;
-                    //line_at(m_selection_end).mark_dirty();
-                    draw_window();
-                }*/
+                // TODO: Update selection
                 break;
             }
              
