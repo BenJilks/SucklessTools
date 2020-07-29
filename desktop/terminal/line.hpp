@@ -12,10 +12,16 @@ struct Rune
     TerminalColor color;
 };
 
+/*
 class Line
 {
 public:
-    Line() {}
+    Line(Line&) = delete;
+    Line(const Line&) = delete;
+
+    Line(Rune *data, int columns)
+        : m_data(data)
+        , m_columns(columns) {}
 
     // Iterator setup methods
     const auto begin() const { return m_data.begin(); }
@@ -34,9 +40,7 @@ public:
     inline bool is_dirty() const { return m_is_dirty; }
     inline void mark_dirty() { m_is_dirty = true; }
     inline void unmark_dirty() { m_is_dirty = false; }
-
-    inline size_t length() const { return m_data.size(); }
-    inline void clear() { return m_data.clear(); mark_dirty(); }
+    inline void clear();
     
     inline bool was_in_selection() { return m_was_in_selection; }
     inline void mark_in_selection() { m_was_in_selection = true; }
@@ -45,9 +49,11 @@ public:
 private:
     void modify_attribute(int column, std::function<void(TerminalColor&)> callback);
     
-    std::vector<Rune> m_data;
+    Rune *m_data;
+    int m_columns;
 
     bool m_is_dirty { false };
     bool m_was_in_selection { false };
     
 };
+*/

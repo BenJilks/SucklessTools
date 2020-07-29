@@ -1,7 +1,8 @@
 #pragma once
 #include <stdint.h>
 #include <variant>
-#include "escapes.hpp"
+#include <string>
+#include <vector>
 
 class Decoder
 {
@@ -13,19 +14,28 @@ public:
         EscapePrivate,
         EscapeArg,
         EscapeCommand,
+    };    
+
+    struct EscapeSequence
+    {
+        char command;
+        std::vector<int> args;
+        bool is_private;
     };
-    
+
     struct Result
     {
         enum Type
         {
             Incomplete,
             Rune,
-            Escape
+            Escape,
+            Bell,
         };
 
         Type type;
-        std::variant<uint32_t, Escape::Sequence> value;
+        uint32_t value;
+        EscapeSequence escape;
     };
     
     Decoder() {}

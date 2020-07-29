@@ -17,15 +17,13 @@ public:
 
     inline void move_to(int coloumn, int row) 
     { 
-        m_coloumn = std::max(coloumn, 0); 
-        m_row = std::max(row, 0);
+        m_coloumn = coloumn;
+        m_row = row;
     }
-    inline void move_to_begging_of_line() { m_coloumn = 0; }
-
     inline void move_by(int coloumn, int row) 
     {
-        m_coloumn = std::max(m_coloumn + coloumn, 0);
-        m_row = std::max(m_row + row, 0);
+        m_coloumn += coloumn;
+        m_row += row;
     }
     
 private:

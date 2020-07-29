@@ -1,5 +1,4 @@
 #include "terminal.hpp"
-#include "escapes.hpp"
 #include <pty.h>
 #include <unistd.h>
 #include <signal.h>
