@@ -329,7 +329,7 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
 void XLibOutput::draw_rune(const CursorPosition &pos)
 {
     auto &rune = buffer().rune_at(pos);
-    auto color = rune.color;
+    auto color = rune.attribute.color();
 
     auto c = rune.value;
     auto x = (pos.coloumn() + 1) * m_font_width;
@@ -349,7 +349,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos)
 void XLibOutput::draw_cursor()
 {
     auto &rune = buffer().rune_at(cursor());
-    auto color = rune.color.inverted();
+    auto color = current_attribute().color().inverted();
 
     auto c = rune.value;
     auto x = (cursor().coloumn() + 1) * m_font_width;

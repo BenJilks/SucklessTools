@@ -13,6 +13,7 @@ set(SOURCES
     color.cpp
     decoder.cpp
     buffer.cpp
+    attribute.cpp
     output/output.cpp
     output/xlib.cpp
 )

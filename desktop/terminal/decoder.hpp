@@ -41,9 +41,6 @@ public:
         EscapeSequence escape;
     };
 
-    static void parse_attribute_code(int code,
-        std::function<void(TerminalColor::Type, TerminalColor::Named)> on_color_callback);
-
     Decoder() {}
     
     Result parse(char c);

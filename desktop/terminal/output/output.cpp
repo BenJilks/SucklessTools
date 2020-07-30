@@ -43,7 +43,7 @@ void Output::out_rune(uint32_t rune)
     }
     else
     {
-        m_buffer.rune_at(m_cursor).value = rune;
+        m_buffer.rune_at(m_cursor) = { rune, m_current_attribute };
         draw_rune(m_cursor);
         move_cursor_by(1, 0);
     }
@@ -63,8 +63,14 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
     {
         case 'm':
         {
+            if (arg_len == 0)
+            {
+                m_current_attribute.apply(0);
+                break;
+            }
+
             for (int attr_code : escape.args)
-                m_buffer.set_attributes(m_cursor, attr_code);
+                m_current_attribute.apply(attr_code);
             break;
         }
         
@@ -157,6 +163,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
         }
 
+        case 'M':
         case 'L':
         {
             assert (arg_len == 0);

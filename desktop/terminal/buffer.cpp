@@ -4,7 +4,7 @@
 
 Buffer::Rune Buffer::blank_rune()
 {
-    return Rune { ' ', TerminalColor::default_color() };
+    return Rune { ' ', {} };
 }
 
 Buffer::Buffer(int rows, int columns)
@@ -67,26 +67,6 @@ void Buffer::scroll(int top, int bottom, int by)
         for (int i = top; i < top - by; i++)
             clear_row(i);
     }
-}
-
-void Buffer::set_attributes(const CursorPosition &pos, int attr_code)
-{
-    auto on_color = [&](auto type, auto new_color)
-    {
-        auto start_index = pos.row() * m_columns + pos.coloumn();
-        auto original_color = rune_at(pos).color.from_type(type);
-
-        for (int i = start_index; i < m_rows * m_columns; i++)
-        {
-            auto &color = m_buffer[i].color.from_type(type);
-            if (color != original_color)
-                break;
-
-            color = new_color;
-        }
-    };
-
-    Decoder::parse_attribute_code(attr_code, on_color);
 }
 
 Buffer::Rune &Buffer::rune_at(const CursorPosition &pos)
