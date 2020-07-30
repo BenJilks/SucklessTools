@@ -61,8 +61,9 @@ void Terminal::init()
         close(slave);
         close(m_master);
     
+        const auto *shell = getenv("SHELL");
         setenv("TERM", "st-16color", 1);
-        if (execl("/usr/bin/bash", "bash", nullptr) < 0)
+        if (execl(shell, shell, nullptr) < 0)
             perror("system()");
         exit(-1);
     }
