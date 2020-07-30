@@ -344,9 +344,9 @@ void XLibOutput::draw_rune(const CursorPosition &pos)
 
     if (!isspace(rune.value))
     {
-        XftDrawStringUtf8(m_draw, &text_color_from_terminal(color),
-            m_font, x, y,
-            (const FcChar8 *)&c, 1);
+        auto glyph = XftCharIndex(m_display, m_font, c);
+        XftDrawGlyphs(m_draw, &text_color_from_terminal(color),
+            m_font, x, y, &glyph, 1);
     }
 }
 
@@ -364,9 +364,9 @@ void XLibOutput::draw_cursor()
 
     if (!isspace(rune.value))
     {
-        XftDrawStringUtf8(m_draw, &text_color_from_terminal(color),
-            m_font, x, y,
-            (const FcChar8 *)&c, 1);
+        auto glyph = XftCharIndex(m_display, m_font, c);
+        XftDrawGlyphs(m_draw, &text_color_from_terminal(color),
+            m_font, x, y, &glyph, 1);
     }
 }
 
