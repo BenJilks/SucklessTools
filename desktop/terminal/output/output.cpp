@@ -119,12 +119,33 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
         case 'J':
         {
-            assert (arg_len && escape.args[0] == 2);
+            assert (arg_len <= 1);
 
-            for (int i = 0; i < rows(); i++)
-                m_buffer.clear_row(i);
-            move_cursor_to(0, 0);
-            redraw_all();
+            auto mode = arg_len ? escape.args[0] : 0;
+            switch(mode)
+            {
+                // Clear screen from cursor down
+                case 0:
+                    for (int i = m_cursor.row(); i < rows(); i++)
+                        m_buffer.clear_row(i);
+                    redraw_all();
+                    break;
+
+                // Clear screen from cursor up
+                case 1:
+                    for (int i = 0; i < m_cursor.row(); i++)
+                        m_buffer.clear_row(i);
+                    redraw_all();
+                    break;
+
+                // Clear entire screen
+                case 2:
+                    for (int i = 0; i < rows(); i++)
+                        m_buffer.clear_row(i);
+                    move_cursor_to(0, 0);
+                    redraw_all();
+                    break;
+            }
             break;
         }
 
