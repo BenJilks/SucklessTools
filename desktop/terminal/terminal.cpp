@@ -61,8 +61,8 @@ void Terminal::init()
         close(slave);
         close(m_master);
     
-        setenv("TERM", "vt100-color", 1);
-        if (execl("/usr/local/bin/bash", "bash", nullptr) < 0)
+        setenv("TERM", "st-16color", 1);
+        if (execl("/usr/bin/bash", "bash", nullptr) < 0)
             perror("system()");
         exit(-1);
     }

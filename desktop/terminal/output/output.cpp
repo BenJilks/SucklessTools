@@ -88,7 +88,27 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             move_cursor_to(column - 1, row - 1);
             break;
         }
+
+        // Cursor Character Absolute [column] (default = [row,1]) (CHA)
+        case 'G':
+        {
+            assert (arg_len <= 1);
+            auto column = arg_len >= 1 ? escape.args[0] : 1;
+
+            move_cursor_to(column - 1, m_cursor.row());
+            break;
+        }
         
+        // Line Position Absolute [row] (default = [1,column]) (VPA)
+        case 'd':
+        {
+            assert (arg_len <= 1);
+            auto row = arg_len >= 1 ? escape.args[0] : 1;
+
+            move_cursor_to(m_cursor.coloumn(), row - 1);
+            break;
+        }
+
         case '@':
         {
             assert (arg_len <= 1);
@@ -113,12 +133,38 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
         case 'K':
         {
-            assert (arg_len == 0);
+            assert (arg_len <= 1);
+            auto mode = arg_len ? escape.args[0] : 0;
 
-            for (int i = m_cursor.coloumn(); i < columns(); i++)
+            switch (mode)
             {
-                m_buffer.rune_at(m_cursor.column_offset(i)).value = ' ';
-                draw_rune(CursorPosition(i, m_cursor.row()));
+                // Clear line from cursor right
+                case 0:
+                    for (int i = m_cursor.coloumn(); i < columns(); i++)
+                    {
+                        m_buffer.rune_at(m_cursor.column_offset(i)).value = ' ';
+                        draw_rune(CursorPosition(i, m_cursor.row()));
+                    }
+                    break;
+
+                // Clear line from cursor lef
+                case 1:
+                    for (int i = 0; i < m_cursor.coloumn(); i++)
+                    {
+                        m_buffer.rune_at(m_cursor.column_offset(i)).value = ' ';
+                        draw_rune(CursorPosition(i, m_cursor.row()));
+                    }
+                    break;
+
+                // Clear entire line
+                case 2:
+                    m_buffer.clear_row(m_cursor.row());
+                    for (int i = 0; i < columns(); i++)
+                        draw_rune(CursorPosition(i, m_cursor.row()));
+                    break;
+
+                default:
+                    assert (false);
             }
             break;
         }

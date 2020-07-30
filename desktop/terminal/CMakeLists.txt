@@ -31,3 +31,6 @@ target_include_directories(terminal PRIVATE
     ${X11_X11_INCLUDE_PATH}
     ${X11_Xft_INCLUDE_DIRS}
 )
+
+install(TARGETS terminal
+    RUNTIME DESTINATION bin)
