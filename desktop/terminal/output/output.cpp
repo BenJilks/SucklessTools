@@ -232,8 +232,8 @@ void Output::scroll(int by)
     draw_rune(m_last_cursor);
 
     m_buffer.scroll(m_scroll_region_top, m_scroll_region_bottom, by);
-    //draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
-    redraw_all();
+    draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
+    //redraw_all();
 
     move_cursor_by(0, -by);
     m_last_cursor = m_cursor;
