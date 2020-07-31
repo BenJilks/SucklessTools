@@ -11,21 +11,21 @@ Buffer::Buffer(int rows, int columns)
     : m_rows(rows)
     , m_columns(columns)
 {
-    allocate_new_buffer(rows, columns);
+    m_buffer = allocate_new_buffer(m_buffer, rows, columns, m_columns, m_rows);
 }
 
-void Buffer::allocate_new_buffer(int new_rows, int new_columns)
+Buffer::Rune *Buffer::allocate_new_buffer(Rune *old_buffer,
+    int new_rows, int new_columns,
+    int old_rows, int old_columns)
 {
     Rune *new_buffer = (Rune*)malloc(new_rows * new_columns * sizeof(Rune));
     if (m_buffer == nullptr)
     {
         for (int i = 0; i < new_rows * new_columns; i++)
             new_buffer[i] = blank_rune();
-        m_buffer = new_buffer;
-        return;
+        return new_buffer;
     }
 
-    const auto old_rows = m_rows, old_columns = m_columns;
     for (int row = 0; row < new_rows; row++)
     {
         for (int column = 0; column < new_columns; column++)
@@ -33,14 +33,14 @@ void Buffer::allocate_new_buffer(int new_rows, int new_columns)
             auto new_index = row * new_columns + column;
             auto old_index = row * old_columns + column;
             if (row < old_rows && column < old_columns)
-                new_buffer[new_index] = m_buffer[old_index];
+                new_buffer[new_index] = old_buffer[old_index];
             else
                 new_buffer[new_index] = blank_rune();
         }
     }
 
-    free(m_buffer);
-    m_buffer = new_buffer;
+    free(old_buffer);
+    return new_buffer;
 }
 
 void Buffer::resize(int rows, int columns)
@@ -48,7 +48,8 @@ void Buffer::resize(int rows, int columns)
     if (rows == m_rows && columns == m_columns)
         return;
 
-    allocate_new_buffer(rows, columns);
+    m_buffer = allocate_new_buffer(m_buffer, rows, columns, m_rows, m_columns);
+    m_scroll_back = allocate_new_buffer(m_scroll_back, m_scroll_back_rows, columns, m_scroll_back_rows, m_columns);
     m_rows = rows;
     m_columns = columns;
 }
@@ -68,6 +69,11 @@ void Buffer::scroll(int top, int bottom, int by)
     auto by_index = by * m_columns;
     if (by > 0)
     {
+        m_scroll_back = allocate_new_buffer(m_scroll_back, m_scroll_back_rows + by, m_columns, m_scroll_back_rows, m_columns);
+        for (int i = 0; i < by_index; i++)
+            m_scroll_back[m_scroll_back_rows * m_columns + i] = m_buffer[i];
+        m_scroll_back_rows += by;
+
         for (int i = start_index; i < end_index - start_index - by; i++)
             m_buffer[i] = m_buffer[i + by_index];
         for (int i = bottom - by + 1; i < bottom + 1; i++)
@@ -85,7 +91,7 @@ void Buffer::scroll(int top, int bottom, int by)
 Buffer::Rune &Buffer::rune_at(const CursorPosition &pos)
 {
     if (!m_buffer)
-        allocate_new_buffer(m_rows, m_columns);
+        m_buffer = allocate_new_buffer(m_buffer, m_rows, m_columns, m_rows, m_columns);
 
     if (!(pos.row() >= 0 && pos.row() < m_rows &&
             pos.coloumn() >= 0 && pos.coloumn() < m_columns))
@@ -95,6 +101,20 @@ Buffer::Rune &Buffer::rune_at(const CursorPosition &pos)
     }
 
     return m_buffer[pos.row() * m_columns + pos.coloumn()];
+}
+
+const Buffer::Rune &Buffer::rune_at_scroll_offset(const CursorPosition &pos, int offset) const
+{
+    auto row = pos.row() + offset;
+    if (row >= 0)
+        return rune_at(CursorPosition(pos.coloumn(), row));
+
+    if (-row >= m_scroll_back_rows)
+    {
+        std::cout << "Invalid scroll offset " << row << ", scroll_back_rows=" << m_scroll_back_rows << "\n";
+        assert (false);
+    }
+    return m_scroll_back[(m_scroll_back_rows + row) * m_columns + pos.coloumn()];
 }
 
 const Buffer::Rune &Buffer::rune_at(const CursorPosition &pos) const

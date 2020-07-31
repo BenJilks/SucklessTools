@@ -37,6 +37,7 @@ private:
     virtual void draw_cursor() override;
     virtual void draw_scroll(int begin, int end, int by) override;
     virtual void flush_display() override;
+    void draw_row(int row, bool refresh = false);
 
     std::string decode_key_press(XKeyEvent *key_event);
     CursorPosition cursor_position_from_pixels(int x, int y);
@@ -48,6 +49,7 @@ private:
     int m_depth { 0 };
     int m_font_width { 0 };
     int m_font_height { 0 };
+    int m_scroll_offset { 0 };
     CursorPosition m_mouse_pos;
     
     // Xft

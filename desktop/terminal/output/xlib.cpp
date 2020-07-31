@@ -164,11 +164,23 @@ std::string XLibOutput::update()
                         break;
                     
                     case Button4:
-                        // TODO: Scrollback up
+                        if (-m_scroll_offset < buffer().scroll_back() - 1)
+                        {
+                            m_scroll_offset -= 1;
+                            draw_scroll(0, rows(), -1);
+                            draw_row(0, true);
+                            flush_display();
+                        }
                         break;
 
                     case Button5:
-                        // TODO: Scrollback down
+                        if (m_scroll_offset < 0)
+                        {
+                            m_scroll_offset += 1;
+                            draw_scroll(0, rows(), 1);
+                            draw_row(rows() - 1, true);
+                            flush_display();
+                        }
                         break;
                 }
                 break;
@@ -233,6 +245,16 @@ std::string XLibOutput::update()
     return "";
 }
 
+void XLibOutput::draw_row(int row, bool refresh)
+{
+    for (int column = 0; column < columns(); column++)
+    {
+        auto pos = CursorPosition(column, row);
+        if (!isspace(buffer().rune_at_scroll_offset(pos, m_scroll_offset).value) || refresh)
+            draw_rune(pos);
+    }
+}
+
 void XLibOutput::redraw_all()
 {
     auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);    
@@ -242,14 +264,7 @@ void XLibOutput::redraw_all()
         0, 0, m_width, m_height);
 
     for (int row = 0; row < rows(); row++)
-    {
-        for (int column = 0; column < columns(); column++)
-        {
-            auto pos = CursorPosition(column, row);
-            if (!isspace(buffer().rune_at(pos).value))
-                draw_rune(pos);
-        }
-    }
+        draw_row(row);
 
     flush_display();
 }
@@ -334,7 +349,7 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
 
 void XLibOutput::draw_rune(const CursorPosition &pos)
 {
-    auto &rune = buffer().rune_at(pos);
+    auto &rune = buffer().rune_at_scroll_offset(pos, m_scroll_offset);
     auto color = rune.attribute.color();
 
     auto c = rune.value;
@@ -354,7 +369,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos)
 
 void XLibOutput::draw_cursor()
 {
-    auto &rune = buffer().rune_at(cursor());
+    auto &rune = buffer().rune_at_scroll_offset(cursor(), m_scroll_offset);
     auto color = current_attribute().color().inverted();
 
     auto c = rune.value;
