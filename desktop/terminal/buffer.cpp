@@ -14,20 +14,33 @@ Buffer::Buffer(int rows, int columns)
     allocate_new_buffer(rows, columns);
 }
 
-void Buffer::allocate_new_buffer(int rows, int columns)
+void Buffer::allocate_new_buffer(int new_rows, int new_columns)
 {
-    int old_buffer_size = m_rows * m_columns * sizeof(Rune);
-    int new_buffer_size = rows * columns * sizeof(Rune);
-    if (!m_buffer)
+    Rune *new_buffer = (Rune*)malloc(new_rows * new_columns * sizeof(Rune));
+    if (m_buffer == nullptr)
     {
-        old_buffer_size = 0;
-        m_buffer = (Rune*)malloc(new_buffer_size);
+        for (int i = 0; i < new_rows * new_columns; i++)
+            new_buffer[i] = blank_rune();
+        m_buffer = new_buffer;
+        return;
     }
-    else
-        m_buffer = (Rune*)realloc(m_buffer, new_buffer_size);
 
-    for (int i = old_buffer_size; i < new_buffer_size / (int)sizeof(Rune); i++)
-        m_buffer[i] = blank_rune();
+    const auto old_rows = m_rows, old_columns = m_columns;
+    for (int row = 0; row < new_rows; row++)
+    {
+        for (int column = 0; column < new_columns; column++)
+        {
+            auto new_index = row * new_columns + column;
+            auto old_index = row * old_columns + column;
+            if (row < old_rows && column < old_columns)
+                new_buffer[new_index] = m_buffer[old_index];
+            else
+                new_buffer[new_index] = blank_rune();
+        }
+    }
+
+    free(m_buffer);
+    m_buffer = new_buffer;
 }
 
 void Buffer::resize(int rows, int columns)

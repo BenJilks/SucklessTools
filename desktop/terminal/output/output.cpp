@@ -212,8 +212,8 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
         case 'M':
         case 'L':
         {
-            assert (arg_len == 0);
-            scroll(-1);
+            assert (arg_len <= 1);
+            scroll(arg_len ? -escape.args[0] : -1);
             break;
         }
 
@@ -279,7 +279,6 @@ void Output::scroll(int by)
 
     m_buffer.scroll(m_scroll_region_top, m_scroll_region_bottom, by);
     draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
-    //redraw_all();
 
     move_cursor_by(0, -by);
     m_last_cursor = m_cursor;

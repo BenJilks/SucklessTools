@@ -250,6 +250,8 @@ void XLibOutput::redraw_all()
                 draw_rune(pos);
         }
     }
+
+    flush_display();
 }
 
 std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
