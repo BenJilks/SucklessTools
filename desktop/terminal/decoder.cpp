@@ -32,6 +32,9 @@ Decoder::Result Decoder::parse(char c)
                             { 'D', { 1 }, false }
                         };
 
+                    case '\r':
+                        return { Result::Escape, 0, { 'G', {}, false } };
+
                     case '\t':
                         return { Result::Tab, 0, {} };
                     

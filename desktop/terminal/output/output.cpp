@@ -55,6 +55,11 @@ void Output::out_rune(uint32_t rune)
         scroll(m_cursor.row() - m_scroll_region_bottom);
 }
 
+void Output::set_mode(int mode, bool value)
+{
+    std::cout << "Set mode " << mode << ": " << value << "\n";
+}
+
 void Output::out_escape(Decoder::EscapeSequence &escape)
 {
     int arg_len = escape.args.size();
@@ -216,6 +221,16 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             scroll(arg_len ? -escape.args[0] : -1);
             break;
         }
+
+        case 'l':
+            assert (arg_len == 1);
+            set_mode(escape.args[0], false);
+            break;
+
+        case 'h':
+            assert (arg_len == 1);
+            set_mode(escape.args[0], true);
+            break;
 
         default:
             if (escape.command == 'l' || escape.command == 'h')

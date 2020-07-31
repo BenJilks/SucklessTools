@@ -29,6 +29,7 @@ protected:
 
     void resize(int rows, int columns);
     void scroll(int by);
+    void set_mode(int mode, bool value);
 
     void move_cursor_to(int column, int row);
     void move_cursor_by(int column, int row);
