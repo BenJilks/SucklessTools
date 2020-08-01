@@ -14,6 +14,7 @@ class Command
 {
 public:
 	Command() {}
+    virtual ~Command() = default;
 
 	virtual int execute() = 0;
 	virtual void execute_and_exit() { exit(execute()); }

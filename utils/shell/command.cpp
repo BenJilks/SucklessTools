@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <iostream>
 #include <sstream>
+#include <cassert>
 
 #define READ 		0
 #define WRITE 		1
@@ -172,6 +173,9 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 			left = std::make_unique<CommandOr>(
 				std::move(left), std::move(right));
 			break;
+
+        default:
+            assert (false);
 		}
 
 		peek = lexer.peek();

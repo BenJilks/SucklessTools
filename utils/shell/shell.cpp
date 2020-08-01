@@ -19,7 +19,13 @@ Shell &Shell::the()
 Shell::Shell()
 {
 	auto *pw = getpwuid(getuid());
-	home = std::string(pw->pw_dir);
+
+#ifdef __FreeBSD__
+    home = "/usr" + std::string(pw->pw_dir);
+#else
+    home = std::string(pw->pw_dir);
+#endif
+    std::cout << home << "\n";
 }
 
 void Shell::handle_int_signal()
@@ -91,7 +97,7 @@ void Shell::prompt()
 
 	auto insert = [&](const std::string &with)
 	{
-        if (cursor >= line.length())
+        if (cursor >= (int)line.length())
         {
             line += with;
             cursor += with.length();
@@ -168,7 +174,7 @@ void Shell::prompt()
 
 					// Navigation
 					case 'C': // Right
-						if (cursor < line.length())
+                        if (cursor < (int)line.length())
 						{
 							std::cout << line[cursor];
 							cursor += 1;
@@ -193,7 +199,7 @@ void Shell::prompt()
 					case '4': // End
 						std::getchar(); // Skip ~
 					case 'F': // Xterm end
-						for (int i = cursor; i < line.length(); i++)
+                        for (int i = cursor; i < (int)line.length(); i++)
 							std::cout << line[i];
 						cursor = line.length();
 						break;
@@ -342,7 +348,7 @@ std::string Shell::directory_name(const std::string &path)
 	return path.substr(last_slash_index, path.length() - last_slash_index);
 }
 
-static void s_handle_sig_int(int s)
+static void s_handle_sig_int(int)
 {
 	Shell::the().handle_int_signal();
 }

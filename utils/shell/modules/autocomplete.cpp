@@ -2,6 +2,7 @@
 #include "../shell.hpp"
 #include <filesystem>
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 #include <sys/ioctl.h>
 #include <unistd.h>
