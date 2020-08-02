@@ -1,4 +1,5 @@
 #pragma once
+#include "lexer.hpp"
 #include <string>
 #include <vector>
 #include <memory>
@@ -19,7 +20,7 @@ public:
 	virtual int execute() = 0;
 	virtual void execute_and_exit() { exit(execute()); }
 	
-	static std::unique_ptr<Command> parse(const std::string &source);
+    static std::unique_ptr<Command> parse(Lexer &lexer);
 	static void register_built_in(std::string name, BuiltIn func)
 	{
 		built_ins[name] = func;

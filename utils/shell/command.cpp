@@ -102,7 +102,8 @@ std::unique_ptr<Command> Command::parse_exec(Lexer &lexer)
 			case Token::Type::SubCommand:
 			{
 				auto source = lexer.consume(Token::Type::SubCommand)->data;
-				auto sub_command = parse(source);
+                Lexer lexer(source);
+                auto sub_command = parse(lexer);
 
 				StdOutCapture capture;
 				sub_command->execute();
@@ -184,9 +185,8 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 	return left;
 }
 
-std::unique_ptr<Command> Command::parse(const std::string &source)
+std::unique_ptr<Command> Command::parse(Lexer &lexer)
 {	
-	Lexer lexer(source);
 	auto command_list = std::make_unique<CommandList>();
 
 	for (;;)

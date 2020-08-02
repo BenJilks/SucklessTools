@@ -14,13 +14,12 @@ struct Token
 		With,
 		Variable,
 		VariableAssignment,
-		Glob,
 		SubCommand,
 		EndCommand
 	};
 
 	std::string data;
-	Type type;
+    Type type;
 };
 
 class Lexer
@@ -31,18 +30,37 @@ public:
 	std::optional<Token> peek(int count = 0);
 	std::optional<Token> consume(Token::Type type);
 
-private:
-	std::string parse_string();
-	std::optional<Token> parse_name();
-	std::optional<Token> parse_single_token(Token::Type type);
-	std::optional<Token> parse_double_token(Token::Type a, Token::Type b, char b_char);
-	std::optional<Token> parse_sub_command();
-	std::optional<Token> parse_variable();
-	std::optional<Token> next();
+    void insert_string(const std::string&);
+    std::function<bool(Token&, int)> hook_on_token;
 
-	std::vector<Token> peek_queue;
-	const std::string &source;
-	int pointer;
+private:
+    enum class State
+    {
+        Default,
+        Name,
+        Pipe,
+        And,
+        VariableStart,
+        VariableCurly,
+        Variable,
+        VariableAssignment,
+        VariableAssignmentString,
+        SubCommand,
+        Escape,
+        Escape03,
+        Escape033,
+    };
+
+    std::optional<Token> next();
+
+    State m_state { State::Default };
+    State m_return_state { State::Default };
+    bool m_should_reconsume { false };
+    char m_curr_char { 0 };
+    int m_index { 0 };
+
+    const std::string &m_source;
+    std::vector<Token> m_peek_queue;
+    int m_token_index { 0 };
 
 };
-

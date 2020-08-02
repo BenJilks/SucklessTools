@@ -1,4 +1,5 @@
 #pragma once
+#include "../lexer.hpp"
 #include <string>
 #include <functional>
 
@@ -12,10 +13,13 @@ public:
 		std::function<void(const std::string &)> insert,
 		std::function<void(const std::string &)> replace,
 		std::function<void(const std::string &)> message) 
-	{ return false; }
+    {
+        return false;
+    }
 
-	virtual bool hook_macro(std::string &line) { return false; }
+    virtual bool hook_on_token(Lexer&, Token&, int index) { return false; }
+
+    virtual bool hook_macro(std::string &line) { return false; }
 
 	static const std::string_view name() { return "Module"; }
 };
-

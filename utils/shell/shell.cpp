@@ -235,7 +235,20 @@ void Shell::prompt()
 
 void Shell::exec_line(const std::string &line)
 {
-	auto command = Command::parse(line);
+    Lexer lexer(line);
+    lexer.hook_on_token = [&](Token &token, int index)
+    {
+        bool should_discard = false;
+        for (auto &mod : modules)
+        {
+            if (mod->hook_on_token(lexer, token, index))
+                should_discard = true;
+        }
+
+        return should_discard;
+    };
+
+    auto command = Command::parse(lexer);
 	command->execute();
 }
 
@@ -375,7 +388,8 @@ void Shell::run_script(const std::string &file_path)
 	std::stringstream str_stream;
 	str_stream << stream.rdbuf();
 	
-	auto script = Command::parse(str_stream.str());
+    Lexer lexer(str_stream.str());
+    auto script = Command::parse(lexer);
 	script->execute();
 }
 

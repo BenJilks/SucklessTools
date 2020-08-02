@@ -18,4 +18,3 @@ private:
 	std::vector<std::string> find_completions(const std::string_view &start, bool search_path);
 
 };
-

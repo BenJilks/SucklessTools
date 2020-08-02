@@ -1,257 +1,312 @@
 #include "lexer.hpp"
 #include <iostream>
+#include <cassert>
 
 Lexer::Lexer(const std::string &source)
-	: source(source)
-	, pointer(0)
+    : m_source(source)
 {
-}
-
-static std::string parse_escapes(const std::string &str)
-{
-	std::string out;
-
-	for (int i = 0; i < str.length(); i++)
-	{
-		char c = str[i];
-		if (c == '\\')
-		{
-			if (i >= str.length() - 1)
-				continue;
-
-			c = str[++i];
-			switch (c)
-			{
-				case '\\': out += '\\'; break;
-				case 'n': out += '\n'; break;
-				case 'r': out += '\r'; break;
-				case 't': out += '\t'; break;
-				case '0':
-					if (i >= str.length() - 2)
-						break;
-
-					if (str[i+1] == '3' && str[i+2] == '3')
-					{
-						i += 2;
-						out += '\033';
-					}
-					break;
-			}
-
-			continue;
-		}
-		out += c;
-	}
-
-	return out;
-}
-
-std::string Lexer::parse_string()
-{
-	std::string buffer;
-	pointer += 1; // Skip '"'
-	while (pointer < source.length())
-	{
-		char c = source[pointer];
-		if (c == '"')
-			break;
-
-		buffer += c;
-		pointer += 1;
-	}
-
-	pointer += 1; // Skip "
-	return buffer;
-}
-
-std::optional<Token> Lexer::parse_name()
-{
-	std::string buffer;
-	auto type = Token::Type::Name;
-
-	for(;;)
-	{
-		char c = source[pointer];
-		if (std::isspace(c) || c == ';' || c == '|')
-			break;
-
-		switch (c)
-		{
-			case '=':
-				type = Token::Type::VariableAssignment;
-				break;
-
-			case '*':
-				type = Token::Type::Glob;
-				break;
-		}
-
-		if (c ==  '"')
-		{
-			buffer += parse_string();
-			break;
-		}
-
-		buffer += c;
-		pointer += 1;
-
-		if (pointer >= source.length())
-			break;
-	}
-
-	return Token { parse_escapes(buffer), type };
-}
-
-std::optional<Token> Lexer::peek(int count)
-{
-	if (count < peek_queue.size())
-		return peek_queue[count];
-
-	std::optional<Token> token;
-	for (int i = peek_queue.size() - 1; i < count; i++)
-	{
-		token = next();
-
-		if (token)
-			peek_queue.push_back(*token);
-	}
-
-	return token;
-}
-
-std::optional<Token> Lexer::consume(Token::Type type)
-{
-	if (peek_queue.empty())
-	{
-		auto token = next();
-		if (!token)
-			return std::nullopt;
-
-		if (token->type == type)
-			return token;
-		
-		peek_queue.push_back(*token);
-		return std::nullopt;
-	}
-	
-	auto token = peek_queue[0];
-	if (token.type != type)
-		return std::nullopt;
-	
-	peek_queue.erase(peek_queue.begin());
-	return token;
-}
-
-std::optional<Token> Lexer::parse_single_token(Token::Type type)
-{
-	char c = source[pointer];
-	pointer += 1;
-	
-	return Token { std::to_string(c), type };
-}
-
-std::optional<Token> Lexer::parse_double_token(
-	Token::Type a, Token::Type b, char b_char)
-{
-	std::string buffer = std::to_string(source[pointer]);
-	pointer += 1;
-
-	if (pointer < source.length())
-	{
-		char other = source[pointer];
-		if (other == b_char)
-		{
-			buffer += other;
-			pointer += 1;
-			return Token { buffer, b };
-		}
-	}
-
-	return Token { buffer, a };
-}
-
-std::optional<Token> Lexer::parse_sub_command()
-{
-	pointer += 1; // Skip '('
-
-	std::string buffer;
-	while (pointer < source.length())
-	{
-		char c = source[pointer];
-		if (c == ')')
-			break;
-
-		buffer += c;
-		pointer += 1;
-	}
-
-	pointer += 1; // Skip ')'
-	return Token { buffer, Token::Type::SubCommand };
-}
-
-std::optional<Token> Lexer::parse_variable()
-{	
-	pointer += 1; // Skip '$'
-	if (source[pointer] == '(')
-		return parse_sub_command();
-
-	bool braced = false;
-	if (source[pointer] == '{')
-	{
-		pointer += 1;
-		braced = true;
-	}
-
-	std::string buffer = "";
-	for (;;)
-	{
-		char c = source[pointer];
-		if (braced)
-		{
-			if (c == '}')
-			{
-				pointer += 1;
-				break;
-			}
-		}
-		else
-		{
-			if (!std::isalnum(c) && c != '_')
-				break;
-		}
-
-		buffer += c;
-		pointer += 1;
-	}
-
-	return Token { buffer, Token::Type::Variable };
 }
 
 std::optional<Token> Lexer::next()
 {
-	while (pointer < source.length())
-	{
-		char c = source[pointer];
+    std::string buffer;
 
-		switch(c)
-		{
-			case '|': return parse_double_token(Token::Type::Pipe, Token::Type::Or, '|');
-			case '&': return parse_double_token(Token::Type::With, Token::Type::And, '&');
-			case '\n':
-			case ';': return parse_single_token(Token::Type::EndCommand);
-			case '$': return parse_variable();
-			default: break;
-		}
+    for (;;)
+    {
+        if (!m_should_reconsume)
+            m_curr_char = (m_index < (int)m_source.size()) ? m_source[m_index++] : 0;
+        m_should_reconsume = false;
 
-		if (std::isspace(c))
-		{
-			pointer += 1;
-			continue;
-		}
+        switch (m_state)
+        {
+            case State::Default:
+                if (!m_curr_char)
+                    return std::nullopt;
 
-		return parse_name();
-	}
+                if (m_curr_char == '\n')
+                    return Token { "\n", Token::Type::EndCommand };
 
-	return std::nullopt;
+                if (isspace(m_curr_char))
+                    break;
+
+                switch (m_curr_char)
+                {
+                    case '|':
+                        m_state = State::Pipe;
+                        break;
+                    case '&':
+                        m_state = State::And;
+                        break;
+                    case '$':
+                        m_state = State::VariableStart;
+                        break;
+                    case ';':
+                        return Token { ";", Token::Type::EndCommand };
+
+                    default:
+                        m_state = State::Name;
+                        m_should_reconsume = true;
+                        break;
+                }
+
+                break;
+
+            case State::Name:
+                if (m_curr_char == '=')
+                {
+                    buffer += "=";
+                    m_state = State::VariableAssignment;
+                    break;
+                }
+
+                if (m_curr_char == '\\')
+                {
+                    m_return_state = m_state;
+                    m_state = State::Escape;
+                    break;
+                }
+
+                if (isspace(m_curr_char) || m_curr_char == ';' || m_curr_char == '&' || m_curr_char == '|' || !m_curr_char)
+                {
+                    m_state = State::Default;
+                    m_should_reconsume = true;
+                    return Token { buffer, Token::Type::Name };
+                }
+
+                buffer += m_curr_char;
+                break;
+
+            case State::Pipe:
+                if (m_curr_char == '|')
+                {
+                    m_state = State::Default;
+                    return Token { "||", Token::Type::Or };
+                }
+
+                m_state = State::Default;
+                m_should_reconsume = true;
+                return Token { "|", Token::Type::Pipe };
+
+            case State::And:
+                if (m_curr_char == '&')
+                {
+                    m_state = State::Default;
+                    return Token { "&&", Token::Type::And };
+                }
+
+                m_state = State::Default;
+                m_should_reconsume = true;
+                return Token { "&", Token::Type::With };
+
+            case State::VariableStart:
+                if (m_curr_char == '{')
+                {
+                    m_state = State::VariableCurly;
+                    break;
+                }
+
+                if (m_curr_char == '(')
+                {
+                    m_state = State::SubCommand;
+                    break;
+                }
+
+                m_state = State::Variable;
+                m_should_reconsume = true;
+                break;
+
+            case State::Variable:
+                if (m_curr_char == '\\')
+                {
+                    m_return_state = m_state;
+                    m_state = State::Escape;
+                    break;
+                }
+
+                if (!isalnum(m_curr_char))
+                {
+                    m_state = State::Default;
+                    m_should_reconsume = true;
+                    return Token { buffer, Token::Type::Variable };
+                    break;
+                }
+
+                buffer += m_curr_char;
+                break;
+
+            case State::VariableCurly:
+                if (m_curr_char == '\\')
+                {
+                    m_return_state = m_state;
+                    m_state = State::Escape;
+                    break;
+                }
+
+                if (m_curr_char == '}' || !m_curr_char)
+                {
+                    m_state = State::Default;
+                    m_should_reconsume = true;
+                    return Token { buffer, Token::Type::Variable };
+                }
+
+                buffer += m_curr_char;
+                break;
+
+            case State::VariableAssignment:
+                if (m_curr_char == '"')
+                {
+                    m_state = State::VariableAssignmentString;
+                    break;
+                }
+
+                if (m_curr_char == '\\')
+                {
+                    m_return_state = m_state;
+                    m_state = State::Escape;
+                    break;
+                }
+
+                if (!isalnum(m_curr_char))
+                {
+                    m_state = State::Default;
+                    m_should_reconsume = true;
+                    return Token { buffer, Token::Type::VariableAssignment };
+                    break;
+                }
+
+                buffer += m_curr_char;
+                break;
+
+            case State::VariableAssignmentString:
+                if (m_curr_char == '\\')
+                {
+                    m_return_state = m_state;
+                    m_state = State::Escape;
+                    break;
+                }
+
+                if (m_curr_char == '"' || !m_curr_char)
+                {
+                    m_state = State::Default;
+                    return Token { buffer, Token::Type::VariableAssignment };
+                }
+
+                buffer += m_curr_char;
+                break;
+
+            case State::SubCommand:
+                if (m_curr_char == '\\')
+                {
+                    m_return_state = m_state;
+                    m_state = State::Escape;
+                    break;
+                }
+
+                if (m_curr_char == ')' || !m_curr_char)
+                {
+                    m_state = State::Default;
+                    m_should_reconsume = true;
+                    return Token { buffer, Token::Type::SubCommand };
+                }
+
+                buffer += m_curr_char;
+                break;
+
+            case State::Escape:
+                if (m_curr_char == '0')
+                {
+                    m_state = State::Escape03;
+                    break;
+                }
+
+                switch (m_curr_char)
+                {
+                    case '\\': buffer += '\\'; break;
+                    case 'n': buffer += '\n'; break;
+                    case 'r': buffer += '\r'; break;
+                    case 't': buffer += '\t'; break;
+                    default:
+                        buffer += "\\";
+                        buffer += m_curr_char;
+                        break;
+                }
+
+                m_state = m_return_state;
+                break;
+
+            case State::Escape03:
+                if (m_curr_char == '3')
+                {
+                    m_state = State::Escape033;
+                    break;
+                }
+
+                buffer += "\\0";
+                buffer += m_curr_char;
+                m_state = m_return_state;
+                break;
+
+            case State::Escape033:
+                if (m_curr_char == '3')
+                {
+                    m_state = m_return_state;
+                    buffer += "\033";
+                    break;
+                }
+
+                buffer += "\\03";
+                buffer += m_curr_char;
+                m_state = m_return_state;
+                break;
+        }
+    }
 }
 
+std::optional<Token> Lexer::peek(int count)
+{
+    while (count >= (int)m_peek_queue.size())
+    {
+        auto token = next();
+        if (!token)
+            return std::nullopt;
+
+        bool should_discard = false;
+        if (hook_on_token)
+            should_discard = hook_on_token(*token, m_token_index);
+
+        if (!should_discard)
+        {
+            m_peek_queue.push_back(*token);
+            m_token_index += 1;
+        }
+    }
+
+    return m_peek_queue[count];
+}
+
+std::optional<Token> Lexer::consume(Token::Type type)
+{
+    auto token = peek();
+    if (!token)
+        return std::nullopt;
+
+    if (token->type != type)
+        return std::nullopt;
+
+    m_peek_queue.erase(m_peek_queue.begin());
+    return token;
+}
+
+void Lexer::insert_string(const std::string &str)
+{
+    Lexer sub_lexer(str);
+    for (;;)
+    {
+        auto token = sub_lexer.next();
+        if (!token)
+            break;
+
+        m_peek_queue.push_back(*token);
+        m_token_index += 1;
+    }
+}

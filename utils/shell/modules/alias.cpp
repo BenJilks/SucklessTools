@@ -35,29 +35,19 @@ AliasModule::AliasModule()
 	});
 }
 
-bool AliasModule::hook_macro(std::string &line)
+bool AliasModule::hook_on_token(Lexer &lexer, Token &token, int index)
 {
-	for (const auto &value : aliases)
-	{
-		auto alias = value.first;
-		auto start = std::string_view(line.c_str(), alias.length());
-		if (start == alias)
-		{
-			if (line.length() == alias.length())
-			{
-				line = value.second;
-				return true;
-			}
+    if (index != 0)
+        return false;
 
-			if (line[alias.length()] != ' ')
-				return false;
+    for (const auto &[alias, value] : aliases)
+    {
+        if (token.data == alias)
+        {
+            lexer.insert_string(value);
+            return true;
+        }
+    }
 
-			line = value.second + line.substr(
-				alias.length(), line.length() - alias.length());
-			return true;
-		}
-	}
-
-	return false;
+    return false;
 }
-

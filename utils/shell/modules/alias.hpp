@@ -8,7 +8,7 @@ class AliasModule : public Module
 public:
 	AliasModule();
 
-	virtual bool hook_macro(std::string &line) override;
+    virtual bool hook_on_token(Lexer&, Token&, int index) override;
 
 private:
 	std::map<std::string, std::string> aliases;
