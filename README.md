@@ -12,9 +12,14 @@ This contains a mixture of my own tools and 3rd party ones. The aim of this proj
 | Shell | shell | own |
 | Cron | crond | own |
 | Audio Control | pamixer | cdemoulins |
+| Finance Management | debtorsbook | own |
+| Email Client | emails | own (in progress) |
 
 ## Libraries
 | For | Name | By |
 | -- | -- | -- |
 | Json Parsing | libjson | own |
+| Data Base | database | own |
+| Ini Parser | libconfig | own |
+| Web Server | webinterface | own |
 
