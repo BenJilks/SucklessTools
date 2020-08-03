@@ -24,7 +24,7 @@ public:
 	std::string simplify_path(const std::string &path);
 	std::string expand_path(const std::string &path);
 	std::string directory_name(const std::string &path);
-	inline const std::string &get_home() const { return home; }
+    inline const std::string &get_home() const { return m_home; }
 
 	void set(std::string env, const std::string &value);
 	std::string get(std::string env);
@@ -32,7 +32,7 @@ public:
 	template<typename ModuleType>
 	void add_module()
 	{
-		modules.push_back(std::make_unique<ModuleType>());
+        m_modules.push_back(std::make_unique<ModuleType>());
 	}
 
 	static std::string replace_all(std::string str, 
@@ -40,21 +40,24 @@ public:
 		const std::string &to);
 
 private:
-	void exec_line(const std::string &line);
-	std::string substitute_variables(const std::string &);
+    std::string substitute_variables(const std::string &);
+    void exec_line(const std::string &line);
     char next_char();
 
-	std::string line;
-	int cursor;
+    void load_history();
+    void save_history();
 
-	std::vector<pid_t> bg_processes;
-	pid_t fg_process { -1 };
+    std::string m_line;
+    int m_cursor;
 
-	std::map<std::string, std::string> env_buffer;
-	std::vector<std::string> command_history;
-	std::vector<std::unique_ptr<Module>> modules;
-	std::string home { "/" };
-	bool should_exit { false };
-	bool cancel_line { false };
+    std::vector<pid_t> m_bg_processes;
+    pid_t m_fg_process { -1 };
+
+    std::map<std::string, std::string> m_env_buffer;
+    std::vector<std::string> m_command_history;
+    std::vector<std::unique_ptr<Module>> m_modules;
+    std::string m_home { "/" };
+    bool m_should_exit { false };
+    bool m_cancel_line { false };
 };
 
