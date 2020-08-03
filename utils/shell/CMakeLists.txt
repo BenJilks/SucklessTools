@@ -12,6 +12,10 @@ set(SOURCES
     modules/autocomplete.cpp
     modules/builtins.cpp
     modules/alias.cpp
+    modules/glob.cpp
     main.cpp)
 
 add_executable(shell ${SOURCES})
+
+install(TARGETS shell
+    RUNTIME DESTINATION bin)

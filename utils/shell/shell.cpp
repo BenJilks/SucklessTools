@@ -25,7 +25,6 @@ Shell::Shell()
 #else
     home = std::string(pw->pw_dir);
 #endif
-    std::cout << home << "\n";
 }
 
 void Shell::handle_int_signal()

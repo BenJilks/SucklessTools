@@ -39,11 +39,6 @@ std::pair<std::string, std::string> Command::parse_assignment(Lexer &lexer)
 	return std::make_pair(name, value);
 }
 
-static std::string parse_glob(const std::string &glob)
-{
-	return "";
-}
-
 class StdOutCapture
 {
 public:

@@ -6,6 +6,7 @@ namespace fs = std::filesystem;
 #include "modules/autocomplete.hpp"
 #include "modules/builtins.hpp"
 #include "modules/alias.hpp"
+#include "modules/glob.hpp"
 
 void run_if_exists(const std::string &file_path)
 {
@@ -16,9 +17,10 @@ void run_if_exists(const std::string &file_path)
 int main(int argc, char *argv[])
 {
 	Shell::the().set("PS1", "Shell $ ");
-	Shell::the().set("SHELL", argv[0]);
+    Shell::the().set("SHELL", "/usr/local/bin/shell");
 	Shell::the().add_module<BuiltInsModule>();
 	Shell::the().add_module<AliasModule>();
+    Shell::the().add_module<GlobModule>();
 
 	if (argc <= 1)
 	{
