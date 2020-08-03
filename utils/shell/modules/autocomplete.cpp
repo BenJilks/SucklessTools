@@ -25,9 +25,9 @@ static std::string find_name(const std::string &str)
 
 static std::string print_grid(const std::vector<std::string> &strs)
 {
-	size_t max_len = 0;
+    int max_len = 0;
 	for (const auto &str : strs)
-		max_len = std::max(str.length(), max_len);
+        max_len = std::max((int)str.length(), max_len);
 	max_len += 2;
 
 	struct winsize size;
@@ -35,11 +35,11 @@ static std::string print_grid(const std::vector<std::string> &strs)
 	int coloumn_count = size.ws_col / max_len;
 
 	std::stringstream stream;
-	for (int i = 0; i < strs.size(); i++)
+    for (int i = 0; i < (int)strs.size(); i++)
 	{
 		const auto &str = strs[i];
 		stream << str;
-		for (int j = 0; j < max_len - str.length(); j++)
+        for (int j = 0; j < max_len - (int)str.length(); j++)
 			stream << " ";
 
 		if ((i + 1) % coloumn_count == 0)
@@ -52,7 +52,7 @@ static std::string print_grid(const std::vector<std::string> &strs)
 bool AutoCompleteModule::hook_input(char c, 
 	const std::string &line, int cursor,
 	std::function<void(const std::string &)> insert,
-	std::function<void(const std::string &)> replace,
+    std::function<void(const std::string &)>,
 	std::function<void(const std::string &)> message)
 {
 	if (c != '\t')
@@ -83,7 +83,7 @@ bool AutoCompleteModule::hook_input(char c,
 		for (const auto &option : options)
 		{
 			int index = curr_word.length() + patch.length();
-			if (index > option.length())
+            if (index > (int)option.length())
 			{
 				next_char = 0;
 				break;
@@ -159,12 +159,15 @@ std::vector<std::string> AutoCompleteModule::find_completions(
 	}
 
 	// Look through local paths
-	for (const auto &entry : fs::directory_iterator(Shell::the().expand_path(local_path)))
-	{
-		auto filename = std::string(path) + std::string(entry.path().filename());
-		if (filename.rfind(start, 0) == 0)
-			options.push_back(filename);
-	}
+    if (fs::is_directory(Shell::the().expand_path(local_path)))
+    {
+        for (const auto &entry : fs::directory_iterator(Shell::the().expand_path(local_path)))
+        {
+            auto filename = std::string(path) + std::string(entry.path().filename());
+            if (filename.rfind(start, 0) == 0)
+                options.push_back(filename);
+        }
+    }
 
 	// If search path is enabled, look through all the paths in the envirement $PATH
 	// variable for options
@@ -173,17 +176,20 @@ std::vector<std::string> AutoCompleteModule::find_completions(
 		auto env_path = Shell::the().get("PATH");
 		std::string buffer;
 		
-		for (int i = 0; i < env_path.length(); i++)
+        for (int i = 0; i < (int)env_path.length(); i++)
 		{
 			char c = env_path[i];
 			if (c == ':')
 			{
-				for (const auto &entry : fs::directory_iterator(buffer))
-				{
-					auto filename = std::string(entry.path().filename());
-					if (filename.rfind(start, 0) == 0)
-						options.push_back(filename);
-				}
+                if (fs::is_directory(buffer))
+                {
+                    for (const auto &entry : fs::directory_iterator(buffer))
+                    {
+                        auto filename = std::string(entry.path().filename());
+                        if (filename.rfind(start, 0) == 0)
+                            options.push_back(filename);
+                    }
+                }
 
 				buffer = "";
 				continue;
