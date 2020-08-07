@@ -420,8 +420,7 @@ void Shell::run_script(const std::string &file_path)
 
 void Shell::set(std::string name, const std::string &value)
 {
-    m_env_buffer[name] = name + "=" + value;
-    putenv(m_env_buffer[name].data());
+    setenv(name.c_str(), value.c_str(), 1);
 }
 
 std::string Shell::get(std::string name)
@@ -432,4 +431,3 @@ std::string Shell::get(std::string name)
 	
 	return env;
 }
-

@@ -53,11 +53,9 @@ private:
     std::vector<pid_t> m_bg_processes;
     pid_t m_fg_process { -1 };
 
-    std::map<std::string, std::string> m_env_buffer;
     std::vector<std::string> m_command_history;
     std::vector<std::unique_ptr<Module>> m_modules;
     std::string m_home { "/" };
     bool m_should_exit { false };
     bool m_cancel_line { false };
 };
-

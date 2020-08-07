@@ -25,10 +25,10 @@ struct Token
 class Lexer
 {
 public:
-	Lexer(const std::string &source);
+    Lexer(const std::string &source);
 
-	std::optional<Token> peek(int count = 0);
-	std::optional<Token> consume(Token::Type type);
+    std::optional<Token> peek(int count = 0);
+    std::optional<Token> consume(Token::Type type);
 
     void insert_string(const std::string&);
     std::function<bool(Token&, int)> hook_on_token;
@@ -59,7 +59,7 @@ private:
     char m_curr_char { 0 };
     int m_index { 0 };
 
-    const std::string &m_source;
+    std::string m_source;
     std::vector<Token> m_peek_queue;
     int m_token_index { 0 };
 

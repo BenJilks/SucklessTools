@@ -1,6 +1,7 @@
 #include "lexer.hpp"
 #include <iostream>
 #include <cassert>
+#include <iostream>
 
 Lexer::Lexer(const std::string &source)
     : m_source(source)
@@ -171,7 +172,6 @@ std::optional<Token> Lexer::next()
                     m_state = State::Default;
                     m_should_reconsume = true;
                     return Token { buffer, Token::Type::VariableAssignment };
-                    break;
                 }
 
                 buffer += m_curr_char;
