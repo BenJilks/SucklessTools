@@ -62,7 +62,7 @@ void Terminal::init()
         close(m_master);
     
         const auto *shell = getenv("SHELL");
-        setenv("TERM", "st-16color", 1);
+        setenv("TERM", "vt100-color", 1);
         if (execl(shell, shell, nullptr) < 0)
             perror("system()");
         exit(-1);

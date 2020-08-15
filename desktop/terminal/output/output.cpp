@@ -6,7 +6,6 @@
 
 void Output::resize(int rows, int columns)
 {
-    std::cout << "Resize: (" << rows << ", " << columns << ")\n";
     m_buffer.resize(rows, columns);
     m_scroll_region_top = 0;
     m_scroll_region_bottom = rows - 1;
@@ -206,6 +205,13 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
         }
 
+        case 'c':
+        {
+            assert (arg_len <= 1);
+            input("\033[?6c");
+            break;
+        }
+
         case 'r':
         {
             assert (arg_len == 2);
@@ -283,7 +289,7 @@ void Output::out(std::string_view buff)
     }
 
     draw_rune(m_last_cursor);
-    draw_cursor();
+    draw_rune(m_cursor, true);
     m_last_cursor = m_cursor;
     flush_display();
 }

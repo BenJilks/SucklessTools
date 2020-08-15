@@ -22,10 +22,10 @@ public:
     
 protected:
     virtual void redraw_all() = 0;
-    virtual void draw_rune(const CursorPosition&) = 0;
-    virtual void draw_cursor() = 0;
+    virtual void draw_rune(const CursorPosition&, bool selected = false) = 0;
     virtual void draw_scroll(int begin, int end, int by) = 0;
     virtual void flush_display() = 0;
+    virtual void input(const std::string&) = 0;
 
     void resize(int rows, int columns);
     void scroll(int by);

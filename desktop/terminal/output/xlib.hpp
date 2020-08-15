@@ -33,11 +33,15 @@ public:
 
 private:
     virtual void redraw_all() override;
-    virtual void draw_rune(const CursorPosition&) override;
-    virtual void draw_cursor() override;
+    virtual void draw_rune(const CursorPosition&, bool selected = false) override;
     virtual void draw_scroll(int begin, int end, int by) override;
     virtual void flush_display() override;
+    virtual void input(const std::string&) override;
     void draw_row(int row, bool refresh = false);
+    void draw_update_selection(const CursorPosition &new_end_pos);
+
+    template<typename CallbackFunc>
+    void for_rune_in_selection(CallbackFunc callback);
 
     std::string decode_key_press(XKeyEvent *key_event);
     CursorPosition cursor_position_from_pixels(int x, int y);
@@ -50,7 +54,11 @@ private:
     int m_font_width { 0 };
     int m_font_height { 0 };
     int m_scroll_offset { 0 };
+    bool m_in_selection { false };
+    CursorPosition m_selection_start;
+    CursorPosition m_selection_end;
     CursorPosition m_mouse_pos;
+    std::string m_input_buffer;
     
     // Xft
     XftFont *m_font;

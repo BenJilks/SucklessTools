@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cstring>
 #include <unistd.h>
+#include <cmath>
 
 #include "../config.hpp"
 
@@ -110,40 +111,27 @@ void XLibOutput::load_font(const std::string &&name, int size)
 
 CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
 {
-    int curr_y = 0;
-    for (int row = 0; row < rows(); row++)
-    {
-        if (y >= curr_y && y <= curr_y + m_font->height)
-        {
-            // We've found the row, now find the coloumn
-            int curr_x = 0;
-            
-            for (int coloumn = 0; coloumn < columns(); coloumn++)
-            {
-                auto rune = buffer().rune_at(CursorPosition(coloumn, row));
-                
-                XGlyphInfo extents;
-                XftTextExtentsUtf8(m_display, m_font, 
-                    (const FcChar8 *)&rune.value, 1, &extents);
-                
-                curr_x += extents.xOff;
-                if (x >= curr_x && x <= curr_x + extents.xOff)
-                    return CursorPosition(coloumn, row);
-            }
-            
-            // If no coloumn was found, then make it the end of the line
-            return CursorPosition(columns() - 1, row);
-        }
+    return CursorPosition(
+        roundf(x / m_font_width),
+        roundf(y / m_font_height));
+}
 
-        curr_y += m_font->height;
-    }
-
-    // If no row was found, make it the last line
-    return CursorPosition(0, rows());
+void XLibOutput::input(const std::string &msg)
+{
+    m_input_buffer += msg;
+    write(input_file(), m_input_buffer.data(), m_input_buffer.size());
 }
 
 std::string XLibOutput::update()
 {
+    if (!m_input_buffer.empty())
+    {
+        auto msg = m_input_buffer;
+        m_input_buffer.clear();
+
+        return msg;
+    }
+
     XEvent event;
     while (XNextEvent(m_display, &event) == 0)
     {
@@ -160,7 +148,14 @@ std::string XLibOutput::update()
                 switch (event.xbutton.button)
                 {
                     case Button1:
-                        // TODO: Start a new selection
+                        for_rune_in_selection([this](const CursorPosition &pos)
+                        {
+                            draw_rune(pos);
+                        });
+                        m_selection_start = m_mouse_pos;
+                        m_selection_end = m_mouse_pos;
+                        m_in_selection = true;
+                        flush_display();
                         break;
                     
                     case Button4:
@@ -189,7 +184,7 @@ std::string XLibOutput::update()
                 switch (event.xbutton.button)
                 {
                     case Button1:
-                        // TODO: End selection
+                        m_in_selection = false;
                         break;
                 }
                 break;
@@ -199,8 +194,9 @@ std::string XLibOutput::update()
                 auto x = event.xmotion.x;
                 auto y = event.xmotion.y;
                 m_mouse_pos = cursor_position_from_pixels(x, y);
-                
-                // TODO: Update selection
+
+                if (m_in_selection)
+                    draw_update_selection(m_mouse_pos);
                 break;
             }
              
@@ -213,6 +209,10 @@ std::string XLibOutput::update()
                     auto rows = (m_height / m_font_height);
                     auto columns = (m_width / m_font_width);
 
+                    // Noop, so don't bother resizing anything
+                    if (rows == this->rows() && columns == this->columns())
+                        break;
+
                     if (on_resize)
                     {
                         // Tell the terminal program that we've resized
@@ -222,14 +222,14 @@ std::string XLibOutput::update()
                         size.ws_xpixel = m_width;
                         size.ws_ypixel = m_height;
 
-                        on_resize(size);
                         resize(rows, columns);
+                        on_resize(size);
                     }
 
                     // Create a new back buffer with the new size
                     XFreePixmap(m_display, m_pixel_buffer);
                     m_pixel_buffer = XCreatePixmap(m_display, m_window, 
-                        m_width, m_height, m_depth);
+                        m_width + m_font_width, m_height + m_font_height, m_depth);
                     
                     // We need to tell Xft about the new buffer
                     XftDrawDestroy(m_draw);
@@ -243,6 +243,41 @@ std::string XLibOutput::update()
     }
     
     return "";
+}
+
+template<typename CallbackFunc>
+void XLibOutput::for_rune_in_selection(CallbackFunc callback)
+{
+    auto start = m_selection_start;
+    auto end = m_selection_end;
+    if (start.row() > end.row())
+        std::swap(start, end);
+
+    for (int row = start.row(); row <= end.row(); row++)
+    {
+        auto start_column = (row == start.row() ? start.coloumn() : 0);
+        auto end_column = (row == end.row() ? end.coloumn() : columns());
+        if (start_column > end_column)
+            std::swap(start_column, end_column);
+
+        for (int column = start_column; column < end_column; column++)
+            callback(CursorPosition(column, row));
+    }
+}
+
+void XLibOutput::draw_update_selection(const CursorPosition &new_end_pos)
+{
+    for_rune_in_selection([this](const CursorPosition &pos)
+    {
+        draw_rune(pos);
+    });
+
+    m_selection_end = new_end_pos;
+    for_rune_in_selection([this](const CursorPosition &pos)
+    {
+        draw_rune(pos, true);
+    });
+    flush_display();
 }
 
 void XLibOutput::draw_row(int row, bool refresh)
@@ -287,6 +322,8 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
 
         case XK_Home: return "\033[H";
         case XK_End: return "\033[F";
+        case XK_Page_Up: return "\033[5~";
+        case XK_Page_Down: return "\033[6~";
 
         case XK_BackSpace: return "\b";
     }
@@ -325,6 +362,9 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         XFillRectangle(m_display, m_pixel_buffer, m_gc, 
             0, 0, m_width, top_of_buffer - by_pixels + m_font_height);
     }
+
+    m_selection_start.move_by(0, -by);
+    m_selection_end.move_by(0, -by);
 }
 
 XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
@@ -347,34 +387,16 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
     return m_text_pallet.white;
 }
 
-void XLibOutput::draw_rune(const CursorPosition &pos)
+void XLibOutput::draw_rune(const CursorPosition &pos, bool selected)
 {
     auto &rune = buffer().rune_at_scroll_offset(pos, m_scroll_offset);
     auto color = rune.attribute.color();
+    if (selected)
+        color = color.inverted();
 
     auto c = rune.value;
     auto x = (pos.coloumn() + 1) * m_font_width;
     auto y = (pos.row() + 1) * m_font_height;
-    XSetForeground(m_display, m_gc, color.background_int());
-    XFillRectangle(m_display, m_pixel_buffer, m_gc,
-        x, y - m_font_height + 4, m_font_width, m_font_height);
-
-    if (!isspace(rune.value))
-    {
-        auto glyph = XftCharIndex(m_display, m_font, c);
-        XftDrawGlyphs(m_draw, &text_color_from_terminal(color),
-            m_font, x, y, &glyph, 1);
-    }
-}
-
-void XLibOutput::draw_cursor()
-{
-    auto &rune = buffer().rune_at_scroll_offset(cursor(), m_scroll_offset);
-    auto color = current_attribute().color().inverted();
-
-    auto c = rune.value;
-    auto x = (cursor().coloumn() + 1) * m_font_width;
-    auto y = (cursor().row() + 1) * m_font_height;
     XSetForeground(m_display, m_gc, color.background_int());
     XFillRectangle(m_display, m_pixel_buffer, m_gc,
         x, y - m_font_height + 4, m_font_width, m_font_height);
