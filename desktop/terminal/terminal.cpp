@@ -98,6 +98,11 @@ void Terminal::run_event_loop()
             }
             
             m_output.out(std::string_view(read_buf, ret));
+
+            // Exit when slave pid has exited
+            int status;
+            if (waitpid(m_slave_pid, &status, WNOHANG) != 0)
+                break;
         }
         
         if (FD_ISSET(m_output.input_file(), &fds))
