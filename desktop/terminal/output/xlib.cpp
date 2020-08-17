@@ -125,6 +125,13 @@ void XLibOutput::input(const std::string &msg)
     m_input_buffer += msg;
 }
 
+static uint64_t current_time_in_milliseconds()
+{
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return time.tv_sec * 1000000 + time.tv_usec;
+}
+
 std::string XLibOutput::update()
 {
     if (!m_input_buffer.empty())
@@ -154,11 +161,20 @@ std::string XLibOutput::update()
 
             case KeyRelease:
                 return decode_key_release(&event.xkey);
-            
+
             case ButtonPress:
                 switch (event.xbutton.button)
                 {
                     case Button1:
+                        if (current_time_in_milliseconds() - m_time_after_last_click < 200 * 1000)
+                        {
+                            // Double click
+                            select_word_under_mouse();
+                            m_time_after_last_click = current_time_in_milliseconds();
+                            m_in_selection = true;
+                            break;
+                        }
+
                         for_rune_in_selection([this](const CursorPosition &pos)
                         {
                             draw_rune(pos);
@@ -167,6 +183,7 @@ std::string XLibOutput::update()
                         m_selection_end = m_mouse_pos;
                         m_in_selection = true;
                         flush_display();
+                        m_time_after_last_click = current_time_in_milliseconds();
                         break;
 
                     case Button2:
@@ -264,6 +281,34 @@ std::string XLibOutput::update()
     return "";
 }
 
+void XLibOutput::select_word_under_mouse()
+{
+    int start = 0;
+    int end = columns() - 1;
+
+    for (int i = m_mouse_pos.coloumn(); i >= 0; i--)
+    {
+        if (isspace(buffer().rune_at(m_mouse_pos.column_offset(i)).value))
+        {
+            start = i + 1;
+            break;
+        }
+    }
+
+    for (int i = m_mouse_pos.coloumn(); i < columns(); i++)
+    {
+        if (isspace(buffer().rune_at(m_mouse_pos.column_offset(i)).value))
+        {
+            end = i;
+            break;
+        }
+    }
+
+    auto new_selection_end = CursorPosition(end, m_mouse_pos.row());
+    m_selection_start = CursorPosition(start, m_mouse_pos.row());
+    draw_update_selection(new_selection_end);
+}
+
 void XLibOutput::copy()
 {
     if (m_selection_start != m_selection_end)
@@ -275,8 +320,6 @@ void XLibOutput::copy()
             text += (char)buffer().rune_at(pos).value;
         });
     }
-
-//    std::cout << m_clip_board->paste() << "\n";
 }
 
 std::string XLibOutput::paste()

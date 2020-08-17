@@ -49,8 +49,9 @@ private:
     std::string decode_key_press(XKeyEvent *key_event);
     std::string decode_key_release(XKeyEvent *key_event);
     CursorPosition cursor_position_from_pixels(int x, int y);
-    void load_font(const std::string &&name, int size);
     XftColor &text_color_from_terminal(TerminalColor color);
+    void load_font(const std::string &&name, int size);
+    void select_word_under_mouse();
     
     int m_width { 0 };
     int m_height { 0 };
@@ -78,6 +79,7 @@ private:
     GC m_gc;
     int m_screen;
     int m_color_map;
+    uint64_t m_time_after_last_click { 0 };
     Atom m_wm_delete_message;
     std::unique_ptr<XClipBoard> m_clip_board;
     
