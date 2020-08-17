@@ -400,10 +400,7 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         XFillRectangle(m_display, m_pixel_buffer, m_gc,
             0, bottom_of_buffer - by_pixels, m_width, by_pixels);
         for (int i = end - by; i < end; i++)
-        {
-            std::cout << "Draw row: " << i << "\n";
             draw_row(i, true);
-        }
     }
     else
     {
