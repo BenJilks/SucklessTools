@@ -16,6 +16,7 @@ set(SOURCES
     attribute.cpp
     output/output.cpp
     output/xlib.cpp
+    output/xclipboard.cpp
 )
 
 add_executable(terminal ${SOURCES})

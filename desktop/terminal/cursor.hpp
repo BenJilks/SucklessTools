@@ -27,6 +27,12 @@ public:
         m_coloumn += coloumn;
         m_row += row;
     }
+
+    bool operator ==(const CursorPosition &other) const
+    {
+        return m_row == other.m_row && m_coloumn == other.m_coloumn;
+    }
+    bool operator !=(const CursorPosition &other) const { return !(*this == other); }
     
 private:
     int m_coloumn { 0 };

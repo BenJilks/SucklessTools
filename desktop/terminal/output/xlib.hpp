@@ -1,5 +1,6 @@
 #pragma once
 #include "output.hpp"
+#include "xclipboard.hpp"
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
 #include <string>
@@ -39,6 +40,8 @@ private:
     virtual void input(const std::string&) override;
     void draw_row(int row, bool refresh = false);
     void draw_update_selection(const CursorPosition &new_end_pos);
+    void copy();
+    std::string paste();
 
     template<typename CallbackFunc>
     void for_rune_in_selection(CallbackFunc callback);
@@ -76,5 +79,6 @@ private:
     int m_screen;
     int m_color_map;
     Atom m_wm_delete_message;
+    std::unique_ptr<XClipBoard> m_clip_board;
     
 };

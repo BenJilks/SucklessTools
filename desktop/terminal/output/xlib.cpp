@@ -62,6 +62,7 @@ XLibOutput::XLibOutput()
 
     m_wm_delete_message = XInternAtom(m_display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(m_display, m_window, &m_wm_delete_message, 1);
+    m_clip_board = std::make_unique<XClipBoard>(m_display, m_window);
 }
 
 void XLibOutput::load_font(const std::string &&name, int size)
@@ -167,6 +168,14 @@ std::string XLibOutput::update()
                         m_in_selection = true;
                         flush_display();
                         break;
+
+                    case Button2:
+                        return paste();
+                        break;
+
+                    case Button3:
+                        copy();
+                        break;
                     
                     case Button4:
                         if (-m_scroll_offset < buffer().scroll_back() - 1)
@@ -252,6 +261,37 @@ std::string XLibOutput::update()
         break;
     }
     
+    return "";
+}
+
+void XLibOutput::copy()
+{
+    if (m_selection_start != m_selection_end)
+    {
+        // Find text under selection
+        std::string text;
+        for_rune_in_selection([&](const CursorPosition &pos)
+        {
+            text += (char)buffer().rune_at(pos).value;
+        });
+    }
+
+//    std::cout << m_clip_board->paste() << "\n";
+}
+
+std::string XLibOutput::paste()
+{
+    if (m_selection_start != m_selection_end)
+    {
+        std::string text;
+        for_rune_in_selection([&](const CursorPosition &pos)
+        {
+            text += (char)buffer().rune_at(pos).value;
+        });
+
+        return text;
+    }
+
     return "";
 }
 
