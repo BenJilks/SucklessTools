@@ -304,11 +304,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
         case 'r':
         {
             // Make sure to flush scroll buffer
-            if (m_scroll_buffer)
-            {
-                draw_scroll(m_scroll_region_top, m_scroll_region_bottom, m_scroll_buffer);
-                m_scroll_buffer = 0;
-            }
+            flush_scroll();
 
             if (arg_len == 0)
             {
@@ -406,21 +402,27 @@ void Output::out(std::string_view buff)
     }
 
     // Draw scroll if we have any in the buffer
-    draw_rune(m_last_cursor);
-    if (m_scroll_buffer)
-    {
-        draw_scroll(m_scroll_region_top, m_scroll_region_bottom, m_scroll_buffer);
-        m_scroll_buffer = 0;
-    }
+    flush_scroll();
 
+    draw_rune(m_last_cursor);
     m_buffer.rune_at(m_cursor).attribute = m_current_attribute;
     draw_rune(m_cursor, true);
     m_last_cursor = m_cursor;
     flush_display();
 }
 
+void Output::flush_scroll()
+{
+    if (m_scroll_buffer)
+    {
+        draw_scroll(m_scroll_region_top, m_scroll_region_bottom, m_scroll_buffer);
+        m_scroll_buffer = 0;
+    }
+}
+
 void Output::scroll(int by)
 {
+    draw_rune(m_last_cursor);
     m_buffer.scroll(m_scroll_region_top, m_scroll_region_bottom, by);
     m_scroll_buffer += by;
 }

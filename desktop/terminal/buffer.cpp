@@ -114,7 +114,7 @@ Buffer::Rune &Buffer::rune_at(const CursorPosition &pos)
     {
         std::cout << "Invalid access {row=" << pos.row() << ", column=" << pos.coloumn() << "}\n";
         std::cout << "Buffer size {rows=" << rows() << ", columns=" << columns() << "}\n";
-        assert(false);
+        return m_invalid_rune;
     }
 
     return m_buffer[pos.row() * m_columns + pos.coloumn()];
@@ -129,7 +129,7 @@ const Buffer::Rune &Buffer::rune_at_scroll_offset(const CursorPosition &pos, int
     if (-row >= m_scroll_back_rows)
     {
         std::cout << "Invalid scroll offset " << row << ", scroll_back_rows=" << m_scroll_back_rows << "\n";
-        assert (false);
+        return m_invalid_rune;
     }
     return m_scroll_back[(m_scroll_back_rows + row) * m_columns + pos.coloumn()];
 }

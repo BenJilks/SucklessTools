@@ -31,6 +31,7 @@ protected:
 
     void resize(int rows, int columns);
     void scroll(int by);
+    void flush_scroll();
     void set_mode(int mode, bool value);
     void set_should_close(bool b) { m_should_close = b; }
 

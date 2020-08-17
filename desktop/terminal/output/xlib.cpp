@@ -456,8 +456,14 @@ void XLibOutput::draw_rune(const CursorPosition &pos, bool selected)
     if (!isspace(rune.value))
     {
         auto glyph = XftCharIndex(m_display, m_font, c);
+        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height) };
+
+        XftDrawSetClipRectangles(m_draw, x - m_font_width, y - m_font_height, &rect, 1);
         XftDrawGlyphs(m_draw, &text_color_from_terminal(color),
             m_font, x, y, &glyph, 1);
+
+        // Reset clip
+        XftDrawSetClip(m_draw, 0);
     }
 }
 
