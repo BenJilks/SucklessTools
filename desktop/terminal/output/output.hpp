@@ -39,6 +39,7 @@ protected:
     inline const Attribute &current_attribute() const { return m_current_attribute; }
     inline int rows() const { return m_buffer.rows(); }
     inline int columns() const { return m_buffer.columns(); }
+    inline bool application_keys_mode() const { return m_application_keys_mode; }
 
 private:
     Buffer m_buffer;
@@ -48,11 +49,16 @@ private:
     int m_scroll_region_top { 0 };
     int m_scroll_region_bottom { 79 };
 
+    bool m_auto_wrap_mode { false };
+    bool m_relative_origin_mode { false };
+    bool m_application_keys_mode { false };
+
     Decoder m_decoder;
     int m_insert_count { 0 };
 
     void out_rune(uint32_t);
     void out_escape(Decoder::EscapeSequence&);
     void out_tab();
+    void wait();
 
 };

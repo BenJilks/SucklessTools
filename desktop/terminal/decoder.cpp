@@ -15,6 +15,9 @@ Decoder::Result Decoder::parse(char c)
             case State::Ascii:
                 switch (c)
                 {
+                    case '\0':
+                        break;
+
                     case '\033':
                         m_current_args.clear();
                         m_current_argument.clear();
@@ -47,6 +50,12 @@ Decoder::Result Decoder::parse(char c)
                 if (c == '[')
                 {
                     m_state = State::EscapePrivate;
+                    break;
+                }
+
+                if (c == '#')
+                {
+                    m_state = State::EscapeHash;
                     break;
                 }
 
@@ -93,6 +102,14 @@ Decoder::Result Decoder::parse(char c)
                 m_state = State::Ascii;
                 
                 auto sequence = EscapeSequence { c, m_current_args, m_current_is_private };
+                return { Result::Escape, 0, sequence };
+            }
+
+            case State::EscapeHash:
+            {
+                m_state = State::Ascii;
+
+                auto sequence = EscapeSequence { '#', { c - '0' }, false };
                 return { Result::Escape, 0, sequence };
             }
         }

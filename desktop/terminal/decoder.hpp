@@ -16,6 +16,7 @@ public:
         EscapePrivate,
         EscapeArg,
         EscapeCommand,
+        EscapeHash,
     };    
 
     struct EscapeSequence

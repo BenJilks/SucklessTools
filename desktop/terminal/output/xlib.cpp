@@ -119,7 +119,6 @@ CursorPosition XLibOutput::cursor_position_from_pixels(int x, int y)
 void XLibOutput::input(const std::string &msg)
 {
     m_input_buffer += msg;
-    write(input_file(), m_input_buffer.data(), m_input_buffer.size());
 }
 
 std::string XLibOutput::update()
@@ -143,6 +142,9 @@ std::string XLibOutput::update()
             
             case KeyPress:
                 return decode_key_press(&event.xkey);
+
+            case KeyRelease:
+                return decode_key_release(&event.xkey);
             
             case ButtonPress:
                 switch (event.xbutton.button)
@@ -304,6 +306,30 @@ void XLibOutput::redraw_all()
     flush_display();
 }
 
+std::string XLibOutput::decode_key_release(XKeyEvent *key_event)
+{
+    char buf[64];
+    KeySym ksym;
+    Status status;
+
+    XmbLookupString(m_input_context, key_event,
+        buf, sizeof(buf), &ksym, &status);
+
+    if (application_keys_mode())
+    {
+        switch (ksym)
+        {
+            case XK_Up: return "\033A";
+            case XK_Down: return "\033B";
+            case XK_Right: return "\033C";
+            case XK_Left: return "\033D";
+            default: break;
+        }
+    }
+
+    return "";
+}
+
 std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
 {
     char buf[64];
@@ -313,6 +339,19 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
     auto len = XmbLookupString(m_input_context, key_event, 
         buf, sizeof(buf), &ksym, &status);
     
+    if (application_keys_mode())
+    {
+        // Special application keys
+        switch (ksym)
+        {
+            case XK_Up: return "\033OA";
+            case XK_Down: return "\033OB";
+            case XK_Right: return "\033OC";
+            case XK_Left: return "\033OD";
+            default: break;
+        }
+    }
+
     switch (ksym)
     {
         case XK_Up: return "\033[A";

@@ -3,6 +3,10 @@
 #include <algorithm>
 #include <cassert>
 #include <memory.h>
+#include <unistd.h>
+
+#define DEFAULT(a, b) (a ? a : b)
+// #define DEBUG_OUTPUT
 
 void Output::resize(int rows, int columns)
 {
@@ -19,16 +23,46 @@ void Output::resize(int rows, int columns)
 
 void Output::move_cursor_to(int column, int row)
 {
-    m_cursor.move_to(
-        std::clamp(column, 0, columns() - 1),
-        std::clamp(row, 0, rows()));
+    auto min_row = 0;
+    auto max_row = rows() - 1;
+    if (m_relative_origin_mode)
+    {
+        row += m_scroll_region_top;
+        min_row = m_scroll_region_top;
+        max_row = m_scroll_region_bottom;
+    }
+
+    if (row >= rows())
+    {
+        row = rows() - 1;
+        scroll(rows() - row);
+    }
+
+    if (m_auto_wrap_mode)
+    {
+        if (column < 0)
+            column = 0;
+        if (row < 0)
+            row = 0;
+
+        auto row_offset = (int)(column / (columns() - 1));
+        m_cursor.move_to(
+            column % (columns() - 1),
+            std::clamp(row + row_offset, min_row, max_row));
+    }
+    else
+    {
+        m_cursor.move_to(
+            std::clamp(column, 0, columns() - 1),
+            std::clamp(row, min_row, max_row));
+    }
 }
 
 void Output::move_cursor_by(int column, int row)
 {
-    m_cursor.move_to(
-        std::clamp(m_cursor.coloumn() + column, 0, columns() - 1),
-        std::clamp(m_cursor.row() + row, 0, rows()));
+    move_cursor_to(
+        m_cursor.coloumn() + column,
+        m_cursor.row() + row);
 }
 
 void Output::out_rune(uint32_t rune)
@@ -42,6 +76,10 @@ void Output::out_rune(uint32_t rune)
     }
     else
     {
+#ifdef DEBUG_OUTPUT
+        std::cout << "Out '" << (char)rune << "' (" << rune << ") "
+            "at " << m_cursor.row() << "," << m_cursor.coloumn() << "\n";
+#endif
         m_buffer.rune_at(m_cursor) = { rune, m_current_attribute };
         draw_rune(m_cursor);
         move_cursor_by(1, 0);
@@ -57,6 +95,29 @@ void Output::out_rune(uint32_t rune)
 void Output::set_mode(int mode, bool value)
 {
     std::cout << "Set mode " << mode << ": " << value << "\n";
+    switch (mode)
+    {
+        case 1:
+            m_application_keys_mode = value;
+            break;
+        case 6:
+            m_relative_origin_mode = value;
+
+            // NOTE: We should always move to 0,0 when setting this
+            move_cursor_to(0, 0);
+            break;
+        case 7:
+            m_auto_wrap_mode = value;
+            break;
+    }
+}
+
+void Output::wait()
+{
+    draw_rune(m_cursor, true);
+    flush_display();
+    usleep(10 * 1000);
+    draw_rune(m_cursor, false);
 }
 
 void Output::out_escape(Decoder::EscapeSequence &escape)
@@ -78,11 +139,31 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
         }
         
-        case 'A': move_cursor_by(0, arg_len ? -escape.args[0] : -1); break;
-        case 'B': move_cursor_by(0, arg_len ? escape.args[0] : 1); break;
-        case 'C': move_cursor_by(arg_len ? escape.args[0] : 1, 0); break;
-        case 'D': move_cursor_by(arg_len ? -escape.args[0] : -1, 0); break;
+        case 'A':
+        case 'M':
+            move_cursor_by(0, arg_len ? DEFAULT(-escape.args[0], 1) : -1);
+            break;
+
+        case 'B':
+            move_cursor_by(0, arg_len ? DEFAULT(escape.args[0], 1) : 1);
+            break;
+
+        case 'D':
+            if (arg_len == 0)
+            {
+                move_cursor_by(0, 1);
+                break;
+            }
+
+            assert (arg_len == 1);
+            move_cursor_by(DEFAULT(-escape.args[0], 1), 0);
+            break;
+
+        case 'C':
+            move_cursor_by(arg_len ? DEFAULT(escape.args[0], 1) : 1, 0);
+            break;
         
+        case 'f':
         case 'H':
         {
             assert (arg_len <= 2);
@@ -110,6 +191,14 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             auto row = arg_len >= 1 ? escape.args[0] : 1;
 
             move_cursor_to(m_cursor.coloumn(), row - 1);
+            break;
+        }
+
+        // Move to next line
+        case 'E':
+        {
+            assert(arg_len == 0);
+            move_cursor_to(0, m_cursor.row() + 1);
             break;
         }
 
@@ -151,9 +240,9 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
                     }
                     break;
 
-                // Clear line from cursor lef
+                // Clear line from cursor left
                 case 1:
-                    for (int i = 0; i < m_cursor.coloumn(); i++)
+                    for (int i = 0; i <= m_cursor.coloumn(); i++)
                     {
                         m_buffer.rune_at(m_cursor.column_offset(i)).value = ' ';
                         draw_rune(CursorPosition(i, m_cursor.row()));
@@ -189,7 +278,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
                 // Clear screen from cursor up
                 case 1:
-                    for (int i = 0; i < m_cursor.row(); i++)
+                    for (int i = 0; i <= m_cursor.row(); i++)
                         m_buffer.clear_row(i);
                     redraw_all();
                     break;
@@ -214,13 +303,19 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
         case 'r':
         {
+            if (arg_len == 0)
+            {
+                m_scroll_region_top = 0;
+                m_scroll_region_bottom = rows() - 1;
+                break;
+            }
+
             assert (arg_len == 2);
             m_scroll_region_top = escape.args[0] - 1;
             m_scroll_region_bottom = escape.args[1] - 1;
             break;
         }
 
-        case 'M':
         case 'L':
         {
             assert (arg_len <= 1);
@@ -236,6 +331,21 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
         case 'h':
             assert (arg_len == 1);
             set_mode(escape.args[0], true);
+            break;
+
+        // Screen alignment display
+        case '#':
+            assert (arg_len == 1);
+            switch (escape.args[0])
+            {
+                case 8:
+                    for (int row = 0; row < rows(); row++)
+                    {
+                        for (int column = 0; column < columns(); column++)
+                            m_buffer.rune_at(CursorPosition(column, row)) = { 'E', m_current_attribute };
+                    }
+                    break;
+            }
             break;
 
         default:
@@ -297,10 +407,6 @@ void Output::out(std::string_view buff)
 void Output::scroll(int by)
 {
     draw_rune(m_last_cursor);
-
     m_buffer.scroll(m_scroll_region_top, m_scroll_region_bottom, by);
     draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
-
-    move_cursor_by(0, -by);
-    m_last_cursor = m_cursor;
 }

@@ -44,6 +44,7 @@ private:
     void for_rune_in_selection(CallbackFunc callback);
 
     std::string decode_key_press(XKeyEvent *key_event);
+    std::string decode_key_release(XKeyEvent *key_event);
     CursorPosition cursor_position_from_pixels(int x, int y);
     void load_font(const std::string &&name, int size);
     XftColor &text_color_from_terminal(TerminalColor color);

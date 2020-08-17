@@ -69,6 +69,7 @@ void Buffer::scroll(int top, int bottom, int by)
     auto by_index = by * m_columns;
     if (by > 0)
     {
+        // Copy overflow into scrollback buffer
         m_scroll_back = allocate_new_buffer(m_scroll_back, m_scroll_back_rows + by, m_columns, m_scroll_back_rows, m_columns);
         for (int i = 0; i < by_index; i++)
             m_scroll_back[m_scroll_back_rows * m_columns + i] = m_buffer[i];
@@ -81,10 +82,25 @@ void Buffer::scroll(int top, int bottom, int by)
     }
     else if (by < 0)
     {
-        for (int i = end_index - start_index; i > start_index - by; i--)
+        for (int i = end_index - start_index; i > start_index - by_index; i--)
             m_buffer[i] = m_buffer[i + by_index];
-        for (int i = top; i < top - by; i++)
-            clear_row(i);
+
+        if (m_scroll_back_rows >= -by)
+        {
+            // Copy scrollback, back into buffer
+            for (int i = 0; i < -by_index; i++)
+                m_buffer[i + start_index] = m_scroll_back[(m_scroll_back_rows + by) * m_columns + i];
+
+            // Shrink scrollback
+            m_scroll_back = (Rune*)realloc(m_scroll_back, ((m_scroll_back_rows + by) * m_columns) * sizeof (Rune));
+            m_scroll_back_rows += by;
+        }
+        else
+        {
+            // Clear top lines
+            for (int i = top; i < top - by; i++)
+                clear_row(i);
+        }
     }
 }
 
@@ -97,6 +113,7 @@ Buffer::Rune &Buffer::rune_at(const CursorPosition &pos)
             pos.coloumn() >= 0 && pos.coloumn() < m_columns))
     {
         std::cout << "Invalid access {row=" << pos.row() << ", column=" << pos.coloumn() << "}\n";
+        std::cout << "Buffer size {rows=" << rows() << ", columns=" << columns() << "}\n";
         assert(false);
     }
 
