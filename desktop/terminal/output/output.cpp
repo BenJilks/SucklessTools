@@ -32,11 +32,11 @@ void Output::move_cursor_to(int column, int row)
         max_row = m_scroll_region_bottom;
     }
 
-    if (row >= rows())
-    {
-        row = rows() - 1;
-        scroll(rows() - row);
-    }
+    if (row < m_scroll_region_top)
+        scroll(row - m_scroll_region_top);
+
+    if (row > m_scroll_region_bottom)
+        scroll(row - m_scroll_region_bottom);
 
     if (m_auto_wrap_mode)
     {
@@ -84,12 +84,6 @@ void Output::out_rune(uint32_t rune)
         draw_rune(m_cursor);
         move_cursor_by(1, 0);
     }
-    
-    if (m_cursor.row() < m_scroll_region_top)
-        scroll(m_cursor.row() - m_scroll_region_top);
-
-    if (m_cursor.row() > m_scroll_region_bottom)
-        scroll(m_cursor.row() - m_scroll_region_bottom);
 }
 
 void Output::set_mode(int mode, bool value)
@@ -123,6 +117,12 @@ void Output::wait()
 void Output::out_escape(Decoder::EscapeSequence &escape)
 {
     int arg_len = escape.args.size();
+#if 0
+    std::cout << "Escape: " << escape.command << "(";
+    for (int arg : escape.args)
+        std::cout << arg << ", ";
+    std::cout << ")\n";
+#endif
 
     switch (escape.command)
     {
@@ -303,6 +303,13 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
         case 'r':
         {
+            // Make sure to flush scroll buffer
+            if (m_scroll_buffer)
+            {
+                draw_scroll(m_scroll_region_top, m_scroll_region_bottom, m_scroll_buffer);
+                m_scroll_buffer = 0;
+            }
+
             if (arg_len == 0)
             {
                 m_scroll_region_top = 0;
@@ -398,7 +405,14 @@ void Output::out(std::string_view buff)
         }
     }
 
+    // Draw scroll if we have any in the buffer
     draw_rune(m_last_cursor);
+    if (m_scroll_buffer)
+    {
+        draw_scroll(m_scroll_region_top, m_scroll_region_bottom, m_scroll_buffer);
+        m_scroll_buffer = 0;
+    }
+
     draw_rune(m_cursor, true);
     m_last_cursor = m_cursor;
     flush_display();
@@ -406,7 +420,6 @@ void Output::out(std::string_view buff)
 
 void Output::scroll(int by)
 {
-    draw_rune(m_last_cursor);
     m_buffer.scroll(m_scroll_region_top, m_scroll_region_bottom, by);
-    draw_scroll(m_scroll_region_top, m_scroll_region_bottom, by);
+    m_scroll_buffer += by;
 }

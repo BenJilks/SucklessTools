@@ -303,6 +303,7 @@ void XLibOutput::redraw_all()
     for (int row = 0; row < rows(); row++)
         draw_row(row);
 
+    draw_rune(cursor(), true);
     flush_display();
 }
 
@@ -388,8 +389,13 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
             0, top_of_buffer, m_width, height_of_buffer, 0, top_of_buffer - by_pixels);
 
         XSetForeground(m_display, m_gc, color.background_int());
-        XFillRectangle(m_display, m_pixel_buffer, m_gc, 
+        XFillRectangle(m_display, m_pixel_buffer, m_gc,
             0, bottom_of_buffer - by_pixels, m_width, by_pixels);
+        for (int i = end - by; i < end; i++)
+        {
+            std::cout << "Draw row: " << i << "\n";
+            draw_row(i, true);
+        }
     }
     else
     {
@@ -398,8 +404,10 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
             0, top_of_buffer, m_width, height_of_buffer - m_font_height, 0, top_of_buffer - by_pixels);
 
         XSetForeground(m_display, m_gc, color.background_int());
-        XFillRectangle(m_display, m_pixel_buffer, m_gc, 
+        XFillRectangle(m_display, m_pixel_buffer, m_gc,
             0, 0, m_width, top_of_buffer - by_pixels + m_font_height);
+        for (int i = begin; i < -by; i++)
+            draw_row(i, true);
     }
 
     m_selection_start.move_by(0, -by);

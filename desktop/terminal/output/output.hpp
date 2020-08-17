@@ -48,8 +48,9 @@ private:
     Attribute m_current_attribute;
     int m_scroll_region_top { 0 };
     int m_scroll_region_bottom { 79 };
+    int m_scroll_buffer { 0 };
 
-    bool m_auto_wrap_mode { false };
+    bool m_auto_wrap_mode { true };
     bool m_relative_origin_mode { false };
     bool m_application_keys_mode { false };
 
