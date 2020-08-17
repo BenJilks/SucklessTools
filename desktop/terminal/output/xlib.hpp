@@ -75,5 +75,6 @@ private:
     GC m_gc;
     int m_screen;
     int m_color_map;
+    Atom m_wm_delete_message;
     
 };

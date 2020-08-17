@@ -17,6 +17,8 @@ public:
     virtual std::string update() = 0;
     void out(std::string_view str);
 
+    inline bool should_close() const { return m_should_close; }
+
     // Hooks
     std::function<void(struct winsize)> on_resize;
     
@@ -30,6 +32,7 @@ protected:
     void resize(int rows, int columns);
     void scroll(int by);
     void set_mode(int mode, bool value);
+    void set_should_close(bool b) { m_should_close = b; }
 
     void move_cursor_to(int column, int row);
     void move_cursor_by(int column, int row);
@@ -49,6 +52,7 @@ private:
     int m_scroll_region_top { 0 };
     int m_scroll_region_bottom { 79 };
     int m_scroll_buffer { 0 };
+    bool m_should_close { false };
 
     bool m_auto_wrap_mode { true };
     bool m_relative_origin_mode { false };

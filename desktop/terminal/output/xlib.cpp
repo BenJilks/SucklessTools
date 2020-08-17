@@ -59,6 +59,9 @@ XLibOutput::XLibOutput()
     
     load_font(font_name.c_str(), font_size);
     XMapWindow(m_display, m_window);
+
+    m_wm_delete_message = XInternAtom(m_display, "WM_DELETE_WINDOW", False);
+    XSetWMProtocols(m_display, m_window, &m_wm_delete_message, 1);
 }
 
 void XLibOutput::load_font(const std::string &&name, int size)
@@ -136,6 +139,11 @@ std::string XLibOutput::update()
     {
         switch (event.type)
         {
+            case ClientMessage:
+                if ((Atom)event.xclient.data.l[0] == m_wm_delete_message)
+                    set_should_close(true);
+                break;
+
             case Expose:
                 redraw_all();
                 break;

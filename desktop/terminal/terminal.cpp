@@ -76,7 +76,7 @@ void Terminal::run_event_loop()
 {
     fd_set fds;
     
-    for (;;)
+    while (!m_output.should_close())
     {
         FD_ZERO(&fds);
         FD_SET(m_master, &fds);
