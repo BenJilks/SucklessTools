@@ -88,7 +88,6 @@ void Output::out_rune(uint32_t rune)
 
 void Output::set_mode(int mode, bool value)
 {
-    std::cout << "Set mode " << mode << ": " << value << "\n";
     switch (mode)
     {
         case 1:

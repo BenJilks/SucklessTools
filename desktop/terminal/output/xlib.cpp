@@ -244,7 +244,7 @@ std::string XLibOutput::update()
                     m_width = event.xconfigure.width;
                     m_height = event.xconfigure.height;
                     auto rows = (m_height / m_font_height);
-                    auto columns = (m_width / m_font_width);
+                    auto columns = (m_width / m_font_width) - 1;
 
                     // Noop, so don't bother resizing anything
                     if (rows == this->rows() && columns == this->columns())
