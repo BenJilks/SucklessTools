@@ -4,6 +4,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <cmath>
+#include <sys/time.h>
 
 #include "../config.hpp"
 
@@ -231,7 +232,7 @@ std::string XLibOutput::update()
                 auto y = event.xmotion.y;
                 m_mouse_pos = cursor_position_from_pixels(x, y);
 
-                if (m_in_selection)
+                if (m_in_selection && m_selection_end != m_mouse_pos)
                     draw_update_selection(m_mouse_pos);
                 break;
             }
@@ -539,11 +540,13 @@ void XLibOutput::draw_rune(const CursorPosition &pos, bool selected)
     if (!isspace(rune.value))
     {
         auto glyph = XftCharIndex(m_display, m_font, c);
-        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height) };
 
+        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height) };
         XftDrawSetClipRectangles(m_draw, x - m_font_width, y - m_font_height, &rect, 1);
-        XftDrawGlyphs(m_draw, &text_color_from_terminal(color),
-            m_font, x, y, &glyph, 1);
+
+        XftGlyphSpec spec = { glyph, (short)x, (short)y };
+        XftDrawGlyphSpec(m_draw, &text_color_from_terminal(color),
+            m_font, &spec, 1);
 
         // Reset clip
         XftDrawSetClip(m_draw, 0);
