@@ -119,6 +119,8 @@ static Token lexer_next()
                         return make_single_char_token(g_c, TOKEN_TYPE_OPEN_SQUIGGLY);
                     case '}':
                         return make_single_char_token(g_c, TOKEN_TYPE_CLOSE_SQUIGGLY);
+                    case ',':
+                        return make_single_char_token(g_c, TOKEN_TYPE_COMMA);
                 }
 
                 assert (0);
@@ -155,7 +157,11 @@ Token lexer_peek(int count)
 {
     while (count >= g_peek_queue_count)
     {
-        g_peek_queue[g_peek_queue_end] = lexer_next();
+        Token token = lexer_next();
+        if (token.type == TOKEN_TYPE_NONE)
+            return token;
+
+        g_peek_queue[g_peek_queue_end] = token;
         g_peek_queue_end = (g_peek_queue_end + 1) % PEEK_QUEUE_SIZE;
         g_peek_queue_count += 1;
     }
@@ -168,7 +174,7 @@ Token lexer_consume(enum TokenType type)
     if (type != TOKEN_TYPE_NONE && token.type != type)
         return g_null_token;
 
-    g_peek_queue_start += 1;
+    g_peek_queue_start = (g_peek_queue_start + 1) % PEEK_QUEUE_SIZE;
     g_peek_queue_count -= 1;
     return token;
 }
@@ -183,4 +189,20 @@ const char *lexer_token_type_to_string(enum TokenType type)
     }
 
     return "UNKOWN";
+}
+
+static void free_token(Token *token)
+{
+    if (token->type != TOKEN_TYPE_NONE)
+        free(token->data);
+}
+
+void lexer_close()
+{
+    assert (g_file);
+
+    // Free everything on the peek queue
+    for (int i = 0; i < g_peek_queue_count; i++)
+        free_token(&g_peek_queue[(g_peek_queue_start + i) & PEEK_QUEUE_SIZE]);
+    fclose(g_file);
 }

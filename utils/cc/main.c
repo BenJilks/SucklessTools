@@ -1,21 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "lexer.h"
+#include "parser.h"
 
 int main()
 {
     lexer_open_file("test.txt");
 
-    Token token;
-    for (;;)
+    Unit unit = parse();
+    printf("Function Count: %i\n", unit.function_count);
+    for (int i = 0; i < unit.function_count; i++)
     {
-        token = lexer_consume(TOKEN_TYPE_NONE);
-        if (token.type == TOKEN_TYPE_NONE)
-            break;
-
-        printf("Token: %s, Type: %s\n", token.data, lexer_token_type_to_string(token.type));
-        free(token.data);
+        printf("  Function: %s\n", unit.functions[i].name);
+        for (int j = 0; j < unit.functions[i].param_count; j++)
+            printf("    Param: %s\n", unit.functions[i].params[j].name);
     }
 
-	return 0;
+    free_unit(&unit);
+    lexer_close();
+    return 0;
 }
