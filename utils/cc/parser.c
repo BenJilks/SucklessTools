@@ -8,15 +8,13 @@
 static void match(enum TokenType type)
 {
     Token token = lexer_consume(type);
-    assert (type != TOKEN_TYPE_NONE);
-
-    free(token.data);
+    assert (type != TOKEN_TYPE_NONE && token.type != TOKEN_TYPE_NONE);
 }
 
 static DataType parse_data_type()
 {
     DataType data_type;
-    data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER).data;
+    data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     return data_type;
 }
 
@@ -63,22 +61,40 @@ static void parse_params(Function *function)
     {
         Param param;
         param.data_type = parse_data_type();
-        param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER).data;
+        param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
         append_buffer(&params_buffer, &param);
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
             break;
-        lexer_consume(TOKEN_TYPE_COMMA);
+        match(TOKEN_TYPE_COMMA);
     }
     match(TOKEN_TYPE_CLOSE_BRACKET);
+}
+
+static void parse_function_body(Function *function)
+{
+    match(TOKEN_TYPE_OPEN_SQUIGGLY);
+    while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
+    {
+        // TODO: Parse statements
+    }
+    match(TOKEN_TYPE_CLOSE_SQUIGGLY);
 }
 
 static void parse_function(Unit *unit)
 {
     Function function;
+
+    // Function definition
     function.data_type = parse_data_type();
-    function.name = lexer_consume(TOKEN_TYPE_IDENTIFIER).data;
+    function.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     parse_params(&function);
+
+    // Optional function body
+    if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
+        parse_function_body(&function);
+    else
+        match(TOKEN_TYPE_SEMI);
 
     if (!unit->functions)
         unit->functions = malloc(sizeof(Function));
@@ -113,15 +129,10 @@ Unit parse()
     return unit;
 }
 
-static void free_data_type(DataType *data_type)
-{
-    free(data_type->name);
-}
-
 static void free_function(Function *function)
 {
-    free_data_type(&function->data_type);
-    free(function->name);
+    if (function->params)
+        free(function->params);
 }
 
 void free_unit(Unit *unit)

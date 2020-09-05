@@ -9,7 +9,8 @@
 	__TOKEN_TYPE(CLOSE_BRACKET) \
 	__TOKEN_TYPE(OPEN_SQUIGGLY) \
     __TOKEN_TYPE(CLOSE_SQUIGGLY) \
-    __TOKEN_TYPE(COMMA)
+    __TOKEN_TYPE(COMMA) \
+    __TOKEN_TYPE(SEMI)
 
 enum TokenType
 {
@@ -21,11 +22,14 @@ ENUMERATE_TOKEN_TYPES
 typedef struct Token
 {
 	char *data;
+    int length;
 	enum TokenType type;
 } Token;
 
 void lexer_open_file(const char *file_path);
 void lexer_close();
+
+char *lexer_printable_token_data(Token *token);
 
 Token lexer_consume(enum TokenType);
 Token lexer_peek(int count);

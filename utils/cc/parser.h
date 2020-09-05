@@ -1,20 +1,22 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "lexer.h"
+
 typedef struct DataType
 {
-    char *name;
+    Token name;
 } DataType;
 
 typedef struct Param
 {
-    char *name;
+    Token name;
     DataType data_type;
 } Param;
 
 typedef struct Function
 {
-    char *name;
+    Token name;
     DataType data_type;
 
     Param *params;

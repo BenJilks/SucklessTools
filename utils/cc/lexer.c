@@ -3,28 +3,48 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <memory.h>
 
 #define PEEK_QUEUE_SIZE 10
 
-static FILE *g_file = NULL;
 static Token g_peek_queue[PEEK_QUEUE_SIZE];
 static int g_peek_queue_start = 0;
 static int g_peek_queue_end = 0;
 static int g_peek_queue_count = 0;
-static Token g_null_token = { NULL, TOKEN_TYPE_NONE };
+static Token g_null_token = { NULL, 0, TOKEN_TYPE_NONE };
 
-char g_c = '\0';
-int g_should_reconsume = 0;
-int g_is_eof = 1;
+static char *g_source = NULL;
+static int g_source_length;
+static int g_source_pointer;
+
+static char g_c = '\0';
+static int g_should_reconsume = 0;
 
 void lexer_open_file(const char *file_path)
 {
-	assert (g_file == NULL);
+    assert (!g_source);
 
-	g_file = fopen(file_path, "r");
+    // Open the file and read its length
+    FILE *file = fopen(file_path, "r");
+    fseek(file, 0L, SEEK_END);
+    g_source_length = ftell(file);
+    rewind(file);
+
+    // Read the contents into memory
+    g_source = malloc(g_source_length);
+    fread(g_source, sizeof(char), g_source_length, file);
+    fclose(file);
+
+    // Setup pointers
+    g_source_pointer = 0;
     g_peek_queue_start = 0;
     g_peek_queue_end = 0;
     g_peek_queue_count = 0;
+}
+
+static int is_eof()
+{
+    return g_source_pointer >= g_source_length;
 }
 
 enum State
@@ -41,31 +61,6 @@ typedef struct Buffer
 	int pointer;
 } Buffer;
 
-static Buffer new_buffer()
-{
-	Buffer buffer;
-    buffer.memory = NULL;
-    buffer.size = 0;
-	buffer.pointer = 0;
-	return buffer;
-}
-
-static void append_buffer(Buffer *buffer, char c)
-{
-    if (buffer->memory == NULL)
-    {
-        buffer->memory = malloc(80);
-        buffer->size = 80;
-    }
-
-	while (buffer->pointer >= buffer->size)
-	{
-		buffer->size += 80;
-		buffer->memory = realloc(buffer->memory, buffer->size);
-	}
-	buffer->memory[buffer->pointer++] = c;
-}
-
 static Token make_single_char_token(char c, enum TokenType type)
 {
     Token token;
@@ -79,17 +74,23 @@ static Token make_single_char_token(char c, enum TokenType type)
 static Token lexer_next()
 {
 	enum State state = STATE_INITIAL;
-	Buffer buffer = new_buffer();
-	for (;;)
+
+    Token token;
+    token.type = TOKEN_TYPE_NONE;
+    token.data = NULL;
+    token.length = 0;
+    for (;;)
 	{
         if (!g_should_reconsume)
-            g_is_eof = (fread(&g_c, 1, 1, g_file) == 0);
+        {
+            g_c = is_eof() ? '\0' : g_source[g_source_pointer++];
+        }
         g_should_reconsume = 0;
 
 		switch (state)
 		{
 			case STATE_INITIAL:
-                if (g_is_eof)
+                if (is_eof())
                     return g_null_token;
 
                 if (isspace(g_c))
@@ -98,6 +99,7 @@ static Token lexer_next()
                 if (isalpha(g_c))
 				{
                     state = STATE_IDENTIFIER;
+                    token.data = g_source + g_source_pointer - 1;
                     g_should_reconsume = 1;
 					break;
 				}
@@ -105,6 +107,7 @@ static Token lexer_next()
                 if (isdigit(g_c))
                 {
                     state = STATE_INTEGER;
+                    token.data = g_source + g_source_pointer - 1;
                     g_should_reconsume = 1;
                     break;
                 }
@@ -121,6 +124,8 @@ static Token lexer_next()
                         return make_single_char_token(g_c, TOKEN_TYPE_CLOSE_SQUIGGLY);
                     case ',':
                         return make_single_char_token(g_c, TOKEN_TYPE_COMMA);
+                    case ';':
+                        return make_single_char_token(g_c, TOKEN_TYPE_SEMI);
                 }
 
                 assert (0);
@@ -129,25 +134,25 @@ static Token lexer_next()
 			case STATE_IDENTIFIER:
                 if (!isalnum(g_c) && g_c != '_')
 				{
-                    Token token = { buffer.memory, TOKEN_TYPE_IDENTIFIER };
+                    token.type = TOKEN_TYPE_IDENTIFIER;
 					state = STATE_INITIAL;
                     g_should_reconsume = 1;
                     return token;
 				}
 
-                append_buffer(&buffer, g_c);
+                token.length += 1;
 				break;
 
             case STATE_INTEGER:
                 if (!isdigit(g_c))
                 {
-                    Token token = { buffer.memory, TOKEN_TYPE_INTEGER };
+                    token.type = TOKEN_TYPE_INTEGER;
                     state = STATE_INITIAL;
                     g_should_reconsume = 1;
                     return token;
                 }
 
-                append_buffer(&buffer, g_c);
+                token.length += 1;
                 break;
 		}
 	}
@@ -191,18 +196,17 @@ const char *lexer_token_type_to_string(enum TokenType type)
     return "UNKOWN";
 }
 
-static void free_token(Token *token)
+char *lexer_printable_token_data(Token *token)
 {
-    if (token->type != TOKEN_TYPE_NONE)
-        free(token->data);
+    static char buffer[1024];
+
+    memcpy(buffer, token->data, token->length);
+    buffer[token->length] = '\0';
+    return buffer;
 }
 
 void lexer_close()
 {
-    assert (g_file);
-
-    // Free everything on the peek queue
-    for (int i = 0; i < g_peek_queue_count; i++)
-        free_token(&g_peek_queue[(g_peek_queue_start + i) & PEEK_QUEUE_SIZE]);
-    fclose(g_file);
+    assert (g_source);
+    free(g_source);
 }
