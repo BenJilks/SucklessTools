@@ -2,11 +2,7 @@
 #define PARSER_H
 
 #include "lexer.h"
-
-typedef struct DataType
-{
-    Token name;
-} DataType;
+#include "symbol.h"
 
 typedef struct Param
 {
