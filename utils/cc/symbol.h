@@ -22,8 +22,8 @@ typedef struct Symbol
     DataType data_type;
     int flags;
 
-    struct Symbol *args;
-    int arg_count;
+    struct Symbol *params;
+    int param_count;
 } Symbol;
 
 typedef struct SymbolTable

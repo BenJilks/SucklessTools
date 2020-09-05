@@ -46,11 +46,21 @@ Symbol *symbol_table_lookup(SymbolTable *table, const char *name)
             return symbol;
     }
 
+    if (table->parent)
+        return symbol_table_lookup(table->parent, name);
+
     return NULL;
 }
 
 void free_symbol_table(SymbolTable *table)
 {
     if (table->symbols)
+    {
+        for (int i = 0; i < table->symbol_count; i++)
+        {
+            if (table->symbols[i].params)
+                free(table->symbols[i].params);
+        }
         free(table->symbols);
+    }
 }

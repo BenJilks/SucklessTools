@@ -52,16 +52,18 @@ static void append_buffer(Buffer *buffer, void *item)
     *buffer->count += 1;
 }
 
-static void parse_params(Function *function)
+static void parse_params(Symbol *symbol)
 {
-    Buffer params_buffer = make_buffer((void**)&function->params, &function->param_count, sizeof(Param));
+    Buffer params_buffer = make_buffer((void**)&symbol->params, &symbol->param_count, sizeof(Symbol));
 
     match(TOKEN_TYPE_OPEN_BRACKET);
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_BRACKET)
     {
-        Param param;
+        Symbol param;
         param.data_type = parse_data_type();
         param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+        param.params = NULL;
+        param.param_count = 0;
         append_buffer(&params_buffer, &param);
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
@@ -83,14 +85,18 @@ static void parse_function_body(Function *function)
 
 static void parse_function(Unit *unit)
 {
-    Function function;
-
     // Function definition
-    function.data_type = parse_data_type();
-    function.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    parse_params(&function);
+    Symbol func_symbol;
+    func_symbol.data_type = parse_data_type();
+    func_symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    parse_params(&func_symbol);
+
+    // Register symbol
+    symbol_table_add(&unit->global_table, func_symbol);
 
     // Optional function body
+    Function function;
+    function.func_symbol = func_symbol;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
         parse_function_body(&function);
     else
@@ -108,6 +114,7 @@ Unit parse()
     Unit unit;
     unit.functions = NULL;
     unit.function_count = 0;
+    unit.global_table = symbol_table_new(NULL);
 
     for (;;)
     {
@@ -129,18 +136,10 @@ Unit parse()
     return unit;
 }
 
-static void free_function(Function *function)
-{
-    if (function->params)
-        free(function->params);
-}
-
 void free_unit(Unit *unit)
 {
     if (unit->functions)
-    {
-        for (int i = 0; i < unit->function_count; i++)
-            free_function(&unit->functions[i]);
         free(unit->functions);
-    }
+
+    free_symbol_table(&unit->global_table);
 }
