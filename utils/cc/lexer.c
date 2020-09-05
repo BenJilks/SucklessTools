@@ -61,12 +61,11 @@ typedef struct Buffer
 	int pointer;
 } Buffer;
 
-static Token make_single_char_token(char c, enum TokenType type)
+static Token make_single_char_token(enum TokenType type)
 {
     Token token;
-    token.data = malloc(2);
-    token.data[0] = c;
-    token.data[1] = '\0';
+    token.data = g_source + g_source_pointer - 1;
+    token.length = 1;
     token.type = type;
     return token;
 }
@@ -115,17 +114,17 @@ static Token lexer_next()
                 switch (g_c)
                 {
                     case '(':
-                        return make_single_char_token(g_c, TOKEN_TYPE_OPEN_BRACKET);
+                        return make_single_char_token(TOKEN_TYPE_OPEN_BRACKET);
                     case ')':
-                        return make_single_char_token(g_c, TOKEN_TYPE_CLOSE_BRACKET);
+                        return make_single_char_token(TOKEN_TYPE_CLOSE_BRACKET);
                     case '{':
-                        return make_single_char_token(g_c, TOKEN_TYPE_OPEN_SQUIGGLY);
+                        return make_single_char_token(TOKEN_TYPE_OPEN_SQUIGGLY);
                     case '}':
-                        return make_single_char_token(g_c, TOKEN_TYPE_CLOSE_SQUIGGLY);
+                        return make_single_char_token(TOKEN_TYPE_CLOSE_SQUIGGLY);
                     case ',':
-                        return make_single_char_token(g_c, TOKEN_TYPE_COMMA);
+                        return make_single_char_token(TOKEN_TYPE_COMMA);
                     case ';':
-                        return make_single_char_token(g_c, TOKEN_TYPE_SEMI);
+                        return make_single_char_token(TOKEN_TYPE_SEMI);
                 }
 
                 assert (0);

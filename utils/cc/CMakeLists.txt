@@ -6,6 +6,7 @@ set(SOURCES
 	lexer.c
         parser.c
         symbol.c
+        dumpast.c
 )
 
 add_executable(cc ${SOURCES})
