@@ -14,7 +14,8 @@
     __TOKEN_TYPE(ADD) \
     __TOKEN_TYPE(EQUALS) \
     __TOKEN_TYPE(CONST) \
-    __TOKEN_TYPE(STAR)
+    __TOKEN_TYPE(STAR) \
+    __TOKEN_TYPE(RETURN)
 
 enum TokenType
 {

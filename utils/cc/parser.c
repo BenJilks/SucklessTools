@@ -97,8 +97,8 @@ static void add_statement_to_scope(Scope *scope, Statement statement)
     scope->statement_count += 1;
 }
 
-static Expression *parse_expression();
-static Expression *parse_function_call(Expression *left)
+static Expression *parse_expression(SymbolTable *table);
+static Expression *parse_function_call(SymbolTable *table, Expression *left)
 {
     Expression *call = malloc(sizeof(Expression));
     call->type = EXPRESSION_TYPE_FUNCTION_CALL;
@@ -108,7 +108,7 @@ static Expression *parse_function_call(Expression *left)
     match(TOKEN_TYPE_OPEN_BRACKET);
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_BRACKET)
     {
-        Expression *argument = parse_expression();
+        Expression *argument = parse_expression(table);
         append_buffer(&buffer, &argument);
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
@@ -137,6 +137,7 @@ static Expression *parse_term(SymbolTable *table)
         case TOKEN_TYPE_IDENTIFIER:
             value->type = VALUE_TYPE_VARIABLE;
             value->v = symbol_table_lookup(table, &token);
+            assert(value->v);
             lexer_consume(TOKEN_TYPE_IDENTIFIER);
             break;
         default:
@@ -145,7 +146,7 @@ static Expression *parse_term(SymbolTable *table)
 
     // Parse function call
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_BRACKET)
-        return parse_function_call(expression);
+        return parse_function_call(table, expression);
 
     return expression;
 }
@@ -188,7 +189,7 @@ static void parse_declaration(Scope *scope)
     if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
     {
         match(TOKEN_TYPE_EQUALS);
-        statement.expression = parse_expression();
+        statement.expression = parse_expression(&scope->table);
     }
     match(TOKEN_TYPE_SEMI);
 
@@ -217,25 +218,49 @@ static void parse_expression_statement(Scope *scope)
 {
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
-    statement.expression = parse_expression();
+    statement.expression = parse_expression(&scope->table);
     match(TOKEN_TYPE_SEMI);
 
     add_statement_to_scope(scope, statement);
 }
 
-static Scope *parse_scope()
+static void parse_return(Scope *scope)
+{
+    match(TOKEN_TYPE_RETURN);
+
+    Statement statement;
+    statement.type = STATEMENT_TYPE_RETURN;
+    statement.expression = parse_expression(&scope->table);
+    match(TOKEN_TYPE_SEMI);
+
+    add_statement_to_scope(scope, statement);
+}
+
+static Scope *parse_scope(SymbolTable *parent)
 {
     Scope *scope = malloc(sizeof(Scope));
     scope->statements = NULL;
     scope->statement_count = 0;
+    scope->table = symbol_table_new(parent);
 
     match(TOKEN_TYPE_OPEN_SQUIGGLY);
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
     {
         if (is_data_type_next())
+        {
             parse_declaration(scope);
-        else
-            parse_expression_statement(scope);
+            continue;
+        }
+
+        switch (lexer_peek(0).type)
+        {
+            case TOKEN_TYPE_RETURN:
+                parse_return(scope);
+                break;
+            default:
+                parse_expression_statement(scope);
+                break;
+        }
     }
     match(TOKEN_TYPE_CLOSE_SQUIGGLY);
 
@@ -258,7 +283,8 @@ static void parse_function(Unit *unit)
     function.func_symbol = func_symbol;
     function.body = NULL;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
-        function.body = parse_scope();
+        function.body = parse_scope(&unit->global_table);
+
     else
         match(TOKEN_TYPE_SEMI);
 
@@ -269,12 +295,12 @@ static void parse_function(Unit *unit)
     unit->functions[unit->function_count++] = function;
 }
 
-Unit parse()
+Unit *parse()
 {
-    Unit unit;
-    unit.functions = NULL;
-    unit.function_count = 0;
-    unit.global_table = symbol_table_new(NULL);
+    Unit *unit = malloc(sizeof (Unit));
+    unit->functions = NULL;
+    unit->function_count = 0;
+    unit->global_table = symbol_table_new(NULL);
 
     for (;;)
     {
@@ -285,7 +311,7 @@ Unit parse()
         switch (token.type)
         {
             case TOKEN_TYPE_IDENTIFIER:
-                parse_function(&unit);
+                parse_function(unit);
                 break;
 
             default:

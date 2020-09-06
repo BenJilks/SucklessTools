@@ -97,7 +97,7 @@ typedef struct Unit
     SymbolTable global_table;
 } Unit;
 
-Unit parse();
+Unit *parse();
 void free_unit(Unit *unit);
 
 #endif // PARSER_H

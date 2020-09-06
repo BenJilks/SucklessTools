@@ -21,7 +21,7 @@ static void dump_value(Value *value, int indent)
             printf ("float %f\n", value->f);
             break;
         case VALUE_TYPE_VARIABLE:
-            printf ("variable %s\n", lexer_printable_token_data(&value->v));
+            printf ("variable %s\n", lexer_printable_token_data(&value->v->name));
             break;
         default:
             assert (0);
@@ -93,6 +93,11 @@ static void dump_scope(Scope *scope, int indent)
 
             case STATEMENT_TYPE_EXPRESSION:
                 printf("Expression:\n");
+                dump_expression(statement->expression, indent + 1);
+                break;
+
+            case STATEMENT_TYPE_RETURN:
+                printf("Return:\n");
                 dump_expression(statement->expression, indent + 1);
                 break;
 
