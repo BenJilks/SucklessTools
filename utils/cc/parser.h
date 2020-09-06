@@ -50,7 +50,7 @@ typedef struct Value
     {
         int i;
         float f;
-        Token v;
+        Symbol *v;
     };
 } Value;
 

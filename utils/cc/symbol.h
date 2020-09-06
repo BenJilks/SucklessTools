@@ -43,7 +43,7 @@ typedef struct SymbolTable
 
 SymbolTable symbol_table_new(SymbolTable *parent);
 void symbol_table_add(SymbolTable *table, Symbol symbol);
-Symbol *symbol_table_lookup(SymbolTable *table, const char *name);
+Symbol *symbol_table_lookup(SymbolTable *table, Token *name);
 void free_symbol_table(SymbolTable *table);
 
 #endif // SYMBOL_H

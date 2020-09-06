@@ -231,6 +231,19 @@ int lexer_compair_token_name(Token *token, const char *name)
     return 1;
 }
 
+int lexer_compair_token_token(Token *lhs, Token *rhs)
+{
+    if (lhs->length != rhs->length)
+        return 0;
+
+    for (int i = 0; i < lhs->length; i++)
+    {
+        if (lhs->data[i] != rhs->data[i])
+            return 0;
+    }
+    return 1;
+}
+
 void lexer_close()
 {
     assert (g_source);

@@ -35,6 +35,7 @@ void lexer_close();
 
 char *lexer_printable_token_data(Token*);
 int lexer_compair_token_name(Token*, const char *name);
+int lexer_compair_token_token(Token*, Token*);
 
 Token lexer_consume(enum TokenType);
 Token lexer_peek(int count);

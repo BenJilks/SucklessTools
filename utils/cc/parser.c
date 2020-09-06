@@ -120,21 +120,24 @@ static Expression *parse_function_call(Expression *left)
     return call;
 }
 
-static Expression *parse_term()
+static Expression *parse_term(SymbolTable *table)
 {
     Expression *expression = malloc(sizeof(Expression));
     expression->type = EXPRESSION_TYPE_VALUE;
 
     Value *value = &expression->value;
-    switch (lexer_peek(0).type)
+    Token token = lexer_peek(0);
+    switch (token.type)
     {
         case TOKEN_TYPE_INTEGER:
             value->type = VALUE_TYPE_INT;
-            value->i = atoi(lexer_consume(TOKEN_TYPE_INTEGER).data);
+            value->i = atoi(token.data);
+            lexer_consume(TOKEN_TYPE_INTEGER);
             break;
         case TOKEN_TYPE_IDENTIFIER:
             value->type = VALUE_TYPE_VARIABLE;
-            value->v = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+            value->v = symbol_table_lookup(table, &token);
+            lexer_consume(TOKEN_TYPE_IDENTIFIER);
             break;
         default:
             assert (0);
@@ -147,16 +150,16 @@ static Expression *parse_term()
     return expression;
 }
 
-static Expression *parse_expression()
+static Expression *parse_expression(SymbolTable *table)
 {
-    Expression *left = parse_term();
+    Expression *left = parse_term(table);
     while (lexer_peek(0).type == TOKEN_TYPE_ADD)
     {
         match(TOKEN_TYPE_ADD);
         Expression *operation = malloc(sizeof(Expression));
         operation->type = EXPRESSION_TYPE_ADD;
         operation->left = left;
-        operation->right = parse_term();
+        operation->right = parse_term(table);
         left = operation;
     }
 
@@ -195,14 +198,19 @@ static void parse_declaration(Scope *scope)
 static int is_data_type_next()
 {
     Token token = lexer_peek(0);
-    if (token.type != TOKEN_TYPE_IDENTIFIER)
-        return 0;
-
-    if (lexer_compair_token_name(&token, "int"))
-        return 1;
-    if (lexer_compair_token_name(&token, "float"))
-        return 1;
-    return 0;
+    switch (token.type)
+    {
+        case TOKEN_TYPE_CONST:
+            return 1;
+        case TOKEN_TYPE_IDENTIFIER:
+            if (lexer_compair_token_name(&token, "int"))
+                return 1;
+            if (lexer_compair_token_name(&token, "float"))
+                return 1;
+            return 0;
+        default:
+            return 0;
+    }
 }
 
 static void parse_expression_statement(Scope *scope)
