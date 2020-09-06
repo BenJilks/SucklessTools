@@ -152,6 +152,29 @@ static void parse_declaration(Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
+static int is_data_type_next()
+{
+    Token token = lexer_peek(0);
+    if (token.type != TOKEN_TYPE_IDENTIFIER)
+        return 0;
+
+    if (lexer_compair_token_name(&token, "int"))
+        return 1;
+    if (lexer_compair_token_name(&token, "float"))
+        return 1;
+    return 0;
+}
+
+static void parse_expression_statement(Scope *scope)
+{
+    Statement statement;
+    statement.type = STATEMENT_TYPE_EXPRESSION;
+    statement.expression = parse_expression();
+    match(TOKEN_TYPE_SEMI);
+
+    add_statement_to_scope(scope, statement);
+}
+
 static Scope *parse_scope()
 {
     Scope *scope = malloc(sizeof(Scope));
@@ -161,15 +184,10 @@ static Scope *parse_scope()
     match(TOKEN_TYPE_OPEN_SQUIGGLY);
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
     {
-        switch (lexer_peek(0).type)
-        {
-            case TOKEN_TYPE_IDENTIFIER:
-                parse_declaration(scope);
-                break;
-
-            default:
-                assert (0);
-        }
+        if (is_data_type_next())
+            parse_declaration(scope);
+        else
+            parse_expression_statement(scope);
     }
     match(TOKEN_TYPE_CLOSE_SQUIGGLY);
 

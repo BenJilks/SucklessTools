@@ -208,6 +208,20 @@ char *lexer_printable_token_data(Token *token)
     return buffer;
 }
 
+int lexer_compair_token_name(Token *token, const char *name)
+{
+    int name_len = strlen(name);
+    if (token->length != name_len)
+        return 0;
+
+    for (int i = 0; i < name_len; i++)
+    {
+        if (token->data[i] != name[i])
+            return 0;
+    }
+    return 1;
+}
+
 void lexer_close()
 {
     assert (g_source);

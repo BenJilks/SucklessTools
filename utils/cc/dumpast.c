@@ -62,6 +62,11 @@ static void dump_scope(Scope *scope, int indent)
                     dump_expression(statement->expression, indent + 1);
                 break;
 
+            case STATEMENT_TYPE_EXPRESSION:
+                printf("Expression:\n");
+                dump_expression(statement->expression, indent + 1);
+                break;
+
             default:
                 assert (0);
         }

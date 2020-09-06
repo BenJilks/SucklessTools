@@ -23,26 +23,12 @@ void symbol_table_add(SymbolTable *table, Symbol symbol)
     table->symbol_count += 1;
 }
 
-int compair_token_name(Token *token, const char *name)
-{
-    int name_len = strlen(name);
-    if (token->length != name_len)
-        return 0;
-
-    for (int i = 0; i < name_len; i++)
-    {
-        if (token->data[i] != name[i])
-            return 0;
-    }
-    return 1;
-}
-
 Symbol *symbol_table_lookup(SymbolTable *table, const char *name)
 {
     for (int i = table->symbol_count - 1; i >= 0; i--)
     {
         Symbol *symbol = &table->symbols[i];
-        if (compair_token_name(&symbol->name, name))
+        if (lexer_compair_token_name(&symbol->name, name))
             return symbol;
     }
 
