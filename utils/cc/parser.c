@@ -73,14 +73,59 @@ static void parse_params(Symbol *symbol)
     match(TOKEN_TYPE_CLOSE_BRACKET);
 }
 
-static void parse_function_body(Function *function)
+static void add_statement_to_scope(Scope *scope, Statement statement)
 {
+    if (!scope->statements)
+        scope->statements = malloc(sizeof(Statement));
+    else
+        scope->statements = realloc(scope->statements, (scope->statement_count + 1) * sizeof(Statement));
+
+    scope->statements[scope->statement_count] = statement;
+    scope->statement_count += 1;
+}
+
+static void parse_declaration(Scope *scope)
+{
+    // Create statement
+    Statement statement;
+    statement.type = STATEMENT_TYPE_DECLARATION;
+    statement.data_type = parse_data_type();
+    statement.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    add_statement_to_scope(scope, statement);
+    match(TOKEN_TYPE_SEMI);
+
+    // Create symbol
+    Symbol symbol;
+    symbol.name = statement.name;
+    symbol.data_type = statement.data_type;
+    symbol.flags = SYMBOL_LOCAL;
+    symbol.params = NULL;
+    symbol.param_count = 0;
+    symbol_table_add(&scope->table, symbol);
+}
+
+static Scope *parse_scope()
+{
+    Scope *scope = malloc(sizeof(Scope));
+    scope->statements = NULL;
+    scope->statement_count = 0;
+
     match(TOKEN_TYPE_OPEN_SQUIGGLY);
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
     {
-        // TODO: Parse statements
+        switch (lexer_peek(0).type)
+        {
+            case TOKEN_TYPE_IDENTIFIER:
+                parse_declaration(scope);
+                break;
+
+            default:
+                assert (0);
+        }
     }
     match(TOKEN_TYPE_CLOSE_SQUIGGLY);
+
+    return scope;
 }
 
 static void parse_function(Unit *unit)
@@ -98,7 +143,7 @@ static void parse_function(Unit *unit)
     Function function;
     function.func_symbol = func_symbol;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
-        parse_function_body(&function);
+        function.body = parse_scope();
     else
         match(TOKEN_TYPE_SEMI);
 
@@ -136,10 +181,23 @@ Unit parse()
     return unit;
 }
 
+void free_function(Function *function)
+{
+    if (function->body)
+    {
+        free_symbol_table(&function->body->table);
+        free(function->body);
+    }
+}
+
 void free_unit(Unit *unit)
 {
     if (unit->functions)
+    {
+        for (int i = 0; i < unit->function_count; i++)
+            free_function(&unit->functions[i]);
         free(unit->functions);
+    }
 
     free_symbol_table(&unit->global_table);
 }

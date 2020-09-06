@@ -10,10 +10,10 @@ typedef struct DataType
 
 enum SymbolFlags
 {
-    SYMBOL_NULL,
-    SYMBOL_LOCAL,
-    SYMBOL_GLOBAL,
-    SYMBOL_FUNCTION
+    SYMBOL_NULL     = 1 >> 0,
+    SYMBOL_LOCAL    = 1 >> 1,
+    SYMBOL_GLOBAL   = 1 >> 2,
+    SYMBOL_FUNCTION = 1 >> 3
 };
 
 typedef struct Symbol
