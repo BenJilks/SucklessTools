@@ -33,7 +33,8 @@ enum ValueType
 
 #define ENUMERATE_EXPRESSION_TYPE \
     __TYPE(VALUE) \
-    __TYPE(ADD)
+    __TYPE(ADD) \
+    __TYPE(FUNCTION_CALL)
 
 enum ExpressionType
 {
@@ -60,6 +61,9 @@ typedef struct Expression
     Value value;
     struct Expression *left;
     struct Expression *right;
+
+    struct Expression **arguments;
+    int argument_length;
 } Expression;
 
 typedef struct Statement

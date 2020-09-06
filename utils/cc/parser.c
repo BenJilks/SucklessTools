@@ -14,7 +14,20 @@ static void match(enum TokenType type)
 static DataType parse_data_type()
 {
     DataType data_type;
+    data_type.flags = 0;
+    data_type.pointer_count = 0;
+    if (lexer_peek(0).type == TOKEN_TYPE_CONST)
+    {
+        match(TOKEN_TYPE_CONST);
+        data_type.flags |= DATA_TYPE_CONST;
+    }
+
     data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    while (lexer_peek(0).type == TOKEN_TYPE_STAR)
+    {
+        match(TOKEN_TYPE_STAR);
+        data_type.pointer_count += 1;
+    }
     return data_type;
 }
 
@@ -84,6 +97,29 @@ static void add_statement_to_scope(Scope *scope, Statement statement)
     scope->statement_count += 1;
 }
 
+static Expression *parse_expression();
+static Expression *parse_function_call(Expression *left)
+{
+    Expression *call = malloc(sizeof(Expression));
+    call->type = EXPRESSION_TYPE_FUNCTION_CALL;
+    call->left = left;
+
+    Buffer buffer = make_buffer((void**)&call->arguments, &call->argument_length, sizeof(Expression*));
+    match(TOKEN_TYPE_OPEN_BRACKET);
+    while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_BRACKET)
+    {
+        Expression *argument = parse_expression();
+        append_buffer(&buffer, &argument);
+
+        if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
+            break;
+        match(TOKEN_TYPE_COMMA);
+    }
+    match(TOKEN_TYPE_CLOSE_BRACKET);
+
+    return call;
+}
+
 static Expression *parse_term()
 {
     Expression *expression = malloc(sizeof(Expression));
@@ -103,6 +139,10 @@ static Expression *parse_term()
         default:
             assert (0);
     }
+
+    // Parse function call
+    if (lexer_peek(0).type == TOKEN_TYPE_OPEN_BRACKET)
+        return parse_function_call(expression);
 
     return expression;
 }
@@ -208,6 +248,7 @@ static void parse_function(Unit *unit)
     // Optional function body
     Function function;
     function.func_symbol = func_symbol;
+    function.body = NULL;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
         function.body = parse_scope();
     else
@@ -256,6 +297,16 @@ void free_expression(Expression *expression)
             free_expression(expression->right);
             free(expression->left);
             free(expression->right);
+            break;
+        case EXPRESSION_TYPE_FUNCTION_CALL:
+            free_expression(expression->left);
+            for (int i = 0; i < expression->argument_length; i++)
+            {
+                free_expression(expression->arguments[i]);
+                free(expression->arguments[i]);
+            }
+            free(expression->left);
+            free(expression->arguments);
             break;
         default:
             break;

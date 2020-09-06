@@ -12,7 +12,9 @@
     __TOKEN_TYPE(COMMA) \
     __TOKEN_TYPE(SEMI) \
     __TOKEN_TYPE(ADD) \
-    __TOKEN_TYPE(EQUALS)
+    __TOKEN_TYPE(EQUALS) \
+    __TOKEN_TYPE(CONST) \
+    __TOKEN_TYPE(STAR)
 
 enum TokenType
 {

@@ -1,6 +1,7 @@
 #include "dumpast.h"
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 static void print_indent(int indent)
 {
@@ -41,9 +42,37 @@ static void dump_expression(Expression *expression, int indent)
             dump_expression(expression->left, indent + 1);
             dump_expression(expression->right, indent + 1);
             break;
+        case EXPRESSION_TYPE_FUNCTION_CALL:
+            printf("Call:\n");
+            dump_expression(expression->left, indent + 1);
+            print_indent(indent);
+            printf("Arguments:\n");
+            for (int i = 0; i < expression->argument_length; i++)
+                dump_expression(expression->arguments[i], indent + 1);
+            break;
         default:
             assert (0);
     }
+}
+
+static char *printable_data_type(DataType *data_type)
+{
+    static char buffer[1024];
+    int buffer_pointer = 0;
+    if (data_type->flags & DATA_TYPE_CONST)
+    {
+        sprintf(buffer, "const ");
+        buffer_pointer += 6;
+    }
+    sprintf(buffer + buffer_pointer, "%s", lexer_printable_token_data(&data_type->name));
+    buffer_pointer = strlen(buffer);
+
+    for (int i = 0; i < data_type->pointer_count; i++)
+    {
+        sprintf(buffer + buffer_pointer, "*");
+        buffer_pointer += 1;
+    }
+    return buffer;
 }
 
 static void dump_scope(Scope *scope, int indent)
@@ -57,7 +86,7 @@ static void dump_scope(Scope *scope, int indent)
         {
             case STATEMENT_TYPE_DECLARATION:
                 printf("Dec: %s: ", lexer_printable_token_data(&statement->name));
-                printf("%s\n", lexer_printable_token_data(&statement->data_type.name));
+                printf("%s\n", printable_data_type(&statement->data_type));
                 if (statement->expression)
                     dump_expression(statement->expression, indent + 1);
                 break;
@@ -79,12 +108,12 @@ static void dump_function(Function *function)
     for (int i = 0; i < function->func_symbol.param_count; i++)
     {
         Symbol *param = &function->func_symbol.params[i];
-        printf("%s ", lexer_printable_token_data(&param->data_type.name));
+        printf("%s ", printable_data_type(&param->data_type));
         printf("%s", lexer_printable_token_data(&param->name));
         if (i != function->func_symbol.param_count - 1)
             printf(", ");
     }
-    printf(") -> %s\n", lexer_printable_token_data(&function->func_symbol.data_type.name));
+    printf(") -> %s\n", printable_data_type(&function->func_symbol.data_type));
     if (function->body)
         dump_scope(function->body, 2);
 }

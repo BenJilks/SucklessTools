@@ -70,6 +70,13 @@ static Token make_single_char_token(enum TokenType type)
     return token;
 }
 
+static enum TokenType check_keyword(Token *token)
+{
+    if (lexer_compair_token_name(token, "const"))
+        return TOKEN_TYPE_CONST;
+    return TOKEN_TYPE_IDENTIFIER;
+}
+
 static Token lexer_next()
 {
 	enum State state = STATE_INITIAL;
@@ -129,6 +136,8 @@ static Token lexer_next()
                         return make_single_char_token(TOKEN_TYPE_ADD);
                     case '=':
                         return make_single_char_token(TOKEN_TYPE_EQUALS);
+                    case '*':
+                        return make_single_char_token(TOKEN_TYPE_STAR);
                 }
 
                 assert (0);
@@ -137,7 +146,7 @@ static Token lexer_next()
 			case STATE_IDENTIFIER:
                 if (!isalnum(g_c) && g_c != '_')
 				{
-                    token.type = TOKEN_TYPE_IDENTIFIER;
+                    token.type = check_keyword(&token);
 					state = STATE_INITIAL;
                     g_should_reconsume = 1;
                     return token;

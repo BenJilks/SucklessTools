@@ -3,9 +3,17 @@
 
 #include "lexer.h"
 
+enum DataTypeFlags
+{
+    DATA_TYPE_CONST = 1 >> 0,
+};
+
 typedef struct DataType
 {
     Token name;
+
+    enum DataTypeFlags flags;
+    int pointer_count;
 } DataType;
 
 enum SymbolFlags
