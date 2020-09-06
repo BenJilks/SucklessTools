@@ -7,6 +7,8 @@ set(SOURCES
         parser.c
         symbol.c
         dumpast.c
+        x86.c
+        x86_asm.c
 )
 
 add_executable(cc ${SOURCES})
