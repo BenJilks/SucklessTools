@@ -19,12 +19,56 @@ enum StatementType
 #undef __TYPE
 };
 
+#define ENUMERATE_VALUE_TYPE \
+    __TYPE(INT) \
+    __TYPE(FLOAT) \
+    __TYPE(VARIABLE)
+
+enum ValueType
+{
+#define __TYPE(x) VALUE_TYPE_##x,
+    ENUMERATE_VALUE_TYPE
+#undef __TYPE
+};
+
+#define ENUMERATE_EXPRESSION_TYPE \
+    __TYPE(VALUE) \
+    __TYPE(ADD)
+
+enum ExpressionType
+{
+#define __TYPE(x) EXPRESSION_TYPE_##x,
+    ENUMERATE_EXPRESSION_TYPE
+#undef __TYPE
+};
+
+typedef struct Value
+{
+    enum ValueType type;
+    union
+    {
+        int i;
+        float f;
+        Token v;
+    };
+} Value;
+
+typedef struct Expression
+{
+    enum ExpressionType type;
+
+    Value value;
+    struct Expression *left;
+    struct Expression *right;
+} Expression;
+
 typedef struct Statement
 {
     enum StatementType type;
 
     Token name;
     DataType data_type;
+    Expression *expression;
 } Statement;
 
 typedef struct Scope

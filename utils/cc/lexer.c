@@ -125,6 +125,10 @@ static Token lexer_next()
                         return make_single_char_token(TOKEN_TYPE_COMMA);
                     case ';':
                         return make_single_char_token(TOKEN_TYPE_SEMI);
+                    case '+':
+                        return make_single_char_token(TOKEN_TYPE_ADD);
+                    case '=':
+                        return make_single_char_token(TOKEN_TYPE_EQUALS);
                 }
 
                 assert (0);

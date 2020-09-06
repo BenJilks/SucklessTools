@@ -84,6 +84,45 @@ static void add_statement_to_scope(Scope *scope, Statement statement)
     scope->statement_count += 1;
 }
 
+static Expression *parse_term()
+{
+    Expression *expression = malloc(sizeof(Expression));
+    expression->type = EXPRESSION_TYPE_VALUE;
+
+    Value *value = &expression->value;
+    switch (lexer_peek(0).type)
+    {
+        case TOKEN_TYPE_INTEGER:
+            value->type = VALUE_TYPE_INT;
+            value->i = atoi(lexer_consume(TOKEN_TYPE_INTEGER).data);
+            break;
+        case TOKEN_TYPE_IDENTIFIER:
+            value->type = VALUE_TYPE_VARIABLE;
+            value->v = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+            break;
+        default:
+            assert (0);
+    }
+
+    return expression;
+}
+
+static Expression *parse_expression()
+{
+    Expression *left = parse_term();
+    while (lexer_peek(0).type == TOKEN_TYPE_ADD)
+    {
+        match(TOKEN_TYPE_ADD);
+        Expression *operation = malloc(sizeof(Expression));
+        operation->type = EXPRESSION_TYPE_ADD;
+        operation->left = left;
+        operation->right = parse_term();
+        left = operation;
+    }
+
+    return left;
+}
+
 static void parse_declaration(Scope *scope)
 {
     // Create statement
@@ -91,8 +130,7 @@ static void parse_declaration(Scope *scope)
     statement.type = STATEMENT_TYPE_DECLARATION;
     statement.data_type = parse_data_type();
     statement.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    add_statement_to_scope(scope, statement);
-    match(TOKEN_TYPE_SEMI);
+    statement.expression = NULL;
 
     // Create symbol
     Symbol symbol;
@@ -102,6 +140,16 @@ static void parse_declaration(Scope *scope)
     symbol.params = NULL;
     symbol.param_count = 0;
     symbol_table_add(&scope->table, symbol);
+
+    // Parse assignment expression if there is one
+    if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
+    {
+        match(TOKEN_TYPE_EQUALS);
+        statement.expression = parse_expression();
+    }
+    match(TOKEN_TYPE_SEMI);
+
+    add_statement_to_scope(scope, statement);
 }
 
 static Scope *parse_scope()
@@ -179,6 +227,39 @@ Unit parse()
     }
 
     return unit;
+}
+
+void free_expression(Expression *expression)
+{
+    switch (expression->type)
+    {
+        case EXPRESSION_TYPE_ADD:
+            free_expression(expression->left);
+            free_expression(expression->right);
+            free(expression->left);
+            free(expression->right);
+            break;
+        default:
+            break;
+    }
+}
+
+void free_scope(Scope *scope)
+{
+    free_symbol_table(&scope->table);
+    if (scope->statements)
+    {
+        for (int i = 0; i < scope->statement_count; i++)
+        {
+            Statement *statement = &scope->statements[i];
+            if (statement->expression)
+            {
+                free_expression(statement->expression);
+                free(statement->expression);
+            }
+        }
+        free(scope->statements);
+    }
 }
 
 void free_function(Function *function)
