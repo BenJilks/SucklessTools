@@ -79,14 +79,16 @@ typedef struct Scope
     Statement *statements;
     int statement_count;
 
-    SymbolTable table;
+    SymbolTable *table;
 } Scope;
 
 typedef struct Function
 {
     Symbol func_symbol;
+    SymbolTable *table;
     Scope *body;
     int stack_size;
+    int argument_size;
 } Function;
 
 typedef struct Unit
@@ -94,7 +96,7 @@ typedef struct Unit
     Function *functions;
     int function_count;
 
-    SymbolTable global_table;
+    SymbolTable *global_table;
 } Unit;
 
 Unit *parse();

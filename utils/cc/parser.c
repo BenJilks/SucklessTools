@@ -1,6 +1,6 @@
-#include <assert.h>
 #include "parser.h"
 #include "lexer.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
@@ -63,27 +63,6 @@ static void append_buffer(Buffer *buffer, void *item)
 
     memcpy(buffer->memory + (*buffer->count * buffer->unit_size), item, buffer->unit_size);
     *buffer->count += 1;
-}
-
-static void parse_params(Symbol *symbol)
-{
-    Buffer params_buffer = make_buffer((void**)&symbol->params, &symbol->param_count, sizeof(Symbol));
-
-    match(TOKEN_TYPE_OPEN_BRACKET);
-    while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_BRACKET)
-    {
-        Symbol param;
-        param.data_type = parse_data_type();
-        param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-        param.params = NULL;
-        param.param_count = 0;
-        append_buffer(&params_buffer, &param);
-
-        if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
-            break;
-        match(TOKEN_TYPE_COMMA);
-    }
-    match(TOKEN_TYPE_CLOSE_BRACKET);
 }
 
 static void add_statement_to_scope(Scope *scope, Statement statement)
@@ -154,6 +133,7 @@ static Expression *parse_term(SymbolTable *table)
 static Expression *parse_expression(SymbolTable *table)
 {
     Expression *left = parse_term(table);
+
     while (lexer_peek(0).type == TOKEN_TYPE_ADD)
     {
         match(TOKEN_TYPE_ADD);
@@ -177,7 +157,7 @@ static void parse_declaration(Function *function, Scope *scope)
     symbol.location = function->stack_size;
     symbol.params = NULL;
     symbol.param_count = 0;
-    symbol_table_add(&scope->table, symbol);
+    symbol_table_add(scope->table, symbol);
     function->stack_size += 4; // TODO: Find the real size here
 
     // Create statement
@@ -189,7 +169,7 @@ static void parse_declaration(Function *function, Scope *scope)
     if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
     {
         match(TOKEN_TYPE_EQUALS);
-        statement.expression = parse_expression(&scope->table);
+        statement.expression = parse_expression(scope->table);
     }
     match(TOKEN_TYPE_SEMI);
 
@@ -218,7 +198,7 @@ static void parse_expression_statement(Scope *scope)
 {
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
-    statement.expression = parse_expression(&scope->table);
+    statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_SEMI);
 
     add_statement_to_scope(scope, statement);
@@ -230,7 +210,7 @@ static void parse_return(Scope *scope)
 
     Statement statement;
     statement.type = STATEMENT_TYPE_RETURN;
-    statement.expression = parse_expression(&scope->table);
+    statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_SEMI);
 
     add_statement_to_scope(scope, statement);
@@ -267,24 +247,54 @@ static Scope *parse_scope(Function *function, SymbolTable *parent)
     return scope;
 }
 
+static void parse_params(Function *function, Symbol *symbol)
+{
+    Buffer params_buffer = make_buffer((void**)&symbol->params, &symbol->param_count, sizeof(Symbol));
+
+    match(TOKEN_TYPE_OPEN_BRACKET);
+    while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_BRACKET)
+    {
+        Symbol param;
+        param.flags = SYMBOL_ARGUMENT;
+        param.data_type = parse_data_type();
+        param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+        param.params = NULL;
+        param.param_count = 0;
+
+        param.location = function->argument_size;
+        function->argument_size += 4; // TODO: Real size here
+
+        append_buffer(&params_buffer, &param);
+        symbol_table_add(function->table, param);
+
+        if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
+            break;
+        match(TOKEN_TYPE_COMMA);
+    }
+    match(TOKEN_TYPE_CLOSE_BRACKET);
+}
+
 static void parse_function(Unit *unit)
 {
+    Function function;
+    function.table = symbol_table_new(unit->global_table);
+    function.stack_size = 0;
+    function.argument_size = 0;
+
     // Function definition
     Symbol func_symbol;
     func_symbol.data_type = parse_data_type();
     func_symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    parse_params(&func_symbol);
+    parse_params(&function, &func_symbol);
 
     // Register symbol
-    symbol_table_add(&unit->global_table, func_symbol);
+    symbol_table_add(unit->global_table, func_symbol);
 
     // Optional function body
-    Function function;
     function.func_symbol = func_symbol;
     function.body = NULL;
-    function.stack_size = 0;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
-        function.body = parse_scope(&function, &unit->global_table);
+        function.body = parse_scope(&function, function.table);
     else
         match(TOKEN_TYPE_SEMI);
 
@@ -349,7 +359,8 @@ void free_expression(Expression *expression)
 
 void free_scope(Scope *scope)
 {
-    free_symbol_table(&scope->table);
+    free_symbol_table(scope->table);
+    free(scope->table);
     if (scope->statements)
     {
         for (int i = 0; i < scope->statement_count; i++)
@@ -367,9 +378,11 @@ void free_scope(Scope *scope)
 
 void free_function(Function *function)
 {
+    free_symbol_table(function->table);
+    free(function->table);
     if (function->body)
     {
-        free_symbol_table(&function->body->table);
+        free_symbol_table(function->body->table);
         free(function->body);
     }
 }
@@ -383,5 +396,6 @@ void free_unit(Unit *unit)
         free(unit->functions);
     }
 
-    free_symbol_table(&unit->global_table);
+    free_symbol_table(unit->global_table);
+    free(unit->global_table);
 }

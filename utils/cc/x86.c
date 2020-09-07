@@ -14,7 +14,12 @@ static void compile_value(X86Code *code, Value *value)
             INST(X86_OP_CODE_PUSH_IMM32, value->f);
             break;
         case VALUE_TYPE_VARIABLE:
-            INST(X86_OP_CODE_PUSH_MEM_REG_OFF, X86_REG_EBP, -4 - value->v->location);
+            if (value->v->flags & SYMBOL_LOCAL)
+                INST(X86_OP_CODE_PUSH_MEM_REG_OFF, X86_REG_EBP, -4 - value->v->location);
+            else if (value->v->flags & SYMBOL_ARGUMENT)
+                INST(X86_OP_CODE_PUSH_MEM_REG_OFF, X86_REG_EBP, 8 + value->v->location);
+            else
+                assert (0);
             break;
     }
 }

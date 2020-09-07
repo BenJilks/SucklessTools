@@ -227,7 +227,7 @@ static void dump_instruction(X86Instruction *instruction)
     {
         printf("dword [");
         dump_argument(&instruction->arg1, 1);
-        if (instruction->arg2.off > 0)
+        if (instruction->arg2.off >= 0)
             printf("+%i]", instruction->arg2.off);
         else
             printf("-%i]", -instruction->arg2.off);
@@ -238,7 +238,7 @@ static void dump_instruction(X86Instruction *instruction)
         dump_argument(&instruction->arg1, 1);
         printf("dword [");
         dump_argument(&instruction->arg2, 1);
-        if (instruction->arg3.off > 0)
+        if (instruction->arg3.off >= 0)
             printf("+%i]", instruction->arg3.off);
         else
             printf("-%i]", -instruction->arg3.off);
