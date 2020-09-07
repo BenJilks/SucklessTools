@@ -113,6 +113,11 @@ static Expression *parse_term(SymbolTable *table)
             value->i = atoi(token.data);
             lexer_consume(TOKEN_TYPE_INTEGER);
             break;
+        case TOKEN_TYPE_STRING:
+            value->type = VALUE_TYPE_STRING;
+            value->s = token;
+            lexer_consume(TOKEN_TYPE_STRING);
+            break;
         case TOKEN_TYPE_IDENTIFIER:
             value->type = VALUE_TYPE_VARIABLE;
             value->v = symbol_table_lookup(table, &token);

@@ -54,6 +54,7 @@ typedef struct X86Argument
     __OP_CODE(PUSH_REG,             REG,    NONE,   NONE,   push) \
     __OP_CODE(PUSH_IMM32,           IMM32,  NONE,   NONE,   push) \
     __OP_CODE(PUSH_MEM_REG_OFF,     REG,    OFF,    NONE,   push) \
+    __OP_CODE(PUSH_LABEL,           LABEL,  NONE,   NONE,   push) \
     __OP_CODE(POP_REG,              REG,    NONE,   NONE,   pop) \
     __OP_CODE(CALL_LABEL,           LABEL,  NONE,   NONE,   call) \
     __OP_CODE(RET,                  NONE,   NONE,   NONE,   ret)
@@ -97,6 +98,9 @@ typedef struct X86Code
     char **label_mem;
     int label_count;
 
+    char **string_data;
+    int string_data_count;
+
     char *externals;
     int external_count;
     int external_buffer;
@@ -111,6 +115,7 @@ void x86_code_add_instruction(X86Code*, X86Instruction);
 void x86_code_add_label(X86Code*, const char *label);
 void x86_code_add_blank(X86Code*);
 void x86_code_add_external(X86Code*, const char *external);
+int x86_code_add_string_data(X86Code*, const char *str);
 void free_x86_code(X86Code*);
 
 X86Instruction x86(X86Code *code, enum X86OpCode op_code, ...);

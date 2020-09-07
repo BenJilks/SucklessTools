@@ -13,6 +13,9 @@ X86Code x86_code_new()
     code.label_mem = NULL;
     code.label_count = 0;
 
+    code.string_data = NULL;
+    code.string_data_count = 0;
+
     code.externals = malloc(80 * EXTERNAL_MAX_LENGTH);
     code.external_buffer = 80;
     code.external_count = 0;
@@ -86,6 +89,19 @@ void x86_code_add_blank(X86Code *code)
     X86Line line;
     line.type = X86_LINE_TYPE_BLANK;
     add_line(code, line);
+}
+
+int x86_code_add_string_data(X86Code *code, const char *str)
+{
+    if (!code->string_data)
+        code->string_data = malloc(sizeof(char*));
+    else
+        code->string_data = realloc(code->string_data, (code->string_data_count + 1) * sizeof(char*));
+
+    char *mem = malloc(strlen(str) + 1);
+    strcpy(mem, str);
+    code->string_data[code->string_data_count++] = mem;
+    return code->string_data_count - 1;
 }
 
 static X86Argument reg(enum X86Reg reg, X86Code *code)
@@ -258,12 +274,21 @@ static void dump_externals(X86Code *code)
         printf("  extern %s\n", code->externals + i * EXTERNAL_MAX_LENGTH);
 }
 
+static void dump_string_data(X86Code *code)
+{
+    for (int i = 0; i < code->string_data_count; i++)
+        printf("  str%i: db \"%s\"\n", i, code->string_data[i]);
+}
+
 void x86_dump(X86Code *code)
 {
     printf("  global main\n");
     dump_externals(code);
 
-    printf("segment .text\n");
+    printf("segment .data\n");
+    dump_string_data(code);
+
+    printf("\nsegment .text\n");
     for (int i = 0; i < code->line_count; i++)
     {
         X86Line *line = &code->lines[i];

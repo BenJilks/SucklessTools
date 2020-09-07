@@ -22,6 +22,7 @@ enum StatementType
 #define ENUMERATE_VALUE_TYPE \
     __TYPE(INT) \
     __TYPE(FLOAT) \
+    __TYPE(STRING) \
     __TYPE(VARIABLE)
 
 enum ValueType
@@ -51,6 +52,7 @@ typedef struct Value
         int i;
         float f;
         Symbol *v;
+        Token s;
     };
 } Value;
 

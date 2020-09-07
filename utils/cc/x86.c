@@ -1,7 +1,16 @@
 #include "x86.h"
 #include <assert.h>
+#include <stdio.h>
 
 #define INST(...) x86_code_add_instruction(code, x86(code, __VA_ARGS__))
+
+static void compile_string(X86Code *code, Value *value)
+{
+    int string_id = x86_code_add_string_data(code, lexer_printable_token_data(&value->s));
+    char label[80];
+    sprintf(label, "str%i", string_id);
+    INST(X86_OP_CODE_PUSH_LABEL, label);
+}
 
 static void compile_value(X86Code *code, Value *value)
 {
@@ -12,6 +21,9 @@ static void compile_value(X86Code *code, Value *value)
             break;
         case VALUE_TYPE_FLOAT:
             INST(X86_OP_CODE_PUSH_IMM32, value->f);
+            break;
+        case VALUE_TYPE_STRING:
+            compile_string(code, value);
             break;
         case VALUE_TYPE_VARIABLE:
             if (value->v->flags & SYMBOL_LOCAL)

@@ -52,6 +52,7 @@ enum State
 	STATE_INITIAL,
 	STATE_IDENTIFIER,
     STATE_INTEGER,
+    STATE_STRING,
 };
 
 typedef struct Buffer
@@ -120,6 +121,13 @@ static Token lexer_next()
                     break;
                 }
 
+                if (g_c == '"')
+                {
+                    state = STATE_STRING;
+                    token.data = g_source + g_source_pointer;
+                    break;
+                }
+
                 switch (g_c)
                 {
                     case '(':
@@ -163,6 +171,17 @@ static Token lexer_next()
                     token.type = TOKEN_TYPE_INTEGER;
                     state = STATE_INITIAL;
                     g_should_reconsume = 1;
+                    return token;
+                }
+
+                token.length += 1;
+                break;
+
+            case STATE_STRING:
+                if (g_c == '"')
+                {
+                    token.type = TOKEN_TYPE_STRING;
+                    state = STATE_INITIAL;
                     return token;
                 }
 
