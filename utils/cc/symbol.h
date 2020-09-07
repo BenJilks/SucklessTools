@@ -29,6 +29,7 @@ typedef struct Symbol
     Token name;
     DataType data_type;
     int flags;
+    int location;
 
     struct Symbol *params;
     int param_count;

@@ -19,7 +19,10 @@ enum X86Reg
 #define ENUMERATE_X86_ARGUMENT_TYPE \
     __TYPE(NONE) \
     __TYPE(REG) \
-    __TYPE(IMM8)
+    __TYPE(IMM8) \
+    __TYPE(IMM32) \
+    __TYPE(OFF) \
+    __TYPE(LABEL)
 
 enum X86ArgumentType
 {
@@ -34,16 +37,26 @@ typedef struct X86Argument
     union
     {
         enum X86Reg reg;
+        int8_t off;
         uint8_t imm8;
+        uint32_t imm32;
+        const char *label;
     };
 } X86Argument;
 
 #define ENUMERATE_X86_OP_CODES \
-    __OP_CODE(MOV_REG_REG,      REG,    REG,    mov) \
-    __OP_CODE(SUB_REG_IMM8,     REG,    IMM8,   sub) \
-    __OP_CODE(PUSH_REG,         REG,    NONE,   push) \
-    __OP_CODE(POP_REG,          REG,    NONE,   pop) \
-    __OP_CODE(RET,              NONE,   NONE,   ret)
+    __OP_CODE(MOV_REG_REG,          REG,    REG,    NONE,   mov) \
+    __OP_CODE(MOV_REG_MEM_REG_OFF,  REG,    REG,    OFF,    mov) \
+    __OP_CODE(MOV_MEM_REG_OFF_REG,  REG,    OFF,    REG,    mov) \
+    __OP_CODE(SUB_REG_IMM8,         REG,    IMM8,   NONE,   sub) \
+    __OP_CODE(ADD_REG_REG,          REG,    REG,    NONE,   add) \
+    __OP_CODE(ADD_REG_IMM8,         REG,    IMM8,   NONE,   add) \
+    __OP_CODE(PUSH_REG,             REG,    NONE,   NONE,   push) \
+    __OP_CODE(PUSH_IMM32,           IMM32,  NONE,   NONE,   push) \
+    __OP_CODE(PUSH_MEM_REG_OFF,     REG,    OFF,    NONE,   push) \
+    __OP_CODE(POP_REG,              REG,    NONE,   NONE,   pop) \
+    __OP_CODE(CALL_LABEL,           LABEL,  NONE,   NONE,   call) \
+    __OP_CODE(RET,                  NONE,   NONE,   NONE,   ret)
 
 enum X86OpCode
 {
@@ -57,10 +70,13 @@ typedef struct X86Instruction
     enum X86OpCode op_code;
     X86Argument arg1;
     X86Argument arg2;
+    X86Argument arg3;
 } X86Instruction;
 
 #define ENUMERATE_X86_LINE_TYPE \
-    __TYPE(INSTRUCTION)
+    __TYPE(INSTRUCTION) \
+    __TYPE(LABEL) \
+    __TYPE(BLANK)
 
 enum X86LineType
 {
@@ -73,10 +89,18 @@ typedef struct X86Line
 {
     enum X86LineType type;
     X86Instruction instruction;
+    char label[80];
 } X86Line;
 
 typedef struct X86Code
 {
+    char **label_mem;
+    int label_count;
+
+    char *externals;
+    int external_count;
+    int external_buffer;
+
     X86Line *lines;
     int line_count;
     int line_buffer;
@@ -84,9 +108,12 @@ typedef struct X86Code
 
 X86Code x86_code_new();
 void x86_code_add_instruction(X86Code*, X86Instruction);
+void x86_code_add_label(X86Code*, const char *label);
+void x86_code_add_blank(X86Code*);
+void x86_code_add_external(X86Code*, const char *external);
 void free_x86_code(X86Code*);
 
-X86Instruction x86(enum X86OpCode op_code, ...);
+X86Instruction x86(X86Code *code, enum X86OpCode op_code, ...);
 void x86_dump(X86Code *code);
 
 #endif // X86_ASM_H

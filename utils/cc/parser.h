@@ -70,8 +70,7 @@ typedef struct Statement
 {
     enum StatementType type;
 
-    Token name;
-    DataType data_type;
+    Symbol symbol;
     Expression *expression;
 } Statement;
 
@@ -87,6 +86,7 @@ typedef struct Function
 {
     Symbol func_symbol;
     Scope *body;
+    int stack_size;
 } Function;
 
 typedef struct Unit

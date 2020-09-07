@@ -85,8 +85,8 @@ static void dump_scope(Scope *scope, int indent)
         switch (statement->type)
         {
             case STATEMENT_TYPE_DECLARATION:
-                printf("Dec: %s: ", lexer_printable_token_data(&statement->name));
-                printf("%s\n", printable_data_type(&statement->data_type));
+                printf("Dec: %s: ", lexer_printable_token_data(&statement->symbol.name));
+                printf("%s\n", printable_data_type(&statement->symbol.data_type));
                 if (statement->expression)
                     dump_expression(statement->expression, indent + 1);
                 break;

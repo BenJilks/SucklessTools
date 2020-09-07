@@ -167,23 +167,23 @@ static Expression *parse_expression(SymbolTable *table)
     return left;
 }
 
-static void parse_declaration(Scope *scope)
+static void parse_declaration(Function *function, Scope *scope)
 {
-    // Create statement
-    Statement statement;
-    statement.type = STATEMENT_TYPE_DECLARATION;
-    statement.data_type = parse_data_type();
-    statement.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    statement.expression = NULL;
-
     // Create symbol
     Symbol symbol;
-    symbol.name = statement.name;
-    symbol.data_type = statement.data_type;
+    symbol.data_type = parse_data_type();
+    symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     symbol.flags = SYMBOL_LOCAL;
+    symbol.location = function->stack_size;
     symbol.params = NULL;
     symbol.param_count = 0;
     symbol_table_add(&scope->table, symbol);
+    function->stack_size += 4; // TODO: Find the real size here
+
+    // Create statement
+    Statement statement;
+    statement.type = STATEMENT_TYPE_DECLARATION;
+    statement.symbol = symbol;
 
     // Parse assignment expression if there is one
     if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
@@ -236,7 +236,7 @@ static void parse_return(Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
-static Scope *parse_scope(SymbolTable *parent)
+static Scope *parse_scope(Function *function, SymbolTable *parent)
 {
     Scope *scope = malloc(sizeof(Scope));
     scope->statements = NULL;
@@ -248,7 +248,7 @@ static Scope *parse_scope(SymbolTable *parent)
     {
         if (is_data_type_next())
         {
-            parse_declaration(scope);
+            parse_declaration(function, scope);
             continue;
         }
 
@@ -282,9 +282,9 @@ static void parse_function(Unit *unit)
     Function function;
     function.func_symbol = func_symbol;
     function.body = NULL;
+    function.stack_size = 0;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
-        function.body = parse_scope(&unit->global_table);
-
+        function.body = parse_scope(&function, &unit->global_table);
     else
         match(TOKEN_TYPE_SEMI);
 

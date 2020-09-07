@@ -11,7 +11,6 @@ int main()
 
     // Parse
     Unit *unit = parse();
-    dump_unit(unit);
 
     // Compile
     X86Code code = x86_compile_unit(unit);
