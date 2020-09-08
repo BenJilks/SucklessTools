@@ -34,6 +34,7 @@ typedef struct Symbol
 
     struct Symbol *params;
     int param_count;
+    int is_variadic;
 } Symbol;
 
 typedef struct SymbolTable

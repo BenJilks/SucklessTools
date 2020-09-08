@@ -7,7 +7,7 @@
 
 int main()
 {
-    lexer_open_file("test.txt");
+    lexer_open_file("test.c");
 
     // Parse
     Unit *unit = parse();

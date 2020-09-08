@@ -20,6 +20,11 @@ static int g_source_pointer;
 static char g_c = '\0';
 static int g_should_reconsume = 0;
 
+void lexer_error(const char *message)
+{
+    printf("Error: %s\n", message);
+}
+
 void lexer_open_file(const char *file_path)
 {
     assert (!g_source);
@@ -53,6 +58,8 @@ enum State
 	STATE_IDENTIFIER,
     STATE_INTEGER,
     STATE_STRING,
+    STATE_DOT,
+    STATE_DOT_DOT,
 };
 
 typedef struct Buffer
@@ -128,6 +135,14 @@ static Token lexer_next()
                     break;
                 }
 
+                if (g_c == '.')
+                {
+                    state = STATE_DOT;
+                    token.data = g_source + g_source_pointer - 1;
+                    token.length = 1;
+                    break;
+                }
+
                 switch (g_c)
                 {
                     case '(':
@@ -187,7 +202,34 @@ static Token lexer_next()
 
                 token.length += 1;
                 break;
-		}
+
+            case STATE_DOT:
+                if (g_c == '.')
+                {
+                    state = STATE_DOT_DOT;
+                    token.length += 1;
+                    break;
+                }
+
+                ERROR("Unexpected char '%c'", g_c);
+                state = STATE_INITIAL;
+                g_should_reconsume = 1;
+                break;
+
+            case STATE_DOT_DOT:
+                if (g_c == '.')
+                {
+                    state = STATE_INITIAL;
+                    token.length += 1;
+                    token.type = TOKEN_TYPE_ELLIPSE;
+                    return token;
+                }
+
+                ERROR("Unexpected char '%c'", g_c);
+                state = STATE_INITIAL;
+                g_should_reconsume = 1;
+                break;
+        }
 	}
 }
 
