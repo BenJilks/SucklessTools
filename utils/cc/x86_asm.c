@@ -128,11 +128,19 @@ static X86Argument imm32(uint32_t imm32, X86Code *code)
     arg.imm32 = imm32;
     return arg;
 }
-static X86Argument off(uint8_t off, X86Code *code)
+static X86Argument off32(uint8_t off, X86Code *code)
 {
     (void)code;
     X86Argument arg;
-    arg.type = X86_ARGUMENT_TYPE_OFF;
+    arg.type = X86_ARGUMENT_TYPE_OFF32;
+    arg.off = off;
+    return arg;
+}
+static X86Argument off8(uint8_t off, X86Code *code)
+{
+    (void)code;
+    X86Argument arg;
+    arg.type = X86_ARGUMENT_TYPE_OFF8;
     arg.off = off;
     return arg;
 }
@@ -171,8 +179,10 @@ X86Instruction x86(X86Code *code, enum X86OpCode op_code, ...)
 #define ARG_TYPE_IMM8 int
 #define ARG_FUNC_IMM32 imm32
 #define ARG_TYPE_IMM32 int
-#define ARG_FUNC_OFF off
-#define ARG_TYPE_OFF int
+#define ARG_FUNC_OFF32 off32
+#define ARG_TYPE_OFF32 int
+#define ARG_FUNC_OFF8 off8
+#define ARG_TYPE_OFF8 int
 #define ARG_FUNC_LABEL label
 #define ARG_TYPE_LABEL const char*
 #define ARG_FUNC_NONE(...) none
@@ -229,6 +239,32 @@ static void dump_argument(X86Argument *argument, int is_first)
     }
 }
 
+static int is_offset(enum X86ArgumentType type)
+{
+    return type == X86_ARGUMENT_TYPE_OFF32 || type == X86_ARGUMENT_TYPE_OFF8;
+}
+
+static void dump_offset(X86Argument *a, X86Argument *b)
+{
+    switch (b->type)
+    {
+        case X86_ARGUMENT_TYPE_OFF8:
+            printf("byte [");
+            break;
+        case X86_ARGUMENT_TYPE_OFF32:
+            printf("dword [");
+            break;
+        default:
+            assert (0);
+    }
+
+    dump_argument(a, 1);
+    if (b->off >= 0)
+        printf("+%i]", b->off);
+    else
+        printf("-%i]", -b->off);
+}
+
 static void dump_instruction(X86Instruction *instruction)
 {
     switch (instruction->op_code)
@@ -239,25 +275,15 @@ static void dump_instruction(X86Instruction *instruction)
 #undef __OP_CODE
     }
 
-    if (instruction->arg2.type == X86_ARGUMENT_TYPE_OFF)
+    if (is_offset(instruction->arg2.type))
     {
-        printf("dword [");
-        dump_argument(&instruction->arg1, 1);
-        if (instruction->arg2.off >= 0)
-            printf("+%i]", instruction->arg2.off);
-        else
-            printf("-%i]", -instruction->arg2.off);
+        dump_offset(&instruction->arg1, &instruction->arg2);
         dump_argument(&instruction->arg3, 0);
     }
-    else if (instruction->arg3.type == X86_ARGUMENT_TYPE_OFF)
+    else if (is_offset(instruction->arg3.type))
     {
         dump_argument(&instruction->arg1, 1);
-        printf("dword [");
-        dump_argument(&instruction->arg2, 1);
-        if (instruction->arg3.off >= 0)
-            printf("+%i]", instruction->arg3.off);
-        else
-            printf("-%i]", -instruction->arg3.off);
+        dump_offset(&instruction->arg2, &instruction->arg3);
     }
     else
     {

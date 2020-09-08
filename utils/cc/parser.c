@@ -28,6 +28,15 @@ static DataType parse_data_type()
     }
 
     data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    if (lexer_compair_token_name(&data_type.name, "int"))
+        data_type.size = 4;
+    else if (lexer_compair_token_name(&data_type.name, "float"))
+        data_type.size = 4;
+    else if (lexer_compair_token_name(&data_type.name, "char"))
+        data_type.size = 1;
+    else
+        ERROR("Expected datatype, got '%s' instead", lexer_printable_token_data(&data_type.name));
+
     while (lexer_peek(0).type == TOKEN_TYPE_STAR)
     {
         match(TOKEN_TYPE_STAR, "*");
@@ -84,6 +93,9 @@ static void add_statement_to_scope(Scope *scope, Statement statement)
 static Expression *parse_expression(SymbolTable *table);
 static Expression *parse_function_call(SymbolTable *table, Expression *left)
 {
+    Symbol *function_symbol = left->value.v;
+    int argument_count = 0;
+
     Expression *call = malloc(sizeof(Expression));
     call->type = EXPRESSION_TYPE_FUNCTION_CALL;
     call->left = left;
@@ -94,6 +106,7 @@ static Expression *parse_function_call(SymbolTable *table, Expression *left)
     {
         Expression *argument = parse_expression(table);
         append_buffer(&buffer, &argument);
+        argument_count += 1;
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
             break;
@@ -101,6 +114,22 @@ static Expression *parse_function_call(SymbolTable *table, Expression *left)
     }
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
 
+    if (argument_count != function_symbol->param_count)
+    {
+        if (function_symbol->is_variadic)
+        {
+            if (argument_count < function_symbol->param_count)
+            {
+                ERROR("Expected at least %i argument(s) for variadic function '%s', got %i instead",
+                      function_symbol->param_count, lexer_printable_token_data(&function_symbol->name), argument_count);
+            }
+        }
+        else
+        {
+            ERROR("Expected %i argument(s) to function '%s', got %i instead",
+                  function_symbol->param_count, lexer_printable_token_data(&function_symbol->name), argument_count);
+        }
+    }
     return call;
 }
 
@@ -174,7 +203,7 @@ static void parse_declaration(Function *function, Scope *scope)
     symbol.params = NULL;
     symbol.param_count = 0;
     symbol_table_add(scope->table, symbol);
-    function->stack_size += 4; // TODO: Find the real size here
+    function->stack_size += symbol.data_type.size;
 
     // Create statement
     Statement statement;
@@ -203,6 +232,8 @@ static int is_data_type_next()
             if (lexer_compair_token_name(&token, "int"))
                 return 1;
             if (lexer_compair_token_name(&token, "float"))
+                return 1;
+            if (lexer_compair_token_name(&token, "char"))
                 return 1;
             return 0;
         default:
@@ -286,7 +317,7 @@ static void parse_params(Function *function, Symbol *symbol)
         param.param_count = 0;
 
         param.location = function->argument_size;
-        function->argument_size += 4; // TODO: Real size here
+        function->argument_size += param.data_type.size;
 
         append_buffer(&params_buffer, &param);
         symbol_table_add(function->table, param);

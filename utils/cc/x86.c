@@ -12,6 +12,19 @@ static void compile_string(X86Code *code, Value *value)
     INST(X86_OP_CODE_PUSH_LABEL, label);
 }
 
+static void compile_variable(X86Code *code, Symbol *variable)
+{
+    int location;
+    if (variable->flags & SYMBOL_LOCAL)
+        location = -4 - variable->location;
+    else if (variable->flags & SYMBOL_ARGUMENT)
+        location = 8 + variable->location;
+    else
+        assert (0);
+
+    INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
+}
+
 static void compile_value(X86Code *code, Value *value)
 {
     switch (value->type)
@@ -29,12 +42,7 @@ static void compile_value(X86Code *code, Value *value)
             if (!value->v)
                 break;
 
-            if (value->v->flags & SYMBOL_LOCAL)
-                INST(X86_OP_CODE_PUSH_MEM_REG_OFF, X86_REG_EBP, -4 - value->v->location);
-            else if (value->v->flags & SYMBOL_ARGUMENT)
-                INST(X86_OP_CODE_PUSH_MEM_REG_OFF, X86_REG_EBP, 8 + value->v->location);
-            else
-                assert (0);
+            compile_variable(code, value->v);
             break;
     }
 }
@@ -42,11 +50,12 @@ static void compile_value(X86Code *code, Value *value)
 static void compile_expression(X86Code *code, Expression *expression);
 static void compile_fuction_call(X86Code *code, Expression *expression)
 {
-    Token func = expression->left->value.v->name;
+    Symbol *func_symbol = expression->left->value.v;
+    Token func_name = func_symbol->name;
     for (int i = expression->argument_length - 1; i >= 0; i--)
         compile_expression(code, expression->arguments[i]);
 
-    INST(X86_OP_CODE_CALL_LABEL, lexer_printable_token_data(&func));
+    INST(X86_OP_CODE_CALL_LABEL, lexer_printable_token_data(&func_name));
     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, expression->argument_length * 4);
 }
 
@@ -71,6 +80,22 @@ static void compile_expression(X86Code *code, Expression *expression)
     }
 }
 
+static void compile_assign_variable(X86Code *code, Symbol *variable)
+{
+    INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+
+    int location = -4 - variable->location;
+    switch (variable->data_type.size)
+    {
+        case 1:
+            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location, X86_REG_AL);
+            break;
+        case 8:
+            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
+            break;
+    }
+}
+
 static void compile_scope(X86Code *code, Scope *scope)
 {
     for (int i = 0; i < scope->statement_count; i++)
@@ -82,8 +107,7 @@ static void compile_scope(X86Code *code, Scope *scope)
                 if (statement->expression)
                 {
                     compile_expression(code, statement->expression);
-                    INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
-                    INST(X86_OP_CODE_MOV_MEM_REG_OFF_REG, X86_REG_EBP, -4 - statement->symbol.location, X86_REG_EAX);
+                    compile_assign_variable(code, &statement->symbol);
                 }
                 break;
             case STATEMENT_TYPE_EXPRESSION:

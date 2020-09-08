@@ -11,6 +11,7 @@ enum DataTypeFlags
 typedef struct DataType
 {
     Token name;
+    int size;
 
     enum DataTypeFlags flags;
     int pointer_count;
