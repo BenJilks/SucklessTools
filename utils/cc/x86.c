@@ -12,7 +12,7 @@ static void compile_string(X86Code *code, Value *value)
     INST(X86_OP_CODE_PUSH_LABEL, label);
 }
 
-static void compile_variable(X86Code *code, Symbol *variable)
+static int get_variable_location(Symbol *variable)
 {
     int location;
     if (variable->flags & SYMBOL_LOCAL)
@@ -22,7 +22,24 @@ static void compile_variable(X86Code *code, Symbol *variable)
     else
         assert (0);
 
+    return location;
+}
+
+static void compile_variable(X86Code *code, Symbol *variable)
+{
+    int location = get_variable_location(variable);
     INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
+}
+
+static void compile_variable_pointer(X86Code *code, Symbol *variable)
+{
+    int location = get_variable_location(variable);
+    INST(X86_OP_CODE_MOV_REG_REG, X86_REG_EAX, X86_REG_EBP);
+    if (location > 0)
+        INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_EAX, location);
+    else if (location < 0)
+        INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_EAX, -location);
+    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
 }
 
 static void compile_value(X86Code *code, Value *value)
@@ -77,6 +94,15 @@ static void compile_expression(X86Code *code, Expression *expression)
             break;
         case EXPRESSION_TYPE_FUNCTION_CALL:
             compile_fuction_call(code, expression);
+            break;
+        case EXPRESSION_TYPE_REF:
+            assert(expression->left->type == EXPRESSION_TYPE_VALUE);
+            if (expression->left->value.type != VALUE_TYPE_VARIABLE)
+                lexer_error("Can only take pointer of non literals");
+            else
+                compile_variable_pointer(code, expression->left->value.v);
+            break;
+        default:
             break;
     }
 }

@@ -303,7 +303,7 @@ static void dump_externals(X86Code *code)
 static void dump_string_data(X86Code *code)
 {
     for (int i = 0; i < code->string_data_count; i++)
-        printf("  str%i: db \"%s\"\n", i, code->string_data[i]);
+        printf("  str%i: db \"%s\", 0\n", i, code->string_data[i]);
 }
 
 void x86_dump(X86Code *code)

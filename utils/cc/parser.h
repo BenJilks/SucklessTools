@@ -35,6 +35,7 @@ enum ValueType
 #define ENUMERATE_EXPRESSION_TYPE \
     __TYPE(VALUE) \
     __TYPE(ADD) \
+    __TYPE(REF) \
     __TYPE(FUNCTION_CALL)
 
 enum ExpressionType

@@ -163,6 +163,8 @@ static Token lexer_next()
                         return make_single_char_token(TOKEN_TYPE_EQUALS);
                     case '*':
                         return make_single_char_token(TOKEN_TYPE_STAR);
+                    case '&':
+                        return make_single_char_token(TOKEN_TYPE_AND);
                 }
 
                 assert (0);

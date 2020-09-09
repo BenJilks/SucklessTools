@@ -175,9 +175,30 @@ static Expression *parse_term(SymbolTable *table)
     return expression;
 }
 
+static Expression *parse_unary_operator(SymbolTable *table);
+static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType type)
+{
+    Expression *expression = malloc(sizeof(Expression));
+    expression->left = parse_unary_operator(table);
+    expression->type = type;
+    return expression;
+}
+
+static Expression *parse_unary_operator(SymbolTable *table)
+{
+    switch (lexer_peek(0).type)
+    {
+        case TOKEN_TYPE_AND:
+            match(TOKEN_TYPE_AND, "&");
+            return make_unary_expression(table, EXPRESSION_TYPE_REF);
+        default:
+            return parse_term(table);
+    }
+}
+
 static Expression *parse_expression(SymbolTable *table)
 {
-    Expression *left = parse_term(table);
+    Expression *left = parse_unary_operator(table);
 
     while (lexer_peek(0).type == TOKEN_TYPE_ADD)
     {
@@ -185,7 +206,7 @@ static Expression *parse_expression(SymbolTable *table)
         Expression *operation = malloc(sizeof(Expression));
         operation->type = EXPRESSION_TYPE_ADD;
         operation->left = left;
-        operation->right = parse_term(table);
+        operation->right = parse_unary_operator(table);
         left = operation;
     }
 
@@ -209,6 +230,7 @@ static void parse_declaration(Function *function, Scope *scope)
     Statement statement;
     statement.type = STATEMENT_TYPE_DECLARATION;
     statement.symbol = symbol;
+    statement.expression = NULL;
 
     // Parse assignment expression if there is one
     if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
@@ -406,6 +428,10 @@ void free_expression(Expression *expression)
             }
             free(expression->left);
             free(expression->arguments);
+            break;
+        case EXPRESSION_TYPE_REF:
+            free_expression(expression->left);
+            free(expression->left);
             break;
         default:
             break;
