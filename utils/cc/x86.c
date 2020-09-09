@@ -57,6 +57,7 @@ static void compile_fuction_call(X86Code *code, Expression *expression)
 
     INST(X86_OP_CODE_CALL_LABEL, lexer_printable_token_data(&func_name));
     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, expression->argument_length * 4);
+    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
 }
 
 static void compile_expression(X86Code *code, Expression *expression)
@@ -96,6 +97,13 @@ static void compile_assign_variable(X86Code *code, Symbol *variable)
     }
 }
 
+static void compile_function_return(X86Code *code)
+{
+    INST(X86_OP_CODE_MOV_REG_REG, X86_REG_ESP, X86_REG_EBP);
+    INST(X86_OP_CODE_POP_REG, X86_REG_EBP);
+    INST(X86_OP_CODE_RET);
+}
+
 static void compile_scope(X86Code *code, Scope *scope)
 {
     for (int i = 0; i < scope->statement_count; i++)
@@ -112,6 +120,12 @@ static void compile_scope(X86Code *code, Scope *scope)
                 break;
             case STATEMENT_TYPE_EXPRESSION:
                 compile_expression(code, statement->expression);
+                INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+                break;
+            case STATEMENT_TYPE_RETURN:
+                compile_expression(code, statement->expression);
+                INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+                compile_function_return(code);
                 break;
             default:
                 break;
@@ -135,9 +149,7 @@ static void compile_function(X86Code *code, Function *function)
     compile_scope(code, function->body);
 
     x86_code_add_blank(code);
-    INST(X86_OP_CODE_MOV_REG_REG, X86_REG_ESP, X86_REG_EBP);
-    INST(X86_OP_CODE_POP_REG, X86_REG_EBP);
-    INST(X86_OP_CODE_RET);
+    compile_function_return(code);
     x86_code_add_blank(code);
 }
 
