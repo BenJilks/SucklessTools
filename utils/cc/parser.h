@@ -75,6 +75,9 @@ typedef struct Statement
 
     Symbol symbol;
     Expression *expression;
+
+    // NOTE: Used for declaration lists
+    struct Statement *next;
 } Statement;
 
 typedef struct Scope

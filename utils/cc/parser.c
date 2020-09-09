@@ -215,22 +215,32 @@ static Expression *parse_expression(SymbolTable *table)
 
 static void parse_declaration(Function *function, Scope *scope)
 {
-    // Create symbol
-    Symbol symbol;
-    symbol.data_type = parse_data_type();
-    symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    symbol.flags = SYMBOL_LOCAL;
-    symbol.location = function->stack_size;
-    symbol.params = NULL;
-    symbol.param_count = 0;
-    symbol_table_add(scope->table, symbol);
-    function->stack_size += symbol.data_type.size;
-
-    // Create statement
+    DataType data_type = parse_data_type();
     Statement statement;
-    statement.type = STATEMENT_TYPE_DECLARATION;
-    statement.symbol = symbol;
-    statement.expression = NULL;
+
+    for (;;)
+    {
+        // Create symbol
+        Symbol symbol;
+        symbol.data_type = data_type;
+        symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+        symbol.flags = SYMBOL_LOCAL;
+        symbol.location = function->stack_size;
+        symbol.params = NULL;
+        symbol.param_count = 0;
+        symbol_table_add(scope->table, symbol);
+        function->stack_size += symbol.data_type.size;
+
+        // Create statement
+        statement.type = STATEMENT_TYPE_DECLARATION;
+        statement.symbol = symbol;
+        statement.expression = NULL;
+
+        if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
+            break;
+        match(TOKEN_TYPE_COMMA, ",");
+    }
+    match(TOKEN_TYPE_SEMI, ";");
 
     // Parse assignment expression if there is one
     if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
@@ -238,7 +248,6 @@ static void parse_declaration(Function *function, Scope *scope)
         match(TOKEN_TYPE_EQUALS, "=");
         statement.expression = parse_expression(scope->table);
     }
-    match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
 }
