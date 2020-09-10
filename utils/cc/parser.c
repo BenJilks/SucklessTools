@@ -218,8 +218,22 @@ static void parse_declaration(Function *function, Scope *scope)
     DataType data_type = parse_data_type();
     Statement statement;
 
+    Statement *curr_statement = NULL;
     for (;;)
     {
+        if (curr_statement == NULL)
+        {
+            curr_statement = &statement;
+            curr_statement->next = NULL;
+        }
+        else
+        {
+            Statement *next_statement = malloc(sizeof(Statement));
+            curr_statement->next = next_statement;
+            curr_statement = next_statement;
+            curr_statement->next = NULL;
+        }
+
         // Create symbol
         Symbol symbol;
         symbol.data_type = data_type;
@@ -232,22 +246,22 @@ static void parse_declaration(Function *function, Scope *scope)
         function->stack_size += symbol.data_type.size;
 
         // Create statement
-        statement.type = STATEMENT_TYPE_DECLARATION;
-        statement.symbol = symbol;
-        statement.expression = NULL;
+        curr_statement->type = STATEMENT_TYPE_DECLARATION;
+        curr_statement->symbol = symbol;
+        curr_statement->expression = NULL;
+
+        // Parse assignment expression if there is one
+        if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
+        {
+            match(TOKEN_TYPE_EQUALS, "=");
+            curr_statement->expression = parse_expression(scope->table);
+        }
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
             break;
         match(TOKEN_TYPE_COMMA, ",");
     }
     match(TOKEN_TYPE_SEMI, ";");
-
-    // Parse assignment expression if there is one
-    if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
-    {
-        match(TOKEN_TYPE_EQUALS, "=");
-        statement.expression = parse_expression(scope->table);
-    }
 
     add_statement_to_scope(scope, statement);
 }

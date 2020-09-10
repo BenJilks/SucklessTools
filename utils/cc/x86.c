@@ -117,9 +117,12 @@ static void compile_assign_variable(X86Code *code, Symbol *variable)
         case 1:
             INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location, X86_REG_AL);
             break;
-        case 8:
+        case 4:
             INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
             break;
+        default:
+            printf("Error: Unknown size %i\n", variable->data_type.size);
+            assert (0);
     }
 }
 
@@ -130,6 +133,18 @@ static void compile_function_return(X86Code *code)
     INST(X86_OP_CODE_RET);
 }
 
+static void compile_decleration(X86Code *code, Statement *statement)
+{
+    if (statement->expression)
+    {
+        compile_expression(code, statement->expression);
+        compile_assign_variable(code, &statement->symbol);
+    }
+
+    if (statement->next)
+        compile_decleration(code, statement->next);
+}
+
 static void compile_scope(X86Code *code, Scope *scope)
 {
     for (int i = 0; i < scope->statement_count; i++)
@@ -138,11 +153,7 @@ static void compile_scope(X86Code *code, Scope *scope)
         switch (statement->type)
         {
             case STATEMENT_TYPE_DECLARATION:
-                if (statement->expression)
-                {
-                    compile_expression(code, statement->expression);
-                    compile_assign_variable(code, &statement->symbol);
-                }
+                compile_decleration(code, statement);
                 break;
             case STATEMENT_TYPE_EXPRESSION:
                 compile_expression(code, statement->expression);
