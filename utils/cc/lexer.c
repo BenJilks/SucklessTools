@@ -57,6 +57,7 @@ enum State
 	STATE_INITIAL,
 	STATE_IDENTIFIER,
     STATE_INTEGER,
+    STATE_FLOAT,
     STATE_STRING,
     STATE_DOT,
     STATE_DOT_DOT,
@@ -183,9 +184,28 @@ static Token lexer_next()
 				break;
 
             case STATE_INTEGER:
+                if (g_c == '.')
+                {
+                    state = STATE_FLOAT;
+                    token.length += 1;
+                    break;
+                }
+
                 if (!isdigit(g_c))
                 {
                     token.type = TOKEN_TYPE_INTEGER;
+                    state = STATE_INITIAL;
+                    g_should_reconsume = 1;
+                    return token;
+                }
+
+                token.length += 1;
+                break;
+
+            case STATE_FLOAT:
+                if (!isdigit(g_c))
+                {
+                    token.type = TOKEN_TYPE_FLOAT;
                     state = STATE_INITIAL;
                     g_should_reconsume = 1;
                     return token;

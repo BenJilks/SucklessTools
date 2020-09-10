@@ -226,10 +226,10 @@ static void dump_argument(X86Argument *argument, int is_first)
             dump_reg(argument->reg);
             break;
         case X86_ARGUMENT_TYPE_IMM8:
-            printf("%sbyte %i", is_first ? "" : ", ", argument->imm8);
+            printf("%sbyte 0x%x", is_first ? "" : ", ", argument->imm8);
             break;
         case X86_ARGUMENT_TYPE_IMM32:
-            printf("%sdword %i", is_first ? "" : ", ", argument->imm32);
+            printf("%sdword 0x%x", is_first ? "" : ", ", argument->imm32);
             break;
         case X86_ARGUMENT_TYPE_LABEL:
             printf("%s%s", is_first ? "" : ", ", argument->label);
