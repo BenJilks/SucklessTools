@@ -82,14 +82,15 @@ void Buffer::scroll(int top, int bottom, int by)
     }
     else if (by < 0)
     {
-        for (int i = end_index - start_index; i > start_index - by_index; i--)
+        for (int i = end_index - start_index; i >= start_index - by_index; i--)
             m_buffer[i] = m_buffer[i + by_index];
 
         if (m_scroll_back_rows >= -by)
         {
             // Copy scrollback, back into buffer
-            for (int i = 0; i < -by_index; i++)
-                m_buffer[i + start_index] = m_scroll_back[(m_scroll_back_rows + by) * m_columns + i];
+            for (int i = 0; i < -by; i++)
+                clear_row(i);
+            //     m_buffer[i + start_index] = m_scroll_back[(m_scroll_back_rows + by) * m_columns + i];
 
             // Shrink scrollback
             m_scroll_back = (Rune*)realloc(m_scroll_back, ((m_scroll_back_rows + by) * m_columns) * sizeof (Rune));

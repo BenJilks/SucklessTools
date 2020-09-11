@@ -493,6 +493,8 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
     auto bottom_of_buffer = (end + 1) * m_font_height;
     auto height_of_buffer = bottom_of_buffer - top_of_buffer;
 
+    redraw_all();
+    /*
     auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
     if (by > 0)
     {
@@ -518,6 +520,7 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         for (int i = begin; i < -by; i++)
             draw_row(i, true);
     }
+    */
 
     m_selection_start.move_by(0, -by);
     m_selection_end.move_by(0, -by);
