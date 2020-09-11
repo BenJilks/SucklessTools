@@ -162,7 +162,7 @@ void XLibOutput::did_resize()
         // Tell the terminal program that we've resized
         struct winsize size;
         size.ws_row = rows;
-        size.ws_col = columns;
+        size.ws_col = columns - 1;
         size.ws_xpixel = m_width;
         size.ws_ypixel = m_height;
 
