@@ -18,6 +18,10 @@ void Attribute::apply(int code)
             m_flags |= Flag::Bold;
             return;
 
+        case 7:
+            m_color = m_color.inverted();
+            return;
+
         default:
             break;
     }

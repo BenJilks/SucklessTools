@@ -17,17 +17,31 @@ XLibOutput::XLibOutput()
         return;
     }
 
-    m_width = 100;
-    m_height = 100;
+    m_width = 800;
+    m_height = 400;
     m_screen = DefaultScreen(m_display);
     m_depth = 32;
     
     XVisualInfo visual_info;
-    if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
+    auto match_visual_info = [&]()
     {
-        std::cerr << "terminal: xlib: 32bit depth not supported\n";
-        return;
+        if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
+        {
+            std::cerr << "terminal: xlib: " << m_depth << " bit depth not supported\n";
+            return false;
+        }
+
+        return true;
+    };
+
+    if (!match_visual_info())
+    {
+        // If 32bit mode failed to load, then try 24bit
+        m_depth = 24;
+        if (!match_visual_info())
+            return;
     }
+
     m_visual = visual_info.visual;
     m_color_map = XCreateColormap(m_display, 
         DefaultRootWindow(m_display), m_visual, AllocNone);
@@ -64,6 +78,7 @@ XLibOutput::XLibOutput()
     m_wm_delete_message = XInternAtom(m_display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(m_display, m_window, &m_wm_delete_message, 1);
     m_clip_board = std::make_unique<XClipBoard>(m_display, m_window);
+    did_resize();
 }
 
 void XLibOutput::load_font(const std::string &&name, int size)
@@ -131,6 +146,39 @@ static uint64_t current_time_in_milliseconds()
     struct timeval time;
     gettimeofday(&time, NULL);
     return time.tv_sec * 1000000 + time.tv_usec;
+}
+
+void XLibOutput::did_resize()
+{
+    auto rows = (m_height / m_font_height);
+    auto columns = (m_width / m_font_width) - 1;
+
+    // Noop, so don't bother resizing anything
+    if (rows == this->rows() && columns == this->columns())
+        return;
+
+    if (on_resize)
+    {
+        // Tell the terminal program that we've resized
+        struct winsize size;
+        size.ws_row = rows;
+        size.ws_col = columns - 1;
+        size.ws_xpixel = m_width;
+        size.ws_ypixel = m_height;
+
+        resize(rows, columns);
+        on_resize(size);
+    }
+
+    // Create a new back buffer with the new size
+    XFreePixmap(m_display, m_pixel_buffer);
+    m_pixel_buffer = XCreatePixmap(m_display, m_window,
+        m_width + m_font_width, m_height + m_font_height, m_depth);
+
+    // We need to tell Xft about the new buffer
+    XftDrawDestroy(m_draw);
+    m_draw = XftDrawCreate(m_display, m_pixel_buffer,
+        m_visual, m_color_map);
 }
 
 std::string XLibOutput::update()
@@ -243,35 +291,7 @@ std::string XLibOutput::update()
                 {
                     m_width = event.xconfigure.width;
                     m_height = event.xconfigure.height;
-                    auto rows = (m_height / m_font_height);
-                    auto columns = (m_width / m_font_width) - 1;
-
-                    // Noop, so don't bother resizing anything
-                    if (rows == this->rows() && columns == this->columns())
-                        break;
-
-                    if (on_resize)
-                    {
-                        // Tell the terminal program that we've resized
-                        struct winsize size;
-                        size.ws_row = rows;
-                        size.ws_col = columns;
-                        size.ws_xpixel = m_width;
-                        size.ws_ypixel = m_height;
-
-                        resize(rows, columns);
-                        on_resize(size);
-                    }
-
-                    // Create a new back buffer with the new size
-                    XFreePixmap(m_display, m_pixel_buffer);
-                    m_pixel_buffer = XCreatePixmap(m_display, m_window, 
-                        m_width + m_font_width, m_height + m_font_height, m_depth);
-                    
-                    // We need to tell Xft about the new buffer
-                    XftDrawDestroy(m_draw);
-                    m_draw = XftDrawCreate(m_display, m_pixel_buffer, 
-                        m_visual, m_color_map);
+                    did_resize();
                 }
                 break;
         }
@@ -369,18 +389,17 @@ void XLibOutput::draw_update_selection(const CursorPosition &new_end_pos)
     m_selection_end = new_end_pos;
     for_rune_in_selection([this](const CursorPosition &pos)
     {
-        draw_rune(pos, true);
+        draw_rune(pos, RuneMode::Hilighted);
     });
     flush_display();
 }
 
-void XLibOutput::draw_row(int row, bool refresh)
+void XLibOutput::draw_row(int row, bool)
 {
     for (int column = 0; column < columns(); column++)
     {
         auto pos = CursorPosition(column, row);
-        if (!isspace(buffer().rune_at_scroll_offset(pos, m_scroll_offset).value) || refresh)
-            draw_rune(pos);
+        draw_rune(pos);
     }
 }
 
@@ -395,7 +414,7 @@ void XLibOutput::redraw_all()
     for (int row = 0; row < rows(); row++)
         draw_row(row);
 
-    draw_rune(cursor(), true);
+    draw_rune(cursor(), RuneMode::Cursor);
     flush_display();
 }
 
@@ -483,7 +502,7 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_pixel_buffer, m_gc,
             0, bottom_of_buffer - by_pixels, m_width, by_pixels);
-        for (int i = end - by; i < end; i++)
+        for (int i = end - by; i <= end; i++)
             draw_row(i, true);
     }
     else
@@ -523,12 +542,19 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
     return m_text_pallet.white;
 }
 
-void XLibOutput::draw_rune(const CursorPosition &pos, bool selected)
+void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
 {
     auto &rune = buffer().rune_at_scroll_offset(pos, m_scroll_offset);
     auto color = rune.attribute.color();
-    if (selected)
-        color = color.inverted();
+    switch (mode)
+    {
+        case RuneMode::Hilighted:
+            color = color.inverted();
+        case RuneMode::Cursor:
+            color = current_attribute().color().inverted();
+        default:
+            break;
+    }
 
     auto c = rune.value;
     auto x = (pos.coloumn() + 1) * m_font_width;
@@ -541,7 +567,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos, bool selected)
     {
         auto glyph = XftCharIndex(m_display, m_font, c);
 
-        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height) };
+        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height * 2) };
         XftDrawSetClipRectangles(m_draw, x - m_font_width, y - m_font_height, &rect, 1);
 
         XftGlyphSpec spec = { glyph, (short)x, (short)y };

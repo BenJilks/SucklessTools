@@ -35,13 +35,14 @@ public:
 
 private:
     virtual void redraw_all() override;
-    virtual void draw_rune(const CursorPosition&, bool selected = false) override;
+    virtual void draw_rune(const CursorPosition&, RuneMode mode = RuneMode::Normal) override;
     virtual void draw_scroll(int begin, int end, int by) override;
     virtual void flush_display() override;
     virtual void input(const std::string&) override;
     void draw_row(int row, bool refresh = false);
     void draw_update_selection(const CursorPosition &new_end_pos);
     void copy();
+    void did_resize();
     std::string paste();
 
     template<typename CallbackFunc>

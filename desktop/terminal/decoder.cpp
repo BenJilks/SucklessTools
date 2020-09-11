@@ -6,6 +6,14 @@
 
 Decoder::Result Decoder::parse(char c)
 {
+#if 0
+    if (c == '\033')
+        std::cout << "\\033";
+    else
+        std::cout << c;
+    std::cout.flush();
+#endif
+
     bool should_consume = true;
     do
     {
@@ -56,6 +64,12 @@ Decoder::Result Decoder::parse(char c)
                 if (c == '#')
                 {
                     m_state = State::EscapeHash;
+                    break;
+                }
+
+                if (c == '(')
+                {
+                    m_state = State::EscapeBracket;
                     break;
                 }
 
@@ -110,6 +124,14 @@ Decoder::Result Decoder::parse(char c)
                 m_state = State::Ascii;
 
                 auto sequence = EscapeSequence { '#', { c - '0' }, false };
+                return { Result::Escape, 0, sequence };
+            }
+
+            case State::EscapeBracket:
+            {
+                m_state = State::Ascii;
+
+                auto sequence = EscapeSequence { '(', { c }, false };
                 return { Result::Escape, 0, sequence };
             }
         }

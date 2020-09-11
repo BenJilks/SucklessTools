@@ -107,10 +107,10 @@ void Output::set_mode(int mode, bool value)
 
 void Output::wait()
 {
-    draw_rune(m_cursor, true);
+    draw_rune(m_cursor, RuneMode::Cursor);
     flush_display();
     usleep(10 * 1000);
-    draw_rune(m_cursor, false);
+    draw_rune(m_cursor, RuneMode::Normal);
 }
 
 void Output::out_escape(Decoder::EscapeSequence &escape)
@@ -208,6 +208,17 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
         }
         
+        case 'X':
+        {
+            auto clear_count = arg_len ? DEFAULT(escape.args[0], 1) : 1;
+            for (int i = 0; i < clear_count; i++)
+            {
+                auto pos = m_cursor.column_offset(i + m_cursor.coloumn());
+                m_buffer.rune_at(pos) = m_buffer.blank_rune();
+            }
+            break;
+        }
+
         case 'P':
         {
             assert (arg_len <= 1);
@@ -234,7 +245,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
                 case 0:
                     for (int i = m_cursor.coloumn(); i < columns(); i++)
                     {
-                        m_buffer.rune_at(m_cursor.column_offset(i)).value = ' ';
+                        m_buffer.rune_at(m_cursor.column_offset(i)) = m_buffer.blank_rune();
                         draw_rune(CursorPosition(i, m_cursor.row()));
                     }
                     break;
@@ -243,7 +254,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
                 case 1:
                     for (int i = 0; i <= m_cursor.coloumn(); i++)
                     {
-                        m_buffer.rune_at(m_cursor.column_offset(i)).value = ' ';
+                        m_buffer.rune_at(m_cursor.column_offset(i)) = m_buffer.blank_rune();
                         draw_rune(CursorPosition(i, m_cursor.row()));
                     }
                     break;
@@ -350,6 +361,10 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             }
             break;
 
+        case '(':
+            std::cout << (char)escape.args[0] << "\n";
+            break;
+
         default:
             if (escape.command == 'l' || escape.command == 'h')
                 break;
@@ -404,8 +419,7 @@ void Output::out(std::string_view buff)
     flush_scroll();
 
     draw_rune(m_last_cursor);
-    m_buffer.rune_at(m_cursor).attribute = m_current_attribute;
-    draw_rune(m_cursor, true);
+    draw_rune(m_cursor, RuneMode::Cursor);
     m_last_cursor = m_cursor;
     flush_display();
 }
