@@ -17,17 +17,31 @@ XLibOutput::XLibOutput()
         return;
     }
 
-    m_width = 100;
-    m_height = 100;
+    m_width = 800;
+    m_height = 400;
     m_screen = DefaultScreen(m_display);
     m_depth = 32;
     
     XVisualInfo visual_info;
-    if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
+    auto match_visual_info = [&]()
     {
-        std::cerr << "terminal: xlib: 32bit depth not supported\n";
-        return;
+        if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
+        {
+            std::cerr << "terminal: xlib: " << m_depth << " bit depth not supported\n";
+            return false;
+        }
+
+        return true;
+    };
+
+    if (!match_visual_info())
+    {
+        // If 32bit mode failed to load, then try 24bit
+        m_depth = 24;
+        if (!match_visual_info())
+            return;
     }
+
     m_visual = visual_info.visual;
     m_color_map = XCreateColormap(m_display, 
         DefaultRootWindow(m_display), m_visual, AllocNone);
