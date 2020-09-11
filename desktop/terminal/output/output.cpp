@@ -208,6 +208,18 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
         }
         
+        case 'X':
+        {
+            auto clear_count = arg_len ? DEFAULT(escape.args[0], 1) : 1;
+            for (int i = 0; i < clear_count; i++)
+            {
+                auto &rune = m_buffer.rune_at(m_cursor.column_offset(i + m_cursor.coloumn()));
+                rune.value = ' ';
+                rune.attribute = {};
+            }
+            break;
+        }
+
         case 'P':
         {
             assert (arg_len <= 1);
@@ -348,6 +360,10 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
                     }
                     break;
             }
+            break;
+
+        case '(':
+            std::cout << (char)escape.args[0] << "\n";
             break;
 
         default:
