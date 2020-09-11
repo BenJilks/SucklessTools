@@ -404,7 +404,6 @@ void Output::out(std::string_view buff)
     flush_scroll();
 
     draw_rune(m_last_cursor);
-    m_buffer.rune_at(m_cursor).attribute = m_current_attribute;
     draw_rune(m_cursor, true);
     m_last_cursor = m_cursor;
     flush_display();
