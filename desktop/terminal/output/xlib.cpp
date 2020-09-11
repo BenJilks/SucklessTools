@@ -555,7 +555,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos, bool selected)
     {
         auto glyph = XftCharIndex(m_display, m_font, c);
 
-        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height) };
+        XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height * 2) };
         XftDrawSetClipRectangles(m_draw, x - m_font_width, y - m_font_height, &rect, 1);
 
         XftGlyphSpec spec = { glyph, (short)x, (short)y };
