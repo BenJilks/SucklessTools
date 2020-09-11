@@ -394,13 +394,12 @@ void XLibOutput::draw_update_selection(const CursorPosition &new_end_pos)
     flush_display();
 }
 
-void XLibOutput::draw_row(int row, bool refresh)
+void XLibOutput::draw_row(int row, bool)
 {
     for (int column = 0; column < columns(); column++)
     {
         auto pos = CursorPosition(column, row);
-        if (!isspace(buffer().rune_at_scroll_offset(pos, m_scroll_offset).value) || refresh)
-            draw_rune(pos);
+        draw_rune(pos);
     }
 }
 
