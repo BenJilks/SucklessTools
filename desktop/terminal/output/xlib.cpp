@@ -493,8 +493,6 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
     auto bottom_of_buffer = (end + 1) * m_font_height;
     auto height_of_buffer = bottom_of_buffer - top_of_buffer;
 
-    redraw_all();
-    /*
     auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
     if (by > 0)
     {
@@ -505,7 +503,7 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_pixel_buffer, m_gc,
             0, bottom_of_buffer - by_pixels, m_width, by_pixels);
-        for (int i = end - by; i < end; i++)
+        for (int i = end - by; i <= end; i++)
             draw_row(i, true);
     }
     else
@@ -520,7 +518,6 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         for (int i = begin; i < -by; i++)
             draw_row(i, true);
     }
-    */
 
     m_selection_start.move_by(0, -by);
     m_selection_end.move_by(0, -by);
