@@ -31,7 +31,7 @@ public:
 private:
     Rune *m_buffer { nullptr };
     Rune *m_scroll_back { nullptr };
-    Rune m_invalid_rune;
+    Rune m_invalid_rune { '\0', {} };
     int m_rows { 80 };
     int m_columns { 80 };
     int m_scroll_back_rows { 0 };

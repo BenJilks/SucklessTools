@@ -23,8 +23,15 @@ public:
     std::function<void(struct winsize)> on_resize;
     
 protected:
+    enum class RuneMode
+    {
+        Normal,
+        Hilighted,
+        Cursor
+    };
+
     virtual void redraw_all() = 0;
-    virtual void draw_rune(const CursorPosition&, bool selected = false) = 0;
+    virtual void draw_rune(const CursorPosition&, RuneMode mode = RuneMode::Normal) = 0;
     virtual void draw_scroll(int begin, int end, int by) = 0;
     virtual void flush_display() = 0;
     virtual void input(const std::string&) = 0;

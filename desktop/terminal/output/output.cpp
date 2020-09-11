@@ -107,10 +107,10 @@ void Output::set_mode(int mode, bool value)
 
 void Output::wait()
 {
-    draw_rune(m_cursor, true);
+    draw_rune(m_cursor, RuneMode::Cursor);
     flush_display();
     usleep(10 * 1000);
-    draw_rune(m_cursor, false);
+    draw_rune(m_cursor, RuneMode::Normal);
 }
 
 void Output::out_escape(Decoder::EscapeSequence &escape)
@@ -404,7 +404,7 @@ void Output::out(std::string_view buff)
     flush_scroll();
 
     draw_rune(m_last_cursor);
-    draw_rune(m_cursor, true);
+    draw_rune(m_cursor, RuneMode::Cursor);
     m_last_cursor = m_cursor;
     flush_display();
 }
