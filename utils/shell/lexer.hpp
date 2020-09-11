@@ -2,6 +2,7 @@
 #include <string>
 #include <optional>
 #include <queue>
+#include <functional>
 
 struct Token
 {

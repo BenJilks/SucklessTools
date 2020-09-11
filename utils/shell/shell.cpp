@@ -69,11 +69,7 @@ int Shell::foreground(pid_t pid)
     m_fg_process = pid;
 
 	int status = -1;
-	for (;;)
-	{
-		if (waitpid(pid, &status, WNOHANG) == pid)
-			break;
-	}
+	waitpid(pid, &status, 0);
 
     m_fg_process = -1;
 	return status;
