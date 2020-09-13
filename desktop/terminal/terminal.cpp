@@ -4,6 +4,7 @@
 #include <sys/wait.h>
 #include <string>
 #include <iostream>
+#include <libprofile/profile.hpp>
 
 #if __FreeBSD__
 #include <libutil.h>
@@ -31,6 +32,7 @@ Terminal::Terminal(Output &&output)
 
 void Terminal::init()
 {
+    Profile::Timer timer("Terminal::init");
     wait_flag = true;
 
     int slave;
@@ -61,8 +63,8 @@ void Terminal::init()
         close(slave);
         close(m_master);
     
-        const auto *shell = getenv("SHELL");
-        setenv("TERM", "st-16color", 1);
+        const auto *shell = "/usr/bin/bash"; //getenv("SHELL");
+        setenv("TERM", "xterm-16color", 1);
         if (execl(shell, shell, nullptr) < 0)
             perror("system()");
         exit(-1);
@@ -74,6 +76,7 @@ void Terminal::init()
 
 void Terminal::run_event_loop()
 {
+    Profile::Timer timer("Terminal::run_event_loop");
     fd_set fds;
     
     while (!m_output.should_close())

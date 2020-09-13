@@ -4,6 +4,7 @@
 #include <cassert>
 #include <memory.h>
 #include <unistd.h>
+#include <libprofile/profile.hpp>
 
 #define DEFAULT(a, b) (a ? a : b)
 // #define DEBUG_OUTPUT
@@ -67,6 +68,8 @@ void Output::move_cursor_by(int column, int row)
 
 void Output::out_rune(uint32_t rune)
 {
+    Profile::Timer timer("Output::out_rune");
+
     if (rune == '\r' || rune == '\033')
         return;
     
@@ -107,6 +110,8 @@ void Output::set_mode(int mode, bool value)
 
 void Output::wait()
 {
+    Profile::Timer timer("Output::wait");
+
     draw_rune(m_cursor, RuneMode::Cursor);
     flush_display();
     usleep(10 * 1000);
@@ -115,6 +120,8 @@ void Output::wait()
 
 void Output::out_escape(Decoder::EscapeSequence &escape)
 {
+    Profile::Timer timer("Output::out_escape");
+
     int arg_len = escape.args.size();
 #if 0
     std::cout << "Escape: " << escape.command << "(";
@@ -337,12 +344,16 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
         }
 
         case 'l':
-            assert (arg_len == 1);
+            // NOTE: ????
+            if (arg_len != 1)
+                break;
             set_mode(escape.args[0], false);
             break;
 
         case 'h':
-            assert (arg_len == 1);
+            // NOTE: ????
+            if (arg_len != 1)
+                break;
             set_mode(escape.args[0], true);
             break;
 
@@ -362,7 +373,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             break;
 
         case '(':
-            std::cout << (char)escape.args[0] << "\n";
+            // TODO: Handle this
             break;
 
         default:
@@ -380,6 +391,8 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 
 void Output::out_tab()
 {
+    Profile::Timer timer("Output::out_tab");
+
     int length = 8 - (m_cursor.coloumn() % 8);
     for (int i = 0; i < length; i++)
         out_rune(' ');
@@ -387,6 +400,8 @@ void Output::out_tab()
 
 void Output::out(std::string_view buff)
 {
+    Profile::Timer timer("Output::out");
+
     for (int i = 0; i < (int)buff.length(); i++)
     {
         char c = buff[i];
@@ -426,6 +441,8 @@ void Output::out(std::string_view buff)
 
 void Output::flush_scroll()
 {
+    Profile::Timer timer("Output::flush_scroll");
+
     if (m_scroll_buffer)
     {
         draw_scroll(m_scroll_region_top, m_scroll_region_bottom, m_scroll_buffer);

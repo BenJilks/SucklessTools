@@ -24,6 +24,7 @@ target_link_libraries(terminal
     ${FREETYPE_LIBRARIES}
     ${X11_LIBRARIES}
     ${X11_Xft_LIB}
+    profile
     util # This is for ARM, where 'openpty' is in libutil
 )
 

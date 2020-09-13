@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <cmath>
 #include <sys/time.h>
+#include <libprofile/profile.hpp>
 
 #include "../config.hpp"
 
@@ -544,6 +545,8 @@ XftColor &XLibOutput::text_color_from_terminal(TerminalColor color)
 
 void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
 {
+    Profile::Timer timer("XLibOutput::draw_rune");
+
     auto &rune = buffer().rune_at_scroll_offset(pos, m_scroll_offset);
     auto color = rune.attribute.color();
     switch (mode)
@@ -559,12 +562,16 @@ void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
     auto c = rune.value;
     auto x = (pos.coloumn() + 1) * m_font_width;
     auto y = (pos.row() + 1) * m_font_height;
-    XSetForeground(m_display, m_gc, color.background_int());
-    XFillRectangle(m_display, m_pixel_buffer, m_gc,
-        x, y - m_font_height + 4, m_font_width, m_font_height);
+    {
+        Profile::Timer timer("XLibOutput::draw_rune background");
+        XSetForeground(m_display, m_gc, color.background_int());
+        XFillRectangle(m_display, m_pixel_buffer, m_gc,
+            x, y - m_font_height + 4, m_font_width, m_font_height);
+    }
 
     if (!isspace(rune.value))
     {
+        Profile::Timer timer("XLibOutput::draw_rune glyph");
         auto glyph = XftCharIndex(m_display, m_font, c);
 
         XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height * 2) };
@@ -581,7 +588,9 @@ void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
 
 void XLibOutput::flush_display()
 {
-    XCopyArea(m_display, m_pixel_buffer, m_window, m_gc, 
+    Profile::Timer timer("XLibOutput::flush_display");
+
+    XCopyArea(m_display, m_pixel_buffer, m_window, m_gc,
         0, 0, m_width, m_height, 0, 0);
     XFlush(m_display);
 }
