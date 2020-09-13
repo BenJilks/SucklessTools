@@ -22,28 +22,23 @@ XLibOutput::XLibOutput()
     m_height = 400;
     m_screen = DefaultScreen(m_display);
     m_depth = 32;
-    
+
     XVisualInfo visual_info;
-    auto match_visual_info = [&]()
-    {
-        if (!XMatchVisualInfo(m_display, m_screen, m_depth, TrueColor, &visual_info))
-        {
-            std::cerr << "terminal: xlib: " << m_depth << " bit depth not supported\n";
-            return false;
-        }
+    load_back_buffer(visual_info);
 
-        return true;
-    };
+    int matches;
+    XVisualInfo *match =
+        XGetVisualInfo(m_display,
+            VisualIDMask|VisualScreenMask|VisualDepthMask,
+            &visual_info,
+            &matches);
 
-    if (!match_visual_info())
-    {
-        // If 32bit mode failed to load, then try 24bit
-        m_depth = 24;
-        if (!match_visual_info())
-            return;
+    if (!match || matches < 1) {
+        std::cout << "Couldn't match a Visual with double buffering\n";
+        return;
     }
 
-    m_visual = visual_info.visual;
+    m_visual = match->visual;
     m_color_map = XCreateColormap(m_display, 
         DefaultRootWindow(m_display), m_visual, AllocNone);
     
@@ -56,14 +51,16 @@ XLibOutput::XLibOutput()
     m_window = XCreateWindow(
         m_display, RootWindow(m_display, m_screen), 
         10, 10, m_width, m_height, 0, 
-        m_depth, InputOutput, m_visual,
+        CopyFromParent, CopyFromParent, m_visual,
         window_mask, &window_attr);
+
+    m_back_buffer = XdbeAllocateBackBufferName(m_display, m_window, XdbeCopied);
+
+    //m_pixel_buffer = XCreatePixmap(m_display, m_window,
+    //    m_width, m_height, m_depth);
+    m_gc = XCreateGC(m_display, m_back_buffer, 0, 0);
     
-    m_pixel_buffer = XCreatePixmap(m_display, m_window, 
-        m_width, m_height, m_depth);
-    m_gc = XCreateGC(m_display, m_pixel_buffer, 0, 0);
-    
-    XSelectInput (m_display, m_window,
+    XSelectInput(m_display, m_window,
         ExposureMask | KeyPressMask | StructureNotifyMask | 
         ButtonPress | ButtonReleaseMask | PointerMotionMask);
      
@@ -80,6 +77,23 @@ XLibOutput::XLibOutput()
     XSetWMProtocols(m_display, m_window, &m_wm_delete_message, 1);
     m_clip_board = std::make_unique<XClipBoard>(m_display, m_window);
     did_resize();
+}
+
+void XLibOutput::load_back_buffer(XVisualInfo &info)
+{
+    int num_of_screens = 0;
+    auto *screens = &DefaultRootWindow(m_display);
+
+    XdbeScreenVisualInfo *screen_info = XdbeGetVisualInfo(
+        m_display, screens, &num_of_screens);
+    if (!screen_info || num_of_screens < 1 || screen_info->count < 1) {
+        fprintf(stderr, "No visuals support Xdbe\n");
+        return;
+    }
+
+    info.visualid = screen_info->visinfo[0].visual;
+    info.screen = 0;
+    info.depth = screen_info->visinfo[0].depth;
 }
 
 void XLibOutput::load_font(const std::string &&name, int size)
@@ -122,7 +136,7 @@ void XLibOutput::load_font(const std::string &&name, int size)
     load_color(m_text_pallet.cyan, ColorPalette::Cyan);
     load_color(m_text_pallet.white, ColorPalette::White);
     
-    m_draw = XftDrawCreate(m_display, m_pixel_buffer, m_visual, m_color_map);
+    m_draw = XftDrawCreate(m_display, m_back_buffer, m_visual, m_color_map);
     if (!m_draw)
     {
         std::cerr << "terminal: xft: Could not create draw\n";
@@ -171,14 +185,12 @@ void XLibOutput::did_resize()
         on_resize(size);
     }
 
-    // Create a new back buffer with the new size
-    XFreePixmap(m_display, m_pixel_buffer);
-    m_pixel_buffer = XCreatePixmap(m_display, m_window,
-        m_width + m_font_width, m_height + m_font_height, m_depth);
+    // Reallocate back buffer
+    m_back_buffer = XdbeAllocateBackBufferName(m_display, m_window, XdbeCopied);
 
     // We need to tell Xft about the new buffer
     XftDrawDestroy(m_draw);
-    m_draw = XftDrawCreate(m_display, m_pixel_buffer,
+    m_draw = XftDrawCreate(m_display, m_back_buffer,
         m_visual, m_color_map);
 }
 
@@ -409,7 +421,7 @@ void XLibOutput::redraw_all()
     auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);    
     
     XSetForeground(m_display, m_gc, color.background_int());
-    XFillRectangle(m_display, m_pixel_buffer, m_gc,
+    XFillRectangle(m_display, m_back_buffer, m_gc,
         0, 0, m_width, m_height);
 
     for (int row = 0; row < rows(); row++)
@@ -497,11 +509,11 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
     if (by > 0)
     {
         // Down
-        XCopyArea(m_display, m_pixel_buffer, m_pixel_buffer, m_gc,
+        XCopyArea(m_display, m_back_buffer, m_back_buffer, m_gc,
             0, top_of_buffer, m_width, height_of_buffer, 0, top_of_buffer - by_pixels);
 
         XSetForeground(m_display, m_gc, color.background_int());
-        XFillRectangle(m_display, m_pixel_buffer, m_gc,
+        XFillRectangle(m_display, m_back_buffer, m_gc,
             0, bottom_of_buffer - by_pixels, m_width, by_pixels);
         for (int i = end - by; i <= end; i++)
             draw_row(i, true);
@@ -509,11 +521,11 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
     else
     {
         // Up
-        XCopyArea(m_display, m_pixel_buffer, m_pixel_buffer, m_gc,
+        XCopyArea(m_display, m_back_buffer, m_back_buffer, m_gc,
             0, top_of_buffer, m_width, height_of_buffer - m_font_height, 0, top_of_buffer - by_pixels);
 
         XSetForeground(m_display, m_gc, color.background_int());
-        XFillRectangle(m_display, m_pixel_buffer, m_gc,
+        XFillRectangle(m_display, m_back_buffer, m_gc,
             0, 0, m_width, top_of_buffer - by_pixels + m_font_height);
         for (int i = begin; i < -by; i++)
             draw_row(i, true);
@@ -565,7 +577,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
     {
         Profile::Timer timer("XLibOutput::draw_rune background");
         XSetForeground(m_display, m_gc, color.background_int());
-        XFillRectangle(m_display, m_pixel_buffer, m_gc,
+        XFillRectangle(m_display, m_back_buffer, m_gc,
             x, y - m_font_height + 4, m_font_width, m_font_height);
     }
 
@@ -590,8 +602,13 @@ void XLibOutput::flush_display()
 {
     Profile::Timer timer("XLibOutput::flush_display");
 
-    XCopyArea(m_display, m_pixel_buffer, m_window, m_gc,
-        0, 0, m_width, m_height, 0, 0);
+    XdbeSwapInfo swap_info;
+    swap_info.swap_window = m_window;
+    swap_info.swap_action = XdbeCopied;
+
+    // XdbeSwapBuffers returns true on success
+    if (!XdbeSwapBuffers(m_display, &swap_info, 1))
+        std::cout << "terminal: xlib: could not swap buffers\n";
     XFlush(m_display);
 }
 
@@ -605,9 +622,6 @@ XLibOutput::~XLibOutput()
     if (m_font)
         XftFontClose(m_display, m_font);
 
-    if (m_pixel_buffer)
-        XFreePixmap(m_display, m_pixel_buffer);
-    
     if (m_draw)
         XftDrawDestroy(m_draw);
 }

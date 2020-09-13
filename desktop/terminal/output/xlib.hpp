@@ -3,6 +3,7 @@
 #include "xclipboard.hpp"
 #include <X11/Xlib.h>
 #include <X11/Xft/Xft.h>
+#include <X11/extensions/Xdbe.h>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -53,6 +54,7 @@ private:
     CursorPosition cursor_position_from_pixels(int x, int y);
     XftColor &text_color_from_terminal(TerminalColor color);
     void load_font(const std::string &&name, int size);
+    void load_back_buffer(XVisualInfo&);
     void select_word_under_mouse();
     
     int m_width { 0 };
@@ -77,7 +79,7 @@ private:
     Display *m_display;
     Visual *m_visual;
     Window m_window;
-    Pixmap m_pixel_buffer;
+    XdbeBackBuffer m_back_buffer;
     GC m_gc;
     int m_screen;
     int m_color_map;
