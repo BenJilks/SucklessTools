@@ -95,6 +95,7 @@ void Shell::prompt()
 {
 	std::string ps1 = substitute_variables(get("PS1"));
 	std::cout << ps1;
+    std::cout.flush();
 
     m_line = "";
     m_cursor = 0;
@@ -109,7 +110,8 @@ void Shell::prompt()
 
 		// Replace the current line with the new one
 		std::cout << with << "\033[K";
-		
+        std::cout.flush();
+
         m_line = with;
         m_cursor = with.length();
 	};
@@ -130,13 +132,15 @@ void Shell::prompt()
             std::cout << "\033[" << with.length() << "@";
             std::cout << with;
         }
-	};
+        std::cout.flush();
+    };
 
 	auto message = [&](const std::string &msg)
 	{
 		std::cout << "\n" << msg << "\n";
         std::cout << ps1 << m_line;
-	};
+        std::cout.flush();
+    };
 
 	while (!line_end)
 	{
@@ -196,15 +200,17 @@ void Shell::prompt()
                         if (m_cursor < (int)m_line.length())
 						{
                             std::cout << m_line[m_cursor];
+                            std::cout.flush();
                             m_cursor += 1;
-						}
+                        }
 						break;
 					case 'D': // Left
                         if (m_cursor > 0)
 						{
                             m_cursor -= 1;
-							std::cout << "\b";
-						}
+                            std::cout << "\b";
+                            std::cout.flush();
+                        }
 						break;
 					
 					case '1': // Home
@@ -212,6 +218,7 @@ void Shell::prompt()
 					case 'H': // Xterm Home
                         for (int i = m_cursor - 1; i >= 0; --i)
 							std::cout << "\b";
+                        std::cout.flush();
                         m_cursor = 0;
 						break;
 
@@ -220,6 +227,7 @@ void Shell::prompt()
 					case 'F': // Xterm end
                         for (int i = m_cursor; i < (int)m_line.length(); i++)
                             std::cout << m_line[i];
+                        std::cout.flush();
                         m_cursor = m_line.length();
 						break;
 				}
@@ -231,6 +239,7 @@ void Shell::prompt()
                 if (m_cursor > 0)
 				{
 					std::cout << "\b \b\033[P";
+                    std::cout.flush();
                     m_cursor -= 1;
                     m_line.erase(m_cursor, 1);
 				}
