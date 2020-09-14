@@ -4,7 +4,7 @@ project(terminal LANGUAGES CXX)
 find_package(Freetype REQUIRED)
 find_package(X11 REQUIRED)
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES
@@ -18,6 +18,10 @@ set(SOURCES
     output/xlib.cpp
     output/xclipboard.cpp
 )
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_definitions(-DPROFILING_DISABLED)
+endif()
 
 add_executable(terminal ${SOURCES})
 target_link_libraries(terminal
