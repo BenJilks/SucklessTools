@@ -252,7 +252,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
                 case 0:
                     for (int i = m_cursor.coloumn(); i < columns(); i++)
                     {
-                        m_buffer.rune_at(m_cursor.column_offset(i)) = m_buffer.blank_rune();
+                        m_buffer.rune_at(m_cursor.column_offset(i)) = { ' ', m_current_attribute };
                         draw_rune(CursorPosition(i, m_cursor.row()));
                     }
                     break;
@@ -261,7 +261,7 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
                 case 1:
                     for (int i = 0; i <= m_cursor.coloumn(); i++)
                     {
-                        m_buffer.rune_at(m_cursor.column_offset(i)) = m_buffer.blank_rune();
+                        m_buffer.rune_at(m_cursor.column_offset(i)) = { ' ', m_current_attribute };
                         draw_rune(CursorPosition(i, m_cursor.row()));
                     }
                     break;
