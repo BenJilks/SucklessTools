@@ -76,6 +76,10 @@ XLibOutput::XLibOutput()
     m_wm_delete_message = XInternAtom(m_display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(m_display, m_window, &m_wm_delete_message, 1);
     m_clip_board = std::make_unique<XClipBoard>(m_display, m_window);
+}
+
+void XLibOutput::init()
+{
     did_resize();
 }
 

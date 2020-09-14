@@ -11,8 +11,9 @@
 class Output
 {
 public:
-    Output() {}
+    Output() = default;
 
+    virtual void init() = 0;
     virtual int input_file() const = 0;
     virtual std::string update() = 0;
     void out(std::string_view str);

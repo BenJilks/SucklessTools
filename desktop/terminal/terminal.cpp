@@ -25,6 +25,7 @@ Terminal::Terminal(Output &&output)
             return;
         }
     };
+    output.init();
     
     init();
     run_event_loop();

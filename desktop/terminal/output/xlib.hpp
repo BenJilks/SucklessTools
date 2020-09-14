@@ -29,6 +29,7 @@ class XLibOutput final : public Output
 public:
     XLibOutput();
     
+    virtual void init() override;
     virtual int input_file() const override;
     virtual std::string update() override;
     
