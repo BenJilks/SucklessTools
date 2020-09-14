@@ -64,25 +64,30 @@ void Buffer::clear_row(int row)
 
 void Buffer::scroll(int top, int bottom, int by)
 {
+    std::cout << "scroll: top=" << top << ", bottom=" << bottom << ", by=" << by << "\n";
+
     auto start_index = top * m_columns;
     auto end_index = (bottom + 1) * m_columns;
     auto by_index = by * m_columns;
     if (by > 0)
     {
         // Copy overflow into scrollback buffer
-        m_scroll_back = allocate_new_buffer(m_scroll_back, m_scroll_back_rows + by, m_columns, m_scroll_back_rows, m_columns);
+        m_scroll_back = allocate_new_buffer(m_scroll_back,
+            m_scroll_back_rows + by, m_columns,
+            m_scroll_back_rows, m_columns);
+
         for (int i = 0; i < by_index; i++)
             m_scroll_back[m_scroll_back_rows * m_columns + i] = m_buffer[i];
         m_scroll_back_rows += by;
 
-        for (int i = start_index; i < end_index - start_index - by; i++)
+        for (int i = start_index; i < end_index - by; i++)
             m_buffer[i] = m_buffer[i + by_index];
         for (int i = bottom - by + 1; i < bottom + 1; i++)
             clear_row(i);
     }
     else if (by < 0)
     {
-        for (int i = end_index - start_index; i >= start_index - by_index; i--)
+        for (int i = end_index; i >= start_index - by_index; i--)
             m_buffer[i] = m_buffer[i + by_index];
 
         if (m_scroll_back_rows >= -by)
