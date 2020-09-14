@@ -71,6 +71,7 @@ XLibOutput::XLibOutput()
     
     load_font(font_name.c_str(), font_size);
     XMapWindow(m_display, m_window);
+    XStoreName(m_display, m_window, "terminal");
 
     m_wm_delete_message = XInternAtom(m_display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(m_display, m_window, &m_wm_delete_message, 1);
@@ -619,6 +620,20 @@ void XLibOutput::flush_display()
     if (!XdbeSwapBuffers(m_display, &swap_info, 1))
         std::cout << "terminal: xlib: could not swap buffers\n";
     XFlush(m_display);
+}
+
+void XLibOutput::out_os_command(Decoder::OSCommand &os_command)
+{
+    switch (os_command.command)
+    {
+        case 0:
+            XStoreName(m_display, m_window, os_command.body.c_str());
+            break;
+
+        default:
+            std::cout << "terminal: xlib: Unkown os command " << os_command.command << "\n";
+            break;
+    }
 }
 
 int XLibOutput::input_file() const

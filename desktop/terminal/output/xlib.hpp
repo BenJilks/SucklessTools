@@ -41,6 +41,7 @@ private:
     virtual void draw_scroll(int begin, int end, int by) override;
     virtual void flush_display() override;
     virtual void input(const std::string&) override;
+    virtual void out_os_command(Decoder::OSCommand&) override;
     void draw_row(int row, bool refresh = false);
     void draw_update_selection(const CursorPosition &new_end_pos);
     void copy();

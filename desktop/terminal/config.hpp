@@ -3,7 +3,7 @@
 
 namespace ColorPalette
 {
-    static std::string DefaultBackground = "CC000000";
+    static std::string DefaultBackground = "CC322f36";
     static std::string DefaultForeground = "CCCCCC";
     
     static std::string Black = "000000";
