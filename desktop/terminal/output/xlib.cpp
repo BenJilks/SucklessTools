@@ -44,7 +44,7 @@ XLibOutput::XLibOutput()
     
     XSetWindowAttributes window_attr;
     window_attr.colormap = m_color_map;
-    window_attr.background_pixel = 0xFFFFFF;
+    window_attr.background_pixel = TerminalColor::default_color().background_int();
     window_attr.border_pixel = 0;
 
     auto window_mask = CWBackPixel | CWColormap | CWBorderPixel;
@@ -53,7 +53,6 @@ XLibOutput::XLibOutput()
         10, 10, m_width, m_height, 0, 
         CopyFromParent, CopyFromParent, m_visual,
         window_mask, &window_attr);
-
     m_back_buffer = XdbeAllocateBackBufferName(m_display, m_window, XdbeCopied);
 
     //m_pixel_buffer = XCreatePixmap(m_display, m_window,

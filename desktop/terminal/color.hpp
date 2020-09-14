@@ -41,7 +41,7 @@ public:
         , m_background(DefaultBackground)
         , m_flags(0) {}
     
-    inline static TerminalColor default_color() { return TerminalColor(DefaultForeground, DefaultBackground); }
+    inline static TerminalColor default_color() { return TerminalColor(); }
     TerminalColor inverted() const;
     
     inline Named foreground() const { return m_foreground; }
