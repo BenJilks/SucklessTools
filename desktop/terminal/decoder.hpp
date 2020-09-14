@@ -20,6 +20,9 @@ public:
         EscapeBracket,
         OSCommandStart,
         OSCommandBody,
+        Utf8OneByteLeft,
+        Utf8TwoBytesLeft,
+        Utf8ThreeBytesLeft,
     };
 
     struct EscapeSequence
@@ -59,6 +62,7 @@ public:
     
 private:
     State m_state { State::Ascii };
+    uint32_t m_current_rune { 0 };
     std::string m_current_argument;
     std::vector<int> m_current_args;
     bool m_current_is_private;

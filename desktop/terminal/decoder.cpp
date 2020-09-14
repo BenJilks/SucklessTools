@@ -3,6 +3,7 @@
 #include "buffer.hpp"
 #include <optional>
 #include <iostream>
+#include <bitset>
 
 Decoder::Result Decoder::parse(char c)
 {
@@ -21,6 +22,25 @@ Decoder::Result Decoder::parse(char c)
         switch (m_state)
         {
             case State::Ascii:
+                if ((c & 0b11100000) == 0b11000000)
+                {
+                    m_current_rune = (c & 0b00011111) << 6;
+                    m_state = State::Utf8OneByteLeft;
+                    break;
+                }
+                if ((c & 0b11110000) == 0b11100000)
+                {
+                    m_current_rune = (c & 0b00001111) << 12;
+                    m_state = State::Utf8TwoBytesLeft;
+                    break;
+                }
+                if ((c & 0b11111000) == 0b11110000)
+                {
+                    m_current_rune = (c & 0b00000111) << 18;
+                    m_state = State::Utf8ThreeBytesLeft;
+                    break;
+                }
+
                 switch (c)
                 {
                     case '\0':
@@ -171,6 +191,50 @@ Decoder::Result Decoder::parse(char c)
                 break;
             }
 
+            case State::Utf8OneByteLeft:
+            {
+                if ((c & 0b11000000) != 0b10000000)
+                {
+                    std::cout << "Invalid UTF-8\n";
+                    m_state = State::Ascii;
+                    should_consume = false;
+                    break;
+                }
+
+                m_current_rune |= c & 0b00111111;
+                m_state = State::Ascii;
+                return { Result::Rune, m_current_rune, {}, {} };
+            }
+
+            case State::Utf8TwoBytesLeft:
+            {
+                if ((c & 0b11000000) != 0b10000000)
+                {
+                    std::cout << "Invalid UTF-8\n";
+                    m_state = State::Ascii;
+                    should_consume = false;
+                    break;
+                }
+
+                m_current_rune |= (c & 0b00111111) << 6;
+                m_state = State::Utf8OneByteLeft;
+                break;
+            }
+
+            case State::Utf8ThreeBytesLeft:
+            {
+                if ((c & 0b11000000) != 0b10000000)
+                {
+                    std::cout << "Invalid UTF-8\n";
+                    m_state = State::Ascii;
+                    should_consume = false;
+                    break;
+                }
+
+                m_current_rune |= (c & 0b00111111) << 12;
+                m_state = State::Utf8TwoBytesLeft;
+                break;
+            }
         }
     } while (!should_consume);
     
