@@ -509,9 +509,6 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
     auto bottom_of_buffer = (end + 1) * m_font_height;
     auto height_of_buffer = bottom_of_buffer - top_of_buffer;
 
-#if 0
-    redraw_all();
-#else
     auto color = TerminalColor(TerminalColor::DefaultForeground, TerminalColor::DefaultBackground);
     if (by > 0)
     {
@@ -539,7 +536,6 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         for (int i = begin; i < -by; i++)
             draw_row(i, true);
     }
-#endif
 
     m_selection_start.move_by(0, -by);
     m_selection_end.move_by(0, -by);
@@ -588,7 +584,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
         Profile::Timer timer("XLibOutput::draw_rune background");
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_back_buffer, m_gc,
-            x, y - m_font_height + 4, m_font_width, m_font_height);
+            x, y - m_font_height, m_font_width, m_font_height);
     }
 
     if (!isspace(rune.value))
@@ -599,7 +595,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
         XRectangle rect = { 0, 0, (uint16_t)(m_font_width * 2), (uint16_t)(m_font_height * 2) };
         XftDrawSetClipRectangles(m_draw, x - m_font_width, y - m_font_height, &rect, 1);
 
-        XftGlyphSpec spec = { glyph, (short)x, (short)y };
+        XftGlyphSpec spec = { glyph, (short)x, (short)(y - m_font->descent) };
         XftDrawGlyphSpec(m_draw, &text_color_from_terminal(color),
             m_font, &spec, 1);
 
