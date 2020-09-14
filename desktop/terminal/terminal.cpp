@@ -6,6 +6,8 @@
 #include <iostream>
 #include <libprofile/profile.hpp>
 
+#define BUFFER_SIZE 1024 * 4 // 4kb
+
 #if __FreeBSD__
 #include <libutil.h>
 #else
@@ -79,7 +81,8 @@ void Terminal::run_event_loop()
 {
     Profile::Timer timer("Terminal::run_event_loop");
     fd_set fds;
-    
+    auto buffer = new char[BUFFER_SIZE];
+
     while (!m_output.should_close())
     {
         FD_ZERO(&fds);
@@ -93,15 +96,14 @@ void Terminal::run_event_loop()
         
         if (FD_ISSET(m_master, &fds))
         {
-            char read_buf[1024];
-            auto ret = read(m_master, read_buf, sizeof(read_buf));
+            auto ret = read(m_master, buffer, BUFFER_SIZE);
             if (ret < 0)
             {
                 perror("read()");
                 break;
             }
             
-            m_output.out(std::string_view(read_buf, ret));
+            m_output.out(std::string_view(buffer, ret));
 
             // Exit when slave pid has exited
             int status;
@@ -125,4 +127,5 @@ void Terminal::run_event_loop()
     
     std::cout << "Terminal exited\n";
     std::cout.flush();
+    delete[] buffer;
 }
