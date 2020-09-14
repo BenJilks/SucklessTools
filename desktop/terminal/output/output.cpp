@@ -389,6 +389,12 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
     }
 }
 
+void Output::out_os_command(Decoder::OSCommand &os_command)
+{
+    std::cout << "OS Command " << os_command.command << ": "
+              << os_command.body << "\n";
+}
+
 void Output::out_tab()
 {
     Profile::Timer timer("Output::out_tab");
@@ -425,6 +431,7 @@ void Output::out(std::string_view buff)
             case Decoder::Result::Rune: out_rune(result.value); break;
             case Decoder::Result::Bell: std::cout << "BELL!\n"; break;
             case Decoder::Result::Escape: out_escape(result.escape); break;
+            case Decoder::Result::OSCommand: out_os_command(result.os_command); break;
             case Decoder::Result::Tab: out_tab(); break;
             default: break;
         }

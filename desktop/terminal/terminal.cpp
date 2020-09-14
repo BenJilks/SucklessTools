@@ -66,7 +66,7 @@ void Terminal::init()
         close(slave);
         close(m_master);
     
-        const auto *shell = "/usr/bin/bash"; //getenv("SHELL");
+        const auto *shell = getenv("SHELL");
         setenv("TERM", "xterm-16color", 1);
         if (execl(shell, shell, nullptr) < 0)
             perror("system()");

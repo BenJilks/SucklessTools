@@ -34,23 +34,24 @@ Decoder::Result Decoder::parse(char c)
                         break;
                     
                     case 7:
-                        return { Result::Bell, 0, {} };
+                        return { Result::Bell, 0, {}, {} };
 
                     case 8:
                         return
                         {
                             Result::Escape, 0,
-                            { 'D', { 1 }, false }
+                            { 'D', { 1 }, false },
+                            {}
                         };
 
                     case '\r':
-                        return { Result::Escape, 0, { 'G', {}, false } };
+                        return { Result::Escape, 0, { 'G', {}, false }, {} };
 
                     case '\t':
-                        return { Result::Tab, 0, {} };
+                        return { Result::Tab, 0, {}, {} };
                     
                     default:
-                        return { Result::Rune, (uint32_t)c, {} };
+                        return { Result::Rune, (uint32_t)c, {}, {} };
                 }
                 break;
             
@@ -58,6 +59,12 @@ Decoder::Result Decoder::parse(char c)
                 if (c == '[')
                 {
                     m_state = State::EscapePrivate;
+                    break;
+                }
+
+                if (c == ']')
+                {
+                    m_state = State::OSCommandStart;
                     break;
                 }
 
@@ -116,7 +123,7 @@ Decoder::Result Decoder::parse(char c)
                 m_state = State::Ascii;
                 
                 auto sequence = EscapeSequence { c, m_current_args, m_current_is_private };
-                return { Result::Escape, 0, sequence };
+                return { Result::Escape, 0, sequence, {} };
             }
 
             case State::EscapeHash:
@@ -124,7 +131,7 @@ Decoder::Result Decoder::parse(char c)
                 m_state = State::Ascii;
 
                 auto sequence = EscapeSequence { '#', { c - '0' }, false };
-                return { Result::Escape, 0, sequence };
+                return { Result::Escape, 0, sequence, {} };
             }
 
             case State::EscapeBracket:
@@ -132,10 +139,40 @@ Decoder::Result Decoder::parse(char c)
                 m_state = State::Ascii;
 
                 auto sequence = EscapeSequence { '(', { c }, false };
-                return { Result::Escape, 0, sequence };
+                return { Result::Escape, 0, sequence, {} };
             }
+
+            case State::OSCommandStart:
+            {
+                if (c == ';')
+                {
+                    m_state = State::OSCommandBody;
+                    m_current_args.push_back(std::atoi(m_current_argument.c_str()));
+                    m_current_argument.clear();
+                    break;
+                }
+
+                m_current_argument += c;
+                break;
+            }
+
+            case State::OSCommandBody:
+            {
+                if (c == 0x07)
+                {
+                    m_state = State::Ascii;
+                    auto command = OSCommand { m_current_args[0], m_current_argument };
+                    m_current_argument = "";
+                    m_current_args.clear();
+                    return { Result::OSCommand, 0, {}, command };
+                }
+
+                m_current_argument += c;
+                break;
+            }
+
         }
     } while (!should_consume);
     
-    return { Result::Incomplete, 0, {} };
+    return { Result::Incomplete, 0, {}, {} };
 }

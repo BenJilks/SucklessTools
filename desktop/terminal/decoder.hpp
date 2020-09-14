@@ -17,14 +17,22 @@ public:
         EscapeArg,
         EscapeCommand,
         EscapeHash,
-        EscapeBracket
-    };    
+        EscapeBracket,
+        OSCommandStart,
+        OSCommandBody,
+    };
 
     struct EscapeSequence
     {
         char command;
         std::vector<int> args;
         bool is_private;
+    };
+
+    struct OSCommand
+    {
+        int command;
+        std::string body;
     };
 
     struct Result
@@ -34,13 +42,15 @@ public:
             Incomplete,
             Rune,
             Escape,
+            OSCommand,
             Bell,
             Tab,
         };
 
         Type type;
         uint32_t value;
-        EscapeSequence escape;
+        struct EscapeSequence escape;
+        struct OSCommand os_command;
     };
 
     Decoder() {}

@@ -72,6 +72,7 @@ private:
 
     void out_rune(uint32_t);
     void out_escape(Decoder::EscapeSequence&);
+    void out_os_command(Decoder::OSCommand&);
     void out_tab();
     void wait();
 
