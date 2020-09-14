@@ -10,6 +10,7 @@
 namespace Profile
 {
 
+#ifndef PROFILING_DISABLED
     class Timer
     {
     public:
@@ -73,5 +74,25 @@ namespace Profile
         void print_functions_spent_most_time_in(std::ostream&);
 
     };
+#else
+    class Timer
+    {
+    public:
+        Timer(const std::string &name) {}
+    };
+
+    class Profiler
+    {
+    public:
+        static Profiler &the()
+        {
+            static Profiler profiler;
+            return profiler;
+        }
+
+        void print_results(std::ostream& = std::cout) {}
+
+    };
+#endif
 
 }
