@@ -94,11 +94,6 @@ void Terminal::on_terminal_update()
     }
 
     m_output.out(std::string_view(m_buffer, ret));
-
-    // Exit when slave pid has exited
-    int status;
-    if (waitpid(m_slave_pid, &status, WNOHANG) != 0)
-        return;
 }
 
 void Terminal::on_output_update()
@@ -132,6 +127,11 @@ void Terminal::run_event_loop()
         
         if (FD_ISSET(m_output.input_file(), &fds))
             on_output_update();
+
+        // Exit when slave pid has exited
+        int status;
+        if (waitpid(m_slave_pid, &status, WNOHANG) != 0)
+            break;
     }
     
     std::cout << "Terminal exited\n";

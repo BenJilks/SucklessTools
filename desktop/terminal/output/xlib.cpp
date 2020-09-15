@@ -203,8 +203,9 @@ void XLibOutput::did_resize()
 std::string XLibOutput::update()
 {
     XEvent event;
-    while (!should_close() && XNextEvent(m_display, &event) == 0)
+    while (XPending(m_display))
     {
+        XNextEvent(m_display, &event);
         m_clip_board->update(event);
 
         switch (event.type)
@@ -308,6 +309,9 @@ std::string XLibOutput::update()
                     m_height = event.xconfigure.height;
                     did_resize();
                 }
+                break;
+
+            default:
                 break;
         }
     }

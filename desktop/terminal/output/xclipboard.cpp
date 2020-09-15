@@ -7,7 +7,7 @@ XClipBoard::XClipBoard(Display *display, Window window)
     : m_display(display)
     , m_window(window)
 {
-    m_utf8_atom = XInternAtom(display, "text/plain;charset=utf-8", 1);
+    m_utf8_atom = XInternAtom(display, "UTF8_STRING", 1);
     m_clipboard_atom = XInternAtom(display, "CLIPBOARD", 0);
     m_xsel_data_atom = XInternAtom(display, "XSEL_DATA", 0);
 }
@@ -40,6 +40,7 @@ std::string XClipBoard::get_utf8_prop(Atom prop)
     // Signal the selection owner that we have successfully read the data
     XDeleteProperty(m_display, m_window, prop);
 
+    std::cout << "Got paste data: " << data << "\n";
     return data;
 }
 
