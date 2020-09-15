@@ -42,6 +42,7 @@ private:
     virtual void flush_display() override;
     virtual void input(const std::string&) override;
     virtual void out_os_command(Decoder::OSCommand&) override;
+    virtual void on_out_rune(uint32_t rune) override;
     void draw_row(int row, bool refresh = false);
     void draw_update_selection(const CursorPosition &new_end_pos);
     void copy();

@@ -36,7 +36,8 @@ protected:
     virtual void draw_scroll(int begin, int end, int by) = 0;
     virtual void flush_display() = 0;
     virtual void input(const std::string&) = 0;
-    virtual void out_os_command(Decoder::OSCommand&) = 0;
+    virtual void out_os_command(Decoder::OSCommand&) {}
+    virtual void on_out_rune(uint32_t rune) {}
 
     void resize(int rows, int columns);
     void scroll(int by);

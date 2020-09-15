@@ -69,6 +69,7 @@ void Output::move_cursor_by(int column, int row)
 void Output::out_rune(uint32_t rune)
 {
     Profile::Timer timer("Output::out_rune");
+    on_out_rune(rune);
 
     if (rune == '\r' || rune == '\033')
         return;
@@ -387,12 +388,6 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
 #endif
             break;
     }
-}
-
-void Output::out_os_command(Decoder::OSCommand &os_command)
-{
-    std::cout << "OS Command " << os_command.command << ": "
-              << os_command.body << "\n";
 }
 
 void Output::out_tab()

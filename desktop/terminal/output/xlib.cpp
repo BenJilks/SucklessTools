@@ -618,6 +618,15 @@ void XLibOutput::flush_display()
     XFlush(m_display);
 }
 
+void XLibOutput::on_out_rune(uint32_t)
+{
+    if (m_scroll_offset == 0)
+        return;
+
+    m_scroll_offset = 0;
+    redraw_all();
+}
+
 void XLibOutput::out_os_command(Decoder::OSCommand &os_command)
 {
     switch (os_command.command)
