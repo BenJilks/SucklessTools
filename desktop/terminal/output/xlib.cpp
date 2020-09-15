@@ -203,7 +203,7 @@ void XLibOutput::did_resize()
 std::string XLibOutput::update()
 {
     XEvent event;
-    while (XNextEvent(m_display, &event) == 0)
+    while (!should_close() && XNextEvent(m_display, &event) == 0)
     {
         m_clip_board->update(event);
 

@@ -89,6 +89,7 @@ void Terminal::on_terminal_update()
     if (ret < 0)
     {
         perror("read()");
+        m_should_close = true;
         return;
     }
 
@@ -115,7 +116,7 @@ void Terminal::run_event_loop()
     Profile::Timer timer("Terminal::run_event_loop");
     fd_set fds;
 
-    while (!m_output.should_close())
+    while (!m_should_close && !m_output.should_close())
     {
         FD_ZERO(&fds);
         FD_SET(m_master, &fds);

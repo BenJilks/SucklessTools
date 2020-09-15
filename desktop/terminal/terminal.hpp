@@ -19,5 +19,6 @@ private:
     int m_master;
     int m_slave_pid;
     char *m_buffer;
+    bool m_should_close { false };
 
 };
