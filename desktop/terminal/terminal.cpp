@@ -29,8 +29,14 @@ Terminal::Terminal(Output &&output)
     };
     output.init();
     
+    m_buffer = new char[BUFFER_SIZE];
     init();
     run_event_loop();
+}
+
+Terminal::~Terminal()
+{
+    delete[] m_buffer;
 }
 
 void Terminal::init()
@@ -77,11 +83,37 @@ void Terminal::init()
     ioctl(m_master, TIOCPKT, 1);
 }
 
+void Terminal::on_terminal_update()
+{
+    auto ret = read(m_master, m_buffer, BUFFER_SIZE);
+    if (ret < 0)
+    {
+        perror("read()");
+        return;
+    }
+
+    m_output.out(std::string_view(m_buffer, ret));
+
+    // Exit when slave pid has exited
+    int status;
+    if (waitpid(m_slave_pid, &status, WNOHANG) != 0)
+        return;
+}
+
+void Terminal::on_output_update()
+{
+    auto input = m_output.update();
+    if (!input.empty())
+    {
+        if (write(m_master, input.data(), input.length()) < 0)
+            perror("write()");
+    }
+}
+
 void Terminal::run_event_loop()
 {
     Profile::Timer timer("Terminal::run_event_loop");
     fd_set fds;
-    auto buffer = new char[BUFFER_SIZE];
 
     while (!m_output.should_close())
     {
@@ -95,37 +127,12 @@ void Terminal::run_event_loop()
         }
         
         if (FD_ISSET(m_master, &fds))
-        {
-            auto ret = read(m_master, buffer, BUFFER_SIZE);
-            if (ret < 0)
-            {
-                perror("read()");
-                break;
-            }
-            
-            m_output.out(std::string_view(buffer, ret));
-
-            // Exit when slave pid has exited
-            int status;
-            if (waitpid(m_slave_pid, &status, WNOHANG) != 0)
-                break;
-        }
+            on_terminal_update();
         
         if (FD_ISSET(m_output.input_file(), &fds))
-        {
-            auto input = m_output.update();
-            if (!input.empty())
-            {
-                if (write(m_master, input.data(), input.length()) < 0)
-                {
-                    perror("write()");
-                    break;
-                }
-            }
-        }
+            on_output_update();
     }
     
     std::cout << "Terminal exited\n";
     std::cout.flush();
-    delete[] buffer;
 }

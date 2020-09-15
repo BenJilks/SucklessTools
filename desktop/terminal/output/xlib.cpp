@@ -6,6 +6,7 @@
 #include <cmath>
 #include <sys/time.h>
 #include <libprofile/profile.hpp>
+#include <bitset>
 
 #include "../config.hpp"
 
@@ -58,11 +59,12 @@ XLibOutput::XLibOutput()
     //m_pixel_buffer = XCreatePixmap(m_display, m_window,
     //    m_width, m_height, m_depth);
     m_gc = XCreateGC(m_display, m_back_buffer, 0, 0);
-    
+
     XSelectInput(m_display, m_window,
-        ExposureMask | KeyPressMask | StructureNotifyMask | 
-        ButtonPress | ButtonReleaseMask | PointerMotionMask);
-     
+        ExposureMask | KeyPressMask | StructureNotifyMask |
+        ButtonPress | ButtonReleaseMask | PointerMotionMask |
+        PropertyChangeMask);
+
     auto im = XOpenIM(m_display, nullptr, nullptr, nullptr);
     m_input_context = XCreateIC(im, XNInputStyle, 
         XIMPreeditNothing | XIMStatusNothing,
@@ -200,17 +202,11 @@ void XLibOutput::did_resize()
 
 std::string XLibOutput::update()
 {
-    if (!m_input_buffer.empty())
-    {
-        auto msg = m_input_buffer;
-        m_input_buffer.clear();
-
-        return msg;
-    }
-
     XEvent event;
     while (XNextEvent(m_display, &event) == 0)
     {
+        m_clip_board->update(event);
+
         switch (event.type)
         {
             case ClientMessage:
@@ -257,7 +253,6 @@ std::string XLibOutput::update()
 
                     case Button2:
                         return paste();
-                        break;
 
                     case Button3:
                         copy();
@@ -315,10 +310,16 @@ std::string XLibOutput::update()
                 }
                 break;
         }
-        
-        break;
     }
     
+    if (!m_input_buffer.empty())
+    {
+        auto msg = m_input_buffer;
+        m_input_buffer.clear();
+
+        return msg;
+    }
+
     return "";
 }
 
@@ -360,11 +361,16 @@ void XLibOutput::copy()
         {
             text += (char)buffer().rune_at(pos).value;
         });
+
+        // Post text to clipboard
+        m_clip_board->copy(text);
     }
 }
 
 std::string XLibOutput::paste()
 {
+    // NOTE: If we have a selection, paste that and post
+    //       it to the clipboard
     if (m_selection_start != m_selection_end)
     {
         std::string text;
@@ -373,10 +379,11 @@ std::string XLibOutput::paste()
             text += (char)buffer().rune_at(pos).value;
         });
 
+        m_clip_board->copy(text);
         return text;
     }
 
-    return "";
+    return m_clip_board->paste();
 }
 
 template<typename CallbackFunc>
