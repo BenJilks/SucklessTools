@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <iostream>
 
 class CursorPosition
 {
@@ -39,3 +40,9 @@ private:
     int m_row { 0 };
     
 };
+
+static std::ostream &operator <<(std::ostream &stream, const CursorPosition &pos)
+{
+    stream << "CursorPosition {row=" << pos.row() << ", column=" << pos.coloumn() << "}";
+    return stream;
+}

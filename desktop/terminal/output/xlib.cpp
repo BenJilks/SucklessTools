@@ -243,7 +243,10 @@ std::string XLibOutput::update()
 
                         for_rune_in_selection([this](const CursorPosition &pos)
                         {
-                            draw_rune(pos);
+                            if (pos == cursor())
+                                draw_rune(pos, RuneMode::Cursor);
+                            else
+                                draw_rune(pos);
                         });
                         m_selection_start = m_mouse_pos;
                         m_selection_end = m_mouse_pos;
@@ -400,7 +403,10 @@ void XLibOutput::draw_update_selection(const CursorPosition &new_end_pos)
 {
     for_rune_in_selection([this](const CursorPosition &pos)
     {
-        draw_rune(pos);
+        if (pos == cursor())
+            draw_rune(pos, RuneMode::Cursor);
+        else
+            draw_rune(pos);
     });
 
     m_selection_end = new_end_pos;
