@@ -461,7 +461,7 @@ std::string XLibOutput::decode_key_release(XKeyEvent *key_event)
     XmbLookupString(m_input_context, key_event,
         buf, sizeof(buf), &ksym, &status);
 
-    if (application_keys_mode())
+    if (buffer().application_keys_mode())
     {
         switch (ksym)
         {
@@ -485,7 +485,7 @@ std::string XLibOutput::decode_key_press(XKeyEvent *key_event)
     auto len = XmbLookupString(m_input_context, key_event, 
         buf, sizeof(buf), &ksym, &status);
     
-    if (application_keys_mode())
+    if (buffer().application_keys_mode())
     {
         // Special application keys
         switch (ksym)
@@ -589,7 +589,7 @@ void XLibOutput::draw_rune(const CursorPosition &pos, RuneMode mode)
         case RuneMode::Hilighted:
             color = color.inverted();
         case RuneMode::Cursor:
-            color = current_attribute().color().inverted();
+            color = buffer().current_attribute().color().inverted();
         default:
             break;
     }

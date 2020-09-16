@@ -14,6 +14,31 @@ Buffer::Buffer(int rows, int columns)
     m_buffer = allocate_new_buffer(m_buffer, rows, columns, m_columns, m_rows);
 }
 
+void Buffer::set_mode(int mode, bool value)
+{
+    switch (mode)
+    {
+        case 1:
+            m_application_keys_mode = value;
+            break;
+        case 6:
+            m_relative_origin_mode = value;
+
+            // NOTE: We should always move to 0,0 when setting this
+            m_cursor.move_to(0, 0);
+            break;
+        case 7:
+            m_auto_wrap_mode = value;
+            break;
+    }
+}
+
+void Buffer::set_scroll_region(int top, int bottom)
+{
+    m_scroll_region_top = top;
+    m_scroll_region_bottom = bottom;
+}
+
 Buffer::Rune *Buffer::allocate_new_buffer(Rune *old_buffer,
     int new_rows, int new_columns,
     int old_rows, int old_columns)

@@ -5,13 +5,14 @@
 #include "../attribute.hpp"
 #include <string>
 #include <functional>
+#include <memory>
 #include <termios.h>
 #include <sys/ioctl.h>
 
 class Output
 {
 public:
-    Output() = default;
+    Output();
 
     virtual void init() = 0;
     virtual int input_file() const = 0;
@@ -37,7 +38,7 @@ protected:
     virtual void flush_display() = 0;
     virtual void input(const std::string&) = 0;
     virtual void out_os_command(Decoder::OSCommand&) {}
-    virtual void on_out_rune(uint32_t rune) {}
+    virtual void on_out_rune(uint32_t) {}
 
     void resize(int rows, int columns);
     void scroll(int by);
@@ -48,26 +49,17 @@ protected:
     void move_cursor_to(int column, int row);
     void move_cursor_by(int column, int row);
 
-    inline const CursorPosition &cursor() const { return m_cursor; }
-    inline const Buffer &buffer() const { return m_buffer; }
-    inline const Attribute &current_attribute() const { return m_current_attribute; }
-    inline int rows() const { return m_buffer.rows(); }
-    inline int columns() const { return m_buffer.columns(); }
-    inline bool application_keys_mode() const { return m_application_keys_mode; }
+    inline CursorPosition &cursor() { return m_buffer->cursor(); }
+    inline const CursorPosition &cursor() const { return m_buffer->cursor(); }
+    inline const Buffer &buffer() const { return *m_buffer; }
+    inline int rows() const { return m_buffer->rows(); }
+    inline int columns() const { return m_buffer->columns(); }
 
 private:
-    Buffer m_buffer;
-    CursorPosition m_cursor;
-    CursorPosition m_last_cursor;
-    Attribute m_current_attribute;
-    int m_scroll_region_top { 0 };
-    int m_scroll_region_bottom { 79 };
+    std::unique_ptr<Buffer> m_buffer;
     int m_scroll_buffer { 0 };
     bool m_should_close { false };
-
-    bool m_auto_wrap_mode { true };
-    bool m_relative_origin_mode { false };
-    bool m_application_keys_mode { false };
+    CursorPosition m_last_cursor;
 
     Decoder m_decoder;
     int m_insert_count { 0 };
