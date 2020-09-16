@@ -98,6 +98,8 @@ void Output::out_rune(uint32_t rune)
 
 void Output::set_mode(int mode, bool is_private, bool value)
 {
+    m_buffer->set_mode(mode, value);
+
     if (is_private)
     {
         switch (mode)
@@ -131,8 +133,6 @@ void Output::set_mode(int mode, bool is_private, bool value)
         }
         return;
     }
-
-    m_buffer->set_mode(mode, value);
 }
 
 void Output::wait()
