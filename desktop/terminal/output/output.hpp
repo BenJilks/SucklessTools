@@ -43,7 +43,7 @@ protected:
     void resize(int rows, int columns);
     void scroll(int by);
     void flush_scroll();
-    void set_mode(int mode, bool value);
+    void set_mode(int mode, bool is_private, bool value);
     void set_should_close(bool b) { m_should_close = b; }
 
     void move_cursor_to(int column, int row);
@@ -56,7 +56,9 @@ protected:
     inline int columns() const { return m_buffer->columns(); }
 
 private:
-    std::unique_ptr<Buffer> m_buffer;
+    Buffer *m_buffer;
+    std::unique_ptr<Buffer> m_primary_buffer;
+    std::unique_ptr<Buffer> m_secondary_buffer;
     int m_scroll_buffer { 0 };
     bool m_should_close { false };
     CursorPosition m_last_cursor;

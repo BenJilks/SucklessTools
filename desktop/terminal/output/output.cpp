@@ -11,7 +11,9 @@
 
 Output::Output()
 {
-    m_buffer = std::make_unique<Buffer>();
+    m_primary_buffer = std::make_unique<Buffer>();
+    m_secondary_buffer = std::make_unique<Buffer>();
+    m_buffer = m_primary_buffer.get();
 }
 
 void Output::resize(int rows, int columns)
@@ -94,8 +96,42 @@ void Output::out_rune(uint32_t rune)
     }
 }
 
-void Output::set_mode(int mode, bool value)
+void Output::set_mode(int mode, bool is_private, bool value)
 {
+    if (is_private)
+    {
+        switch (mode)
+        {
+            case 1049:
+                if (value)
+                {
+                    // Switch to secondary
+                    if (m_buffer == m_secondary_buffer.get())
+                        break;
+
+                    m_secondary_buffer->resize(m_buffer->rows(), m_buffer->columns());
+                    m_secondary_buffer->cursor() = cursor();
+                    m_buffer = m_secondary_buffer.get();
+                    m_last_cursor = cursor();
+                    redraw_all();
+                }
+                else
+                {
+                    // Switch to primary
+                    if (m_buffer == m_primary_buffer.get())
+                        break;
+
+                    m_primary_buffer->resize(m_buffer->rows(), m_buffer->columns());
+                    m_primary_buffer->cursor() = cursor();
+                    m_buffer = m_primary_buffer.get();
+                    m_last_cursor = cursor();
+                    redraw_all();
+                }
+                break;
+        }
+        return;
+    }
+
     m_buffer->set_mode(mode, value);
 }
 
@@ -338,14 +374,14 @@ void Output::out_escape(Decoder::EscapeSequence &escape)
             // NOTE: ????
             if (arg_len != 1)
                 break;
-            set_mode(escape.args[0], false);
+            set_mode(escape.args[0], escape.is_private, false);
             break;
 
         case 'h':
             // NOTE: ????
             if (arg_len != 1)
                 break;
-            set_mode(escape.args[0], true);
+            set_mode(escape.args[0], escape.is_private, true);
             break;
 
         // Screen alignment display
