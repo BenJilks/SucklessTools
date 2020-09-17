@@ -77,6 +77,22 @@ void Output::out_rune(uint32_t rune)
     Profile::Timer timer("Output::out_rune");
     on_out_rune(rune);
 
+    if (m_insert_count > 0)
+    {
+        for (int i = columns() - 1; i > cursor().coloumn(); i--)
+        {
+            auto from = cursor().column_offset(i - 1);
+            auto to = cursor().column_offset(i);
+            m_buffer->rune_at(to) = m_buffer->rune_at(from);
+            draw_rune(to);
+            draw_rune(from);
+        }
+        m_buffer->rune_at(cursor()) = { rune, m_buffer->current_attribute() };
+        m_insert_count -= 1;
+        move_cursor_by(1, 0);
+        return;
+    }
+
     if (rune == '\r' || rune == '\033')
         return;
     
@@ -435,19 +451,6 @@ void Output::out(std::string_view buff)
     for (int i = 0; i < (int)buff.length(); i++)
     {
         char c = buff[i];
-        if (m_insert_count > 0)
-        {
-            for (int i = columns() - 1; i > cursor().coloumn(); i--)
-            {
-                auto from = cursor().column_offset(i - 1);
-                auto to = cursor().column_offset(i);
-                m_buffer->rune_at(from) = m_buffer->rune_at(to);
-                draw_rune(CursorPosition(i, cursor().row()));
-            }
-            m_buffer->rune_at(cursor()).value = c;
-            m_insert_count -= 1;
-        }
-        
         auto result = m_decoder.parse(c);
         
         switch (result.type)
