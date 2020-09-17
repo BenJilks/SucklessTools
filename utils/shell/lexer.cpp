@@ -43,6 +43,12 @@ std::optional<Token> Lexer::next()
                         break;
                     case ';':
                         return Token { ";", Token::Type::EndCommand };
+                    case '>':
+                        m_state = State::Arrow;
+                        break;
+                    case '2':
+                        m_state = State::Two;
+                        break;
 
                     default:
                         m_state = State::Name;
@@ -95,9 +101,60 @@ std::optional<Token> Lexer::next()
                     return Token { "&&", Token::Type::And };
                 }
 
+                if (m_curr_char == '>')
+                {
+                    m_state = State::AndArrow;
+                    break;
+                }
+
                 m_state = State::Default;
                 m_should_reconsume = true;
                 return Token { "&", Token::Type::With };
+
+            case State::AndArrow:
+                if (m_curr_char == '>')
+                {
+                    m_state = State::Default;
+                    return Token { "&>>", Token::Type::RedirectAllAppend };
+                }
+
+                m_state = State::Default;
+                m_should_reconsume = true;
+                return Token { "&>", Token::Type::RedirectAll };
+
+            case State::Arrow:
+                if (m_curr_char == '>')
+                {
+                    m_state = State::Default;
+                    return Token { ">>", Token::Type::RedirectAppend };
+                }
+
+                m_state = State::Default;
+                m_should_reconsume = true;
+                return Token { ">", Token::Type::Redirect };
+
+            case State::Two:
+                if (m_curr_char == '>')
+                {
+                    m_state = State::TwoArrow;
+                    break;
+                }
+
+                m_state = State::Name;
+                buffer += "2";
+                m_should_reconsume = true;
+                break;
+
+            case State::TwoArrow:
+                if (m_curr_char == '>')
+                {
+                    m_state = State::Default;
+                    return Token { "2>>", Token::Type::RedirectErrAppend };
+                }
+
+                m_state = State::Default;
+                m_should_reconsume = true;
+                return Token { "2>", Token::Type::RedirectErr };
 
             case State::VariableStart:
                 if (m_curr_char == '{')

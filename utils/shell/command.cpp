@@ -10,7 +10,7 @@
 #define READ 		0
 #define WRITE 		1
 
-std::map<std::string, BuiltIn> Command::built_ins;
+std::map<std::string, BuiltIn> Command::s_built_ins;
 
 std::pair<std::string, std::string> Command::parse_assignment(Lexer &lexer)
 {
@@ -128,10 +128,10 @@ std::unique_ptr<Command> Command::parse_exec(Lexer &lexer)
 		return nullptr;
 	}
 
-	if (built_ins.find(command) != built_ins.end())
-		return std::make_unique<CommandBuiltIn>(built_ins[command], arguments, assignments);
+    if (s_built_ins.find(command) != s_built_ins.end())
+        return std::make_unique<CommandBuiltIn>(s_built_ins[command], arguments, assignments);
 
-	return std::make_unique<CommandExec>(command, arguments, assignments);
+    return std::make_unique<CommandExec>(command, arguments, assignments);
 }
 
 std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
@@ -143,32 +143,67 @@ std::unique_ptr<Command> Command::parse_command(Lexer &lexer)
 		peek->type == Token::Type::Pipe || 
 		peek->type == Token::Type::And ||
 		peek->type == Token::Type::With ||
-		peek->type == Token::Type::Or))
+        peek->type == Token::Type::Or ||
+        peek->type == Token::Type::Redirect ||
+        peek->type == Token::Type::RedirectErr ||
+        peek->type == Token::Type::RedirectAll ||
+        peek->type == Token::Type::RedirectAppend ||
+        peek->type == Token::Type::RedirectErrAppend ||
+        peek->type == Token::Type::RedirectAllAppend))
 	{
 		lexer.consume(peek->type);
 		
-		auto right = parse_exec(lexer);
 		switch (peek->type)
 		{
 		case Token::Type::Pipe:
-			left = std::make_unique<CommandPipe>(
+        {
+            auto right = parse_exec(lexer);
+            left = std::make_unique<CommandPipe>(
 				std::move(left), std::move(right));
 			break;
+        }
 
 		case Token::Type::And:
-			left = std::make_unique<CommandAnd>(
+        {
+            auto right = parse_exec(lexer);
+            left = std::make_unique<CommandAnd>(
 				std::move(left), std::move(right));
 			break;
+        }
 
 		case Token::Type::With:
-			left = std::make_unique<CommandWith>(
+        {
+            auto right = parse_exec(lexer);
+            left = std::make_unique<CommandWith>(
 				std::move(left), std::move(right));
 			break;
+        }
 
 		case Token::Type::Or:
-			left = std::make_unique<CommandOr>(
+        {
+            auto right = parse_exec(lexer);
+            left = std::make_unique<CommandOr>(
 				std::move(left), std::move(right));
 			break;
+        }
+
+#define REDIRECT(type, mode, capture) \
+    case Token::Type::type: \
+    { \
+        auto right = lexer.consume(Token::Type::Name); \
+        assert (right); \
+        left = std::make_unique<CommandRedirect>( \
+            std::move(left), right->data, \
+            CommandRedirect::Mode::mode, CommandRedirect::Capture::capture); \
+        break; \
+    }
+
+        REDIRECT(Redirect, Override, StdOut);
+        REDIRECT(RedirectErr, Override, StdErr);
+        REDIRECT(RedirectAll, Override, All);
+        REDIRECT(RedirectAppend, Append, StdOut);
+        REDIRECT(RedirectErrAppend, Append, StdErr);
+        REDIRECT(RedirectAllAppend, Append, All);
 
         default:
             assert (false);
@@ -199,13 +234,13 @@ std::unique_ptr<Command> Command::parse(Lexer &lexer)
 
 void CommandList::add(std::unique_ptr<Command> &command)
 {
-	commands.push_back(std::move(command));
+    m_commands.push_back(std::move(command));
 }
 
 int CommandList::execute()
 {
 	int last_status = 0;
-	for (auto &command : commands)
+    for (auto &command : m_commands)
 		last_status = command->execute();
 	
 	return last_status;
@@ -214,23 +249,23 @@ int CommandList::execute()
 CommandExec::CommandExec(std::string program, 
 			std::vector<std::string> arguments, 
 			std::vector<std::pair<std::string, std::string>> assignments)
-	: program(program)
-	, arguments(arguments)
-	, assignments(assignments)
+    : m_program(program)
+    , m_arguments(arguments)
+    , m_assignments(assignments)
 {
 	// Build argument list
-	raw_arguments.push_back(this->program.data());
-	for (auto &argument : this->arguments)
-		raw_arguments.push_back(argument.data());
-	raw_arguments.push_back(nullptr);
+    m_raw_arguments.push_back(this->m_program.data());
+    for (auto &argument : this->m_arguments)
+        m_raw_arguments.push_back(argument.data());
+    m_raw_arguments.push_back(nullptr);
 	
 	// Build envirment list
-	for (auto &assignment : this->assignments)
+    for (auto &assignment : this->m_assignments)
 	{
 		auto variable = assignment.first + "=" + assignment.second;
-		raw_assignments.push_back(variable.data());
+        m_raw_assignments.push_back(variable.data());
 	}
-	raw_assignments.push_back(nullptr);
+    m_raw_assignments.push_back(nullptr);
 }
 
 int CommandExec::execute()
@@ -254,9 +289,8 @@ int CommandExec::execute()
 
 void CommandExec::execute_and_exit()
 {
-	if (execvp(program.data(), 
-		const_cast<char* const*>(raw_arguments.data())))
-//		const_cast<char* const*>(raw_assignments.data())) < 0)
+    if (execvp(m_program.data(),
+        const_cast<char* const*>(m_raw_arguments.data())))
 	{
 		perror("Shell");
 	}
@@ -266,12 +300,12 @@ void CommandExec::execute_and_exit()
 
 int CommandBuiltIn::execute()
 {
-	return func(args, assignments);
+    return m_func(m_args, m_assignments);
 }
 
 int CommandSetEnv::execute()
 {
-	for (const auto &assignment : assignments)
+    for (const auto &assignment : m_assignments)
 		Shell::the().set(assignment.first, assignment.second);
 	
 	return 0;
@@ -279,13 +313,13 @@ int CommandSetEnv::execute()
 
 int CommandPipe::execute()
 {
-	if (!left || !right)
-		return - 1;
-	
-	auto pid = fork();
+    if (!m_left || !m_right)
+        return -1;
+
+    auto pid = fork();
 	if (pid == -1)
 	{
-		perror("Shell: fork");
+        perror("fork");
 		return -1;
 	}
 
@@ -310,7 +344,7 @@ void CommandPipe::execute_and_exit()
 	auto pid = fork();
 	if (pid == -1)
 	{
-		perror("Shell");
+        perror("fork");
 		return;
 	}
 	
@@ -323,7 +357,7 @@ void CommandPipe::execute_and_exit()
 		close(p[READ]);
 		close(p[WRITE]);
 		
-		left->execute_and_exit();
+        m_left->execute_and_exit();
 		exit(-1);
 	}
 	else
@@ -335,38 +369,88 @@ void CommandPipe::execute_and_exit()
 		close(p[WRITE]);
 		close(p[READ]);
 	
-		right->execute_and_exit();
+        m_right->execute_and_exit();
 		exit(-1);
 	}
 }
 
+int CommandRedirect::execute()
+{
+    int p[2];
+    if (pipe(p) < 0)
+    {
+        perror("pipe");
+        return -1;
+    }
+
+    auto pid = fork();
+    if (pid < 0)
+    {
+        perror("fork");
+        return -1;
+    }
+
+    if (pid == 0)
+    {
+        // Output process
+        if (m_capture == Capture::StdOut || m_capture == Capture::All)
+            dup2(p[WRITE], STDOUT_FILENO);
+        if (m_capture == Capture::StdErr || m_capture == Capture::All)
+            dup2(p[WRITE], STDERR_FILENO);
+
+        close(p[READ]);
+        close(p[WRITE]);
+
+        m_left->execute_and_exit();
+        exit(-1);
+    }
+
+    // Input process
+    close(p[WRITE]);
+
+    static char buffer[1024];
+    auto output = fopen(m_right.c_str(), m_mode == Mode::Append ? "ab" : "wb");
+    for (;;)
+    {
+        auto len_read = read(p[READ], buffer, sizeof(buffer));
+        if (len_read == 0)
+            break;
+
+        fwrite(buffer, sizeof(char), len_read, output);
+    }
+
+    fclose(output);
+    close(p[READ]);
+    return 0;
+}
+
 int CommandAnd::execute()
 {
-	if (!left || !right)
+    if (!m_left || !m_right)
 		return -1;
 	
-	int left_status = left->execute();
+    int left_status = m_left->execute();
 	if (left_status == 0)
-		return right->execute();
+        return m_right->execute();
 	
 	return -1;
 }
 
 int CommandOr::execute()
 {
-	if (!left || !right)
+    if (!m_left || !m_right)
 		return -1;
 	
-	int left_status = left->execute();
+    int left_status = m_left->execute();
 	if (left_status != 0)
-		return right->execute();
+        return m_right->execute();
 	
 	return 0;
 }
 
 int CommandWith::execute()
 {
-	if (!left)
+    if (!m_left)
 		return -1;
 
 	auto pid = fork();
@@ -379,13 +463,13 @@ int CommandWith::execute()
 	// Child process
 	if (pid == 0)
 	{
-		left->execute_and_exit();
+        m_left->execute_and_exit();
 		exit(-1);
 	}
 
-	if (!right)
+    if (!m_right)
 		return 0;
 	
-	return right->execute();
+    return m_right->execute();
 }
 

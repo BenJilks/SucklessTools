@@ -23,7 +23,7 @@ public:
     static std::unique_ptr<Command> parse(Lexer &lexer);
 	static void register_built_in(std::string name, BuiltIn func)
 	{
-		built_ins[name] = func;
+        s_built_ins[name] = func;
 	}
 
 private:
@@ -31,7 +31,7 @@ private:
 	static std::unique_ptr<Command> parse_exec(Lexer &lexer);
 	static std::unique_ptr<Command> parse_command(Lexer &lexer);
 
-	static std::map<std::string, BuiltIn> built_ins;
+    static std::map<std::string, BuiltIn> s_built_ins;
 
 };
 
@@ -44,7 +44,7 @@ public:
 	virtual int execute() override;
 
 private:
-	std::vector<std::unique_ptr<Command>> commands;
+    std::vector<std::unique_ptr<Command>> m_commands;
 
 };
 
@@ -54,18 +54,18 @@ public:
 	CommandBuiltIn(BuiltIn func, 
 				   std::vector<std::string> &args, 
 				   std::vector<std::pair<std::string, std::string>> &assignments)
-		: func(func)
-		, args(args)
-		, assignments(assignments)
+        : m_func(func)
+        , m_args(args)
+        , m_assignments(assignments)
 	{
 	}
 
 	virtual int execute() override;
 
 private:
-	BuiltIn func;
-	std::vector<std::string> args;
-	std::vector<std::pair<std::string, std::string>> assignments;
+    BuiltIn m_func;
+    std::vector<std::string> m_args;
+    std::vector<std::pair<std::string, std::string>> m_assignments;
 
 };
 
@@ -73,14 +73,14 @@ class CommandSetEnv final : public Command
 {
 public:
 	CommandSetEnv(std::vector<std::pair<std::string, std::string>> assignments) 
-		: assignments(assignments)
+        : m_assignments(assignments)
 	{
 	}
 
 	virtual int execute() override;
 
 private:
-	std::vector<std::pair<std::string, std::string>> assignments;
+    std::vector<std::pair<std::string, std::string>> m_assignments;
 
 };
 
@@ -95,12 +95,12 @@ public:
 	virtual void execute_and_exit() override;
 
 private:
-	std::string program;
-	std::vector<std::string> arguments;
-	std::vector<std::pair<std::string, std::string>> assignments;
+    std::string m_program;
+    std::vector<std::string> m_arguments;
+    std::vector<std::pair<std::string, std::string>> m_assignments;
 
-	std::vector<const char*> raw_arguments;
-	std::vector<const char*> raw_assignments;
+    std::vector<const char*> m_raw_arguments;
+    std::vector<const char*> m_raw_assignments;
 
 };
 
@@ -108,14 +108,14 @@ class CommandOperation : public Command
 {
 public:
 	CommandOperation(std::unique_ptr<Command> left, std::unique_ptr<Command> right)
-		: left(std::move(left))
-		, right(std::move(right))
+        : m_left(std::move(left))
+        , m_right(std::move(right))
 	{
 	}
 
 protected:
-	std::unique_ptr<Command> left;
-	std::unique_ptr<Command> right;
+    std::unique_ptr<Command> m_left;
+    std::unique_ptr<Command> m_right;
 
 };
 
@@ -129,6 +129,41 @@ public:
 
 	virtual int execute() override;
 	virtual void execute_and_exit() override;
+};
+
+class CommandRedirect final : public Command
+{
+public:
+    enum class Mode
+    {
+        Override,
+        Append,
+    };
+
+    enum class Capture
+    {
+        StdOut,
+        StdErr,
+        All
+    };
+
+    CommandRedirect(std::unique_ptr<Command> left, const std::string &right,
+            Mode mode, Capture capture)
+        : m_left(std::move(left))
+        , m_right(std::move(right))
+        , m_mode(mode)
+        , m_capture(capture)
+    {
+    }
+
+    virtual int execute() override;
+
+private:
+    std::unique_ptr<Command> m_left;
+    std::string m_right;
+    Mode m_mode;
+    Capture m_capture;
+
 };
 
 class CommandAnd final : public CommandOperation
