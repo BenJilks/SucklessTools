@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SOURCES
     main.cpp
+    item.cpp
+    xlib.cpp
 )
 
 add_executable(open ${SOURCES})
