@@ -244,15 +244,15 @@ static int is_offset(enum X86ArgumentType type)
     return type == X86_ARGUMENT_TYPE_OFF32 || type == X86_ARGUMENT_TYPE_OFF8;
 }
 
-static void dump_offset(X86Argument *a, X86Argument *b)
+static void dump_offset(X86Argument *a, X86Argument *b, int is_first)
 {
     switch (b->type)
     {
         case X86_ARGUMENT_TYPE_OFF8:
-            printf("byte [");
+            printf("%sbyte [", is_first ? "" : ", ");
             break;
         case X86_ARGUMENT_TYPE_OFF32:
-            printf("dword [");
+            printf("%sdword [", is_first ? "" : ", ");
             break;
         default:
             assert (0);
@@ -277,13 +277,13 @@ static void dump_instruction(X86Instruction *instruction)
 
     if (is_offset(instruction->arg2.type))
     {
-        dump_offset(&instruction->arg1, &instruction->arg2);
+        dump_offset(&instruction->arg1, &instruction->arg2, 1);
         dump_argument(&instruction->arg3, 0);
     }
     else if (is_offset(instruction->arg3.type))
     {
         dump_argument(&instruction->arg1, 1);
-        dump_offset(&instruction->arg2, &instruction->arg3);
+        dump_offset(&instruction->arg2, &instruction->arg3, 0);
     }
     else
     {

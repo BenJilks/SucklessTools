@@ -5,7 +5,18 @@
 
 enum DataTypeFlags
 {
-    DATA_TYPE_CONST = 1 >> 0,
+    DATA_TYPE_CONST     = 1 << 0,
+    DATA_TYPE_PRIMITIVE = 1 << 1
+};
+
+enum Primitive
+{
+    PRIMITIVE_NONE,
+    PRIMITIVE_VOID,
+    PRIMITIVE_INT,
+    PRIMITIVE_FLOAT,
+    PRIMITIVE_DOUBLE,
+    PRIMITIVE_CHAR,
 };
 
 typedef struct DataType
@@ -14,6 +25,7 @@ typedef struct DataType
     int size;
 
     enum DataTypeFlags flags;
+    enum Primitive primitive;
     int pointer_count;
 } DataType;
 

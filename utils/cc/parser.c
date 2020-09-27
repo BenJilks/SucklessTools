@@ -16,6 +16,60 @@ static void match(enum TokenType type, const char *name)
     }
 }
 
+static enum Primitive primitive_from_name(Token *name)
+{
+    if (lexer_compair_token_name(name, "void"))
+        return PRIMITIVE_VOID;
+    else if (lexer_compair_token_name(name, "int"))
+        return PRIMITIVE_INT;
+    else if (lexer_compair_token_name(name, "float"))
+        return PRIMITIVE_FLOAT;
+    else if (lexer_compair_token_name(name, "double"))
+        return PRIMITIVE_DOUBLE;
+    else if (lexer_compair_token_name(name, "char"))
+        return PRIMITIVE_CHAR;
+
+    return PRIMITIVE_NONE;
+}
+
+static int size_from_primitive(enum Primitive primitive)
+{
+    switch (primitive)
+    {
+        case PRIMITIVE_VOID:
+            return 0;
+        case PRIMITIVE_INT:
+            return 4;
+        case PRIMITIVE_FLOAT:
+            return 4;
+        case PRIMITIVE_DOUBLE:
+            return 8;
+        case PRIMITIVE_CHAR:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+#define PRIMITIVE_DATA_TYPE(name, primitive) \
+    DataType dt_##name() \
+    { \
+        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER }, 4, DATA_TYPE_PRIMITIVE, primitive, 0 }; \
+    }
+
+PRIMITIVE_DATA_TYPE(void, PRIMITIVE_VOID);
+PRIMITIVE_DATA_TYPE(int, PRIMITIVE_INT);
+PRIMITIVE_DATA_TYPE(float, PRIMITIVE_FLOAT);
+PRIMITIVE_DATA_TYPE(double, PRIMITIVE_DOUBLE);
+PRIMITIVE_DATA_TYPE(char, PRIMITIVE_CHAR);
+DataType dt_const_char_pointer()
+{
+    DataType type = dt_char();
+    type.pointer_count += 1;
+    type.flags |= DATA_TYPE_CONST;
+    return type;
+}
+
 static DataType parse_data_type()
 {
     DataType data_type;
@@ -28,14 +82,14 @@ static DataType parse_data_type()
     }
 
     data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    if (lexer_compair_token_name(&data_type.name, "int"))
-        data_type.size = 4;
-    else if (lexer_compair_token_name(&data_type.name, "float"))
-        data_type.size = 4;
-    else if (lexer_compair_token_name(&data_type.name, "char"))
-        data_type.size = 1;
-    else
+    data_type.primitive = primitive_from_name(&data_type.name);
+
+    // NOTE: For now we only accept primitives as datatypes
+    if (data_type.primitive == PRIMITIVE_NONE)
         ERROR("Expected datatype, got '%s' instead", lexer_printable_token_data(&data_type.name));
+
+    data_type.size = size_from_primitive(data_type.primitive);
+    data_type.flags |= DATA_TYPE_PRIMITIVE;
 
     while (lexer_peek(0).type == TOKEN_TYPE_STAR)
     {
@@ -130,6 +184,8 @@ static Expression *parse_function_call(SymbolTable *table, Expression *left)
                   function_symbol->param_count, lexer_printable_token_data(&function_symbol->name), argument_count);
         }
     }
+
+    call->data_type = function_symbol->data_type;
     return call;
 }
 
@@ -146,26 +202,31 @@ static Expression *parse_term(SymbolTable *table)
             value->type = VALUE_TYPE_INT;
             value->i = atoi(token.data);
             lexer_consume(TOKEN_TYPE_INTEGER);
+            expression->data_type = dt_int();
             break;
         case TOKEN_TYPE_FLOAT:
             value->type = VALUE_TYPE_FLOAT;
             value->f = atof(token.data);
             lexer_consume(TOKEN_TYPE_FLOAT);
+            expression->data_type = dt_float();
             break;
         case TOKEN_TYPE_STRING:
             value->type = VALUE_TYPE_STRING;
             value->s = token;
             lexer_consume(TOKEN_TYPE_STRING);
+            expression->data_type = dt_const_char_pointer();
             break;
         case TOKEN_TYPE_IDENTIFIER:
             value->type = VALUE_TYPE_VARIABLE;
             value->v = symbol_table_lookup(table, &token);
+            lexer_consume(TOKEN_TYPE_IDENTIFIER);
             if (!value->v)
             {
                 ERROR("No symbol with the name '%s' found",
                     lexer_printable_token_data(&token));
+                break;
             }
-            lexer_consume(TOKEN_TYPE_IDENTIFIER);
+            expression->data_type = value->v->data_type;
             break;
         default:
             ERROR("Expected expression, got '%s' instead",
@@ -186,6 +247,10 @@ static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType
     Expression *expression = malloc(sizeof(Expression));
     expression->left = parse_unary_operator(table);
     expression->type = type;
+
+    expression->data_type = expression->left->data_type;
+    if (type == EXPRESSION_TYPE_REF)
+        expression->data_type.pointer_count += 1;
     return expression;
 }
 
@@ -201,6 +266,16 @@ static Expression *parse_unary_operator(SymbolTable *table)
     }
 }
 
+static DataType find_data_type_of_operation(
+    DataType *left, enum ExpressionType operation, DataType *right)
+{
+    // FIXME: This should actully find the correct type. For
+    //        now we just take the left hand side one
+    (void)operation;
+    (void)right;
+    return *left;
+}
+
 static Expression *parse_expression(SymbolTable *table)
 {
     Expression *left = parse_unary_operator(table);
@@ -212,6 +287,8 @@ static Expression *parse_expression(SymbolTable *table)
         operation->type = EXPRESSION_TYPE_ADD;
         operation->left = left;
         operation->right = parse_unary_operator(table);
+        operation->data_type = find_data_type_of_operation(
+            &operation->left->data_type, operation->type, &operation->right->data_type);
         left = operation;
     }
 
@@ -279,11 +356,7 @@ static int is_data_type_next()
         case TOKEN_TYPE_CONST:
             return 1;
         case TOKEN_TYPE_IDENTIFIER:
-            if (lexer_compair_token_name(&token, "int"))
-                return 1;
-            if (lexer_compair_token_name(&token, "float"))
-                return 1;
-            if (lexer_compair_token_name(&token, "char"))
+            if (primitive_from_name(&token) != PRIMITIVE_NONE)
                 return 1;
             return 0;
         default:

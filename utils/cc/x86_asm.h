@@ -47,21 +47,24 @@ typedef struct X86Argument
 } X86Argument;
 
 #define ENUMERATE_X86_OP_CODES                                      \
-    __OP_CODE(MOV_REG_REG,            REG,    REG,    NONE,   mov)  \
-    __OP_CODE(MOV_REG_MEM32_REG_OFF,  REG,    REG,    OFF32,  mov)  \
-    __OP_CODE(MOV_MEM32_REG_OFF_REG,  REG,    OFF32,  REG,    mov)  \
-    __OP_CODE(MOV_MEM8_REG_OFF_REG,   REG,    OFF8,   REG,    mov)  \
-    __OP_CODE(SUB_REG_IMM8,           REG,    IMM8,   NONE,   sub)  \
-    __OP_CODE(ADD_REG_REG,            REG,    REG,    NONE,   add)  \
-    __OP_CODE(ADD_REG_IMM8,           REG,    IMM8,   NONE,   add)  \
-    __OP_CODE(PUSH_REG,               REG,    NONE,   NONE,   push) \
-    __OP_CODE(PUSH_IMM32,             IMM32,  NONE,   NONE,   push) \
-    __OP_CODE(PUSH_MEM32_REG_OFF,     REG,    OFF32,  NONE,   push) \
-    __OP_CODE(PUSH_MEM8_REG_OFF,      REG,    OFF8,   NONE,   push) \
-    __OP_CODE(PUSH_LABEL,             LABEL,  NONE,   NONE,   push) \
-    __OP_CODE(POP_REG,                REG,    NONE,   NONE,   pop)  \
-    __OP_CODE(CALL_LABEL,             LABEL,  NONE,   NONE,   call) \
-    __OP_CODE(RET,                    NONE,   NONE,   NONE,   ret)
+    __OP_CODE(MOV_REG_REG,             REG,    REG,    NONE,   mov)  \
+    __OP_CODE(MOV_REG_IMM32,           REG,    IMM32,  NONE,   mov)  \
+    __OP_CODE(MOV_REG_MEM32_REG_OFF,   REG,    REG,    OFF32,  mov)  \
+    __OP_CODE(MOV_REG_MEM8_REG_OFF,    REG,    REG,    OFF8,   mov)  \
+    __OP_CODE(MOV_MEM32_REG_OFF_REG,   REG,    OFF32,  REG,    mov)  \
+    __OP_CODE(MOV_MEM32_REG_OFF_IMM32, REG,    OFF32,  IMM32,  mov)  \
+    __OP_CODE(MOV_MEM8_REG_OFF_REG,    REG,    OFF8,   REG,    mov)  \
+    __OP_CODE(SUB_REG_IMM8,            REG,    IMM8,   NONE,   sub)  \
+    __OP_CODE(ADD_REG_REG,             REG,    REG,    NONE,   add)  \
+    __OP_CODE(ADD_REG_IMM8,            REG,    IMM8,   NONE,   add)  \
+    __OP_CODE(PUSH_REG,                REG,    NONE,   NONE,   push) \
+    __OP_CODE(PUSH_IMM32,              IMM32,  NONE,   NONE,   push) \
+    __OP_CODE(PUSH_MEM32_REG_OFF,      REG,    OFF32,  NONE,   push) \
+    __OP_CODE(PUSH_MEM8_REG_OFF,       REG,    OFF8,   NONE,   push) \
+    __OP_CODE(PUSH_LABEL,              LABEL,  NONE,   NONE,   push) \
+    __OP_CODE(POP_REG,                 REG,    NONE,   NONE,   pop)  \
+    __OP_CODE(CALL_LABEL,              LABEL,  NONE,   NONE,   call) \
+    __OP_CODE(RET,                     NONE,   NONE,   NONE,   ret)
 
 enum X86OpCode
 {

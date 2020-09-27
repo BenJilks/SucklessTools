@@ -60,6 +60,7 @@ typedef struct Value
 typedef struct Expression
 {
     enum ExpressionType type;
+    DataType data_type;
 
     Value value;
     struct Expression *left;
@@ -107,5 +108,12 @@ typedef struct Unit
 
 Unit *parse();
 void free_unit(Unit *unit);
+
+DataType dt_void();
+DataType dt_int();
+DataType dt_float();
+DataType dt_double();
+DataType dt_char();
+DataType dt_const_char_pointer();
 
 #endif // PARSER_H

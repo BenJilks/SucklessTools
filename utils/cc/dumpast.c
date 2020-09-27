@@ -55,7 +55,7 @@ static void dump_expression(Expression *expression, int indent)
     }
 }
 
-static char *printable_data_type(DataType *data_type)
+char *printable_data_type(DataType *data_type)
 {
     static char buffer[1024];
     int buffer_pointer = 0;

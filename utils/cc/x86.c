@@ -1,8 +1,14 @@
 #include "x86.h"
+#include "dumpast.h"
 #include <assert.h>
 #include <stdio.h>
 
 #define INST(...) x86_code_add_instruction(code, x86(code, __VA_ARGS__))
+
+typedef struct X86Value
+{
+    DataType data_type;
+} X86Value;
 
 static void compile_string(X86Code *code, Value *value)
 {
@@ -25,13 +31,14 @@ static int get_variable_location(Symbol *variable)
     return location;
 }
 
-static void compile_variable(X86Code *code, Symbol *variable)
+static X86Value compile_variable(X86Code *code, Symbol *variable)
 {
     int location = get_variable_location(variable);
     INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
+    return (X86Value) { variable->data_type };
 }
 
-static void compile_variable_pointer(X86Code *code, Symbol *variable)
+static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
 {
     int location = get_variable_location(variable);
     INST(X86_OP_CODE_MOV_REG_REG, X86_REG_EAX, X86_REG_EBP);
@@ -40,50 +47,122 @@ static void compile_variable_pointer(X86Code *code, Symbol *variable)
     else if (location < 0)
         INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_EAX, -location);
     INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+
+    DataType type = variable->data_type;
+    type.pointer_count += 1;
+    return (X86Value) { type };
 }
 
-static void compile_value(X86Code *code, Value *value)
+static X86Value compile_value(X86Code *code, Value *value)
 {
     switch (value->type)
     {
         case VALUE_TYPE_INT:
             INST(X86_OP_CODE_PUSH_IMM32, value->i);
-            break;
+            return (X86Value) { dt_int() };
         case VALUE_TYPE_FLOAT:
             INST(X86_OP_CODE_PUSH_IMM32, value->f);
-            break;
+            return (X86Value) { dt_float() };
         case VALUE_TYPE_STRING:
             compile_string(code, value);
-            break;
+            return (X86Value) { dt_const_char_pointer() };
         case VALUE_TYPE_VARIABLE:
             if (!value->v)
                 break;
 
-            compile_variable(code, value->v);
-            break;
+            return compile_variable(code, value->v);
     }
+
+    return (X86Value) { dt_void() };
 }
 
-static void compile_expression(X86Code *code, Expression *expression);
-static void compile_fuction_call(X86Code *code, Expression *expression)
+X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
+{
+    assert (value->data_type.flags & DATA_TYPE_PRIMITIVE);
+    assert (data_type->flags & DATA_TYPE_PRIMITIVE);
+
+    switch (value->data_type.primitive)
+    {
+        case PRIMITIVE_INT:
+            switch (data_type->primitive)
+            {
+                case PRIMITIVE_INT:
+                    return *value;
+                case PRIMITIVE_CHAR:
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
+                    return (X86Value) { dt_char() };
+                default:
+                    break;
+            }
+            break;
+        case PRIMITIVE_FLOAT:
+            switch (data_type->primitive)
+            {
+                case PRIMITIVE_FLOAT:
+                    return *value;
+                default:
+                    break;
+            }
+            break;
+        case PRIMITIVE_DOUBLE:
+            switch (data_type->primitive)
+            {
+                case PRIMITIVE_DOUBLE:
+                    return *value;
+                default:
+                    break;
+            }
+            break;
+        case PRIMITIVE_CHAR:
+            switch (data_type->primitive)
+            {
+                case PRIMITIVE_CHAR:
+                    return *value;
+                case PRIMITIVE_INT:
+                    INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_MOV_MEM32_REG_OFF_IMM32, X86_REG_ESP, 0, 0);
+                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
+                    return (X86Value) { dt_int() };
+                default:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+
+    printf("Error: Connot cast type '%s'", printable_data_type(&value->data_type));
+    printf(" to '%s'\n", printable_data_type(data_type));
+    return *value;
+}
+
+static X86Value compile_expression(X86Code *code, Expression *expression);
+static X86Value compile_fuction_call(X86Code *code, Expression *expression)
 {
     Symbol *func_symbol = expression->left->value.v;
     Token func_name = func_symbol->name;
     for (int i = expression->argument_length - 1; i >= 0; i--)
-        compile_expression(code, expression->arguments[i]);
+    {
+        DataType argument_type = dt_int();
+        if (i < func_symbol->param_count)
+            argument_type = func_symbol->params[i].data_type;
+
+        X86Value value = compile_expression(code, expression->arguments[i]);
+        compile_cast(code, &value, &argument_type);
+    }
 
     INST(X86_OP_CODE_CALL_LABEL, lexer_printable_token_data(&func_name));
     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, expression->argument_length * 4);
     INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    return (X86Value) { func_symbol->data_type };
 }
 
-static void compile_expression(X86Code *code, Expression *expression)
+static X86Value compile_expression(X86Code *code, Expression *expression)
 {
     switch (expression->type)
     {
         case EXPRESSION_TYPE_VALUE:
-            compile_value(code, &expression->value);
-            break;
+            return compile_value(code, &expression->value);
         case EXPRESSION_TYPE_ADD:
             compile_expression(code, expression->left);
             compile_expression(code, expression->right);
@@ -91,27 +170,29 @@ static void compile_expression(X86Code *code, Expression *expression)
             INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
             INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-            break;
+            return (X86Value) { expression->data_type };
         case EXPRESSION_TYPE_FUNCTION_CALL:
-            compile_fuction_call(code, expression);
-            break;
+            return compile_fuction_call(code, expression);
         case EXPRESSION_TYPE_REF:
             assert(expression->left->type == EXPRESSION_TYPE_VALUE);
             if (expression->left->value.type != VALUE_TYPE_VARIABLE)
                 lexer_error("Can only take pointer of non literals");
             else
-                compile_variable_pointer(code, expression->left->value.v);
+                return compile_variable_pointer(code, expression->left->value.v);
             break;
         default:
             break;
     }
+
+    return (X86Value) { expression->data_type };
 }
 
-static void compile_assign_variable(X86Code *code, Symbol *variable)
+static void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
 {
+    compile_cast(code, value, &variable->data_type);
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
 
-    int location = -4 - variable->location;
+    int location = get_variable_location(variable);
     switch (variable->data_type.size)
     {
         case 1:
@@ -137,8 +218,8 @@ static void compile_decleration(X86Code *code, Statement *statement)
 {
     if (statement->expression)
     {
-        compile_expression(code, statement->expression);
-        compile_assign_variable(code, &statement->symbol);
+        X86Value value = compile_expression(code, statement->expression);
+        compile_assign_variable(code, &statement->symbol, &value);
     }
 
     if (statement->next)
