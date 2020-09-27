@@ -89,6 +89,7 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                 case PRIMITIVE_INT:
                     return *value;
                 case PRIMITIVE_CHAR:
+                    COMMENT_CODE(code, "Cast int to char");
                     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
                     return (X86Value) { dt_char() };
                 default:
@@ -119,6 +120,7 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                 case PRIMITIVE_CHAR:
                     return *value;
                 case PRIMITIVE_INT:
+                    COMMENT_CODE(code, "Cast char to int");
                     INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_MOV_MEM32_REG_OFF_IMM32, X86_REG_ESP, 0, 0);
                     INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
@@ -141,8 +143,10 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
 {
     Symbol *func_symbol = expression->left->value.v;
     Token func_name = func_symbol->name;
+    COMMENT_CODE(code, "Function call %s", lexer_printable_token_data(&func_name));
     for (int i = expression->argument_length - 1; i >= 0; i--)
     {
+        COMMENT_CODE(code, "Argument %i", i);
         DataType argument_type = dt_int();
         if (i < func_symbol->param_count)
             argument_type = func_symbol->params[i].data_type;
@@ -151,6 +155,7 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
         compile_cast(code, &value, &argument_type);
     }
 
+    COMMENT_CODE(code, "Do call");
     INST(X86_OP_CODE_CALL_LABEL, lexer_printable_token_data(&func_name));
     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, expression->argument_length * 4);
     INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
@@ -164,13 +169,22 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
         case EXPRESSION_TYPE_VALUE:
             return compile_value(code, &expression->value);
         case EXPRESSION_TYPE_ADD:
-            compile_expression(code, expression->left);
-            compile_expression(code, expression->right);
+        {
+            COMMENT_CODE(code, "Compile add");
+            COMMENT_CODE(code, "Left hand side");
+            X86Value lhs = compile_expression(code, expression->left);
+            compile_cast(code, &lhs, &expression->data_type);
+            COMMENT_CODE(code, "Right hand side");
+            X86Value rhs = compile_expression(code, expression->right);
+            compile_cast(code, &rhs, &expression->data_type);
+
+            COMMENT_CODE(code, "Do add operation");
             INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
             INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
             INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             return (X86Value) { expression->data_type };
+        }
         case EXPRESSION_TYPE_FUNCTION_CALL:
             return compile_fuction_call(code, expression);
         case EXPRESSION_TYPE_REF:
@@ -189,6 +203,7 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
 
 static void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
 {
+    COMMENT_CODE(code, "Assign vairable %s", lexer_printable_token_data(&variable->name));
     compile_cast(code, value, &variable->data_type);
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
 

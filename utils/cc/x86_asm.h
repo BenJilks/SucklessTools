@@ -84,6 +84,7 @@ typedef struct X86Instruction
 #define ENUMERATE_X86_LINE_TYPE \
     __TYPE(INSTRUCTION) \
     __TYPE(LABEL) \
+    __TYPE(COMMENT) \
     __TYPE(BLANK)
 
 enum X86LineType
@@ -117,9 +118,17 @@ typedef struct X86Code
     int line_buffer;
 } X86Code;
 
+#define COMMENT_CODE(code, ...) \
+    { \
+        char buffer[80]; \
+        sprintf(buffer, __VA_ARGS__); \
+        x86_code_add_comment(code, buffer); \
+    }
+
 X86Code x86_code_new();
 void x86_code_add_instruction(X86Code*, X86Instruction);
 void x86_code_add_label(X86Code*, const char *label);
+void x86_code_add_comment(X86Code*, const char *comment);
 void x86_code_add_blank(X86Code*);
 void x86_code_add_external(X86Code*, const char *external);
 int x86_code_add_string_data(X86Code*, const char *str);

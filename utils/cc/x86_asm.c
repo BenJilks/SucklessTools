@@ -71,6 +71,15 @@ void x86_code_add_label(X86Code *code, const char *label)
     strcpy(line.label, label);
     add_line(code, line);
 }
+
+void x86_code_add_comment(X86Code *code, const char *comment)
+{
+    X86Line line;
+    line.type = X86_LINE_TYPE_COMMENT;
+    strcpy(line.label, comment);
+    add_line(code, line);
+}
+
 void x86_code_add_external(X86Code *code, const char *external)
 {
     if (code->external_count >= code->external_buffer)
@@ -325,6 +334,9 @@ void x86_dump(X86Code *code)
                 break;
             case X86_LINE_TYPE_LABEL:
                 printf("%s:\n", line->label);
+                break;
+            case X86_LINE_TYPE_COMMENT:
+                printf("\n  ; %s\n", line->label);
                 break;
             case X86_LINE_TYPE_BLANK:
                 printf("\n");
