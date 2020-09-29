@@ -38,6 +38,7 @@ public:
 
         MoreThan,
         Equals,
+        And,
 
         Star,
         Comma,

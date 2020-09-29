@@ -101,7 +101,22 @@ Value ValueNode::evaluate(const Row &row)
             return operation(
                 m_left->evaluate(row), m_right->evaluate(row), 
                 [&](auto a, auto b) { return a == b; });
-        
+
+        case Type::And:
+        {
+            assert (m_left);
+            assert (m_right);
+            auto left = m_left->evaluate(row);
+            if (left.type() != Value::Boolean || left.as_bool() == false)
+                return Value(false);
+
+            auto right = m_right->evaluate(row);
+            if (right.type() != Value::Boolean || right.as_bool() == false)
+                return Value(false);
+
+            return Value(true);
+        }
+
         default:
             assert (false);
     }

@@ -168,6 +168,8 @@ Lexer::Token Lexer::parse_name(const std::string &buffer)
         return { buffer, Type::Not };
     else if (lower == "exists")
         return { buffer, Type::Exists };
+    else if (lower == "and")
+        return { buffer, Type::And };
     return { buffer, Type::Name };
 }
 

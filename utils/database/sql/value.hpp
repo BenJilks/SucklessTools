@@ -66,6 +66,7 @@ namespace DB::Sql
             Column,
             MoreThan,
             Equals,
+            And,
         };
         
         explicit ValueNode(Value value)

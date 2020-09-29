@@ -54,37 +54,6 @@ void Parser::parse_list(std::function<void()> callback)
     match(Lexer::CloseBrace, ")");
 }
 
-std::unique_ptr<ValueNode> Parser::parse_condition(std::unique_ptr<ValueNode> left)
-{
-    auto peek = m_lexer.peek();
-    if (!peek)
-        return left;
-
-    ValueNode::Type operation;
-    std::unique_ptr<ValueNode> right;
-    switch (peek->type)
-    {
-        case Lexer::MoreThan:
-            m_lexer.consume();
-            right = parse_value();
-            operation = ValueNode::Type::MoreThan;
-            break;
-        case Lexer::Equals:
-            m_lexer.consume();
-            right = parse_value();
-            operation = ValueNode::Type::Equals;
-            break;
-        default:
-            break;
-    }
-
-    if (!right)
-        return left;
-
-    return std::make_unique<ValueNode>(
-        std::move(left), operation, std::move(right));
-}
-
 std::unique_ptr<ValueNode> Parser::parse_value()
 {
     auto peek = m_lexer.peek();
@@ -128,7 +97,60 @@ std::unique_ptr<ValueNode> Parser::parse_value()
     if (!value)
         return nullptr;
 
-    return parse_condition(std::move(value));
+    return value;
+}
+
+std::unique_ptr<ValueNode> Parser::parse_comparison()
+{
+    auto left = parse_value();
+    auto peek = m_lexer.peek();
+    if (!peek)
+        return left;
+
+    ValueNode::Type operation;
+    std::unique_ptr<ValueNode> right;
+    switch (peek->type)
+    {
+        case Lexer::MoreThan:
+            m_lexer.consume();
+            right = parse_value();
+            operation = ValueNode::Type::MoreThan;
+            break;
+        case Lexer::Equals:
+            m_lexer.consume();
+            right = parse_value();
+            operation = ValueNode::Type::Equals;
+            break;
+        default:
+            return left;
+    }
+
+    return std::make_unique<ValueNode>(
+        std::move(left), operation, std::move(right));
+}
+
+std::unique_ptr<ValueNode> Parser::parse_condition()
+{
+    auto left = parse_comparison();
+    auto peek = m_lexer.peek();
+    if (!peek)
+        return left;
+
+    ValueNode::Type operation;
+    std::unique_ptr<ValueNode> right;
+    switch (peek->type)
+    {
+        case Lexer::And:
+            m_lexer.consume();
+            right = parse_comparison();
+            operation = ValueNode::Type::And;
+            break;
+        default:
+            return left;
+    }
+
+    return std::make_unique<ValueNode>(
+        std::move(left), operation, std::move(right));
 }
 
 std::shared_ptr<Statement> Parser::parse_select()
@@ -165,7 +187,7 @@ std::shared_ptr<Statement> Parser::parse_select()
 
     if (m_lexer.consume(Lexer::Where))
     {
-        auto condition = parse_value();
+        auto condition = parse_condition();
         if (!condition)
         {
             expected("condition");
@@ -318,7 +340,7 @@ std::shared_ptr<Statement> Parser::parse_update()
 
     if (m_lexer.consume(Lexer::Where))
     {
-        auto where = parse_value();
+        auto where = parse_condition();
         if (!where)
         {
             expected("value");
@@ -346,7 +368,7 @@ std::shared_ptr<Statement> Parser::parse_delete()
     delete_->m_table = table->data;
 
     match(Lexer::Where, "where");
-    auto where = parse_value();
+    auto where = parse_condition();
     if (!where)
     {
         expected("condition");
