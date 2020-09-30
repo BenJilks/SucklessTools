@@ -17,4 +17,4 @@ namespace ColorPalette
 };
 
 static std::string font_name = "Liberation Mono";
-static int font_size = 12;
+static int font_size = 16;

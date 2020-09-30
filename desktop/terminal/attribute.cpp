@@ -19,6 +19,7 @@ void Attribute::apply(int code)
             return;
 
         case 7:
+        case 27:
             m_color = m_color.inverted();
             return;
 

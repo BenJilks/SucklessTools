@@ -55,9 +55,6 @@ XLibOutput::XLibOutput()
         CopyFromParent, CopyFromParent, m_visual,
         window_mask, &window_attr);
     m_back_buffer = XdbeAllocateBackBufferName(m_display, m_window, XdbeCopied);
-
-    //m_pixel_buffer = XCreatePixmap(m_display, m_window,
-    //    m_width, m_height, m_depth);
     m_gc = XCreateGC(m_display, m_back_buffer, 0, 0);
 
     XSelectInput(m_display, m_window,
@@ -190,9 +187,6 @@ void XLibOutput::did_resize()
         resize(rows, columns);
         on_resize(size);
     }
-
-    // Reallocate back buffer
-    m_back_buffer = XdbeAllocateBackBufferName(m_display, m_window, XdbeCopied);
 
     // We need to tell Xft about the new buffer
     XftDrawDestroy(m_draw);
