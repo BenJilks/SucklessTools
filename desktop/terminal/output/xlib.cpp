@@ -544,7 +544,7 @@ void XLibOutput::draw_scroll(int begin, int end, int by)
         XSetForeground(m_display, m_gc, color.background_int());
         XFillRectangle(m_display, m_back_buffer, m_gc,
             0, top_of_buffer, m_width, by_pixels + m_font_height);
-        for (int i = begin; i < -by; i++)
+        for (int i = begin; i < begin - by; i++)
             draw_row(i, true);
     }
 
