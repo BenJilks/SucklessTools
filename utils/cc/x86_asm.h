@@ -60,7 +60,6 @@ typedef struct X86Argument
     __OP_CODE(PUSH_REG,                REG,    NONE,   NONE,   push) \
     __OP_CODE(PUSH_IMM32,              IMM32,  NONE,   NONE,   push) \
     __OP_CODE(PUSH_MEM32_REG_OFF,      REG,    OFF32,  NONE,   push) \
-    __OP_CODE(PUSH_MEM8_REG_OFF,       REG,    OFF8,   NONE,   push) \
     __OP_CODE(PUSH_LABEL,              LABEL,  NONE,   NONE,   push) \
     __OP_CODE(POP_REG,                 REG,    NONE,   NONE,   pop)  \
     __OP_CODE(CALL_LABEL,              LABEL,  NONE,   NONE,   call) \
