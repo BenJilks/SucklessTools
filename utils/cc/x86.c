@@ -34,7 +34,20 @@ static int get_variable_location(Symbol *variable)
 static X86Value compile_variable(X86Code *code, Symbol *variable)
 {
     int location = get_variable_location(variable);
-    INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
+    switch (variable->data_type.size)
+    {
+        case 1:
+            INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_EBP, location);
+            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 1);
+            break;
+        case 4:
+            INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
+            break;
+        default:
+            assert (0);
+    }
+
     return (X86Value) { variable->data_type };
 }
 
@@ -90,7 +103,7 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                     return *value;
                 case PRIMITIVE_CHAR:
                     COMMENT_CODE(code, "Cast int to char");
-                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
+                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
                     return (X86Value) { dt_char() };
                 default:
                     break;
@@ -122,8 +135,9 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                 case PRIMITIVE_INT:
                     COMMENT_CODE(code, "Cast char to int");
                     INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
-                    INST(X86_OP_CODE_MOV_MEM32_REG_OFF_IMM32, X86_REG_ESP, 0, 0);
                     INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
+                    INST(X86_OP_CODE_MOV_MEM32_REG_OFF_IMM32, X86_REG_ESP, 0, 0);
+                    INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
                     return (X86Value) { dt_int() };
                 default:
                     break;
@@ -224,6 +238,7 @@ static void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *v
 
 static void compile_function_return(X86Code *code)
 {
+    COMMENT_CODE(code, "Return");
     INST(X86_OP_CODE_MOV_REG_REG, X86_REG_ESP, X86_REG_EBP);
     INST(X86_OP_CODE_POP_REG, X86_REG_EBP);
     INST(X86_OP_CODE_RET);
