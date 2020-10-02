@@ -40,6 +40,11 @@ static void dump_expression(Expression *expression, int indent)
             fprintf(stderr, "Value:\n");
             dump_value(&expression->value, indent + 1);
             break;
+        case EXPRESSION_TYPE_ASSIGN:
+            fprintf(stderr, "Assign:\n");
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
         case EXPRESSION_TYPE_ADD:
             fprintf(stderr, "Add:\n");
             dump_expression(expression->left, indent + 1);
@@ -125,6 +130,14 @@ static void dump_scope(Scope *scope, int indent)
 
             case STATEMENT_TYPE_IF:
                 fprintf(stderr, "If:\n");
+                dump_expression(statement->expression, indent + 1);
+                print_indent(indent);
+                fprintf(stderr, "Body:\n");
+                dump_scope(statement->sub_scope, indent + 1);
+                break;
+
+            case STATEMENT_TYPE_WHILE:
+                fprintf(stderr, "While:\n");
                 dump_expression(statement->expression, indent + 1);
                 print_indent(indent);
                 fprintf(stderr, "Body:\n");

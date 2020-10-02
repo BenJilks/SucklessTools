@@ -87,6 +87,8 @@ static enum TokenType check_keyword(Token *token)
         return TOKEN_TYPE_RETURN;
     if (lexer_compair_token_name(token, "if"))
         return TOKEN_TYPE_IF;
+    if (lexer_compair_token_name(token, "while"))
+        return TOKEN_TYPE_WHILE;
     return TOKEN_TYPE_IDENTIFIER;
 }
 

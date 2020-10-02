@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <memory.h>
 
+#define DEBUG(...) fprintf(stderr, __VA_ARGS__)
+
 static void match(enum TokenType type, const char *name)
 {
     Token token = lexer_consume(type);
@@ -342,7 +344,7 @@ static Expression *parse_add_op(SymbolTable *table)
     return left;
 }
 
-static Expression *parse_expression(SymbolTable *table)
+static Expression *parse_logical(SymbolTable *table)
 {
     Expression *left = parse_add_op(table);
 
@@ -351,6 +353,20 @@ static Expression *parse_expression(SymbolTable *table)
         match(TOKEN_TYPE_LESS_THAN, "<");
         Expression *right = parse_add_op(table);
         left = create_operation_expression(left, EXPRESSION_TYPE_LESS_THAN, right);
+    }
+
+    return left;
+}
+
+static Expression *parse_expression(SymbolTable *table)
+{
+    Expression *left = parse_logical(table);
+
+    while (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
+    {
+        match(TOKEN_TYPE_EQUALS, "=");
+        Expression *right = parse_logical(table);
+        left = create_operation_expression(left, EXPRESSION_TYPE_ASSIGN, right);
     }
 
     return left;
@@ -427,6 +443,7 @@ static int is_data_type_next()
 
 static void parse_expression_statement(Scope *scope)
 {
+    DEBUG("Expression statement\n");
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
     statement.expression = parse_expression(scope->table);
@@ -464,6 +481,20 @@ static void parse_if(Function *function, Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
+static void parse_while(Function *function, Scope *scope)
+{
+    match(TOKEN_TYPE_WHILE, "while");
+    match(TOKEN_TYPE_OPEN_BRACKET, "(");
+
+    Statement statement;
+    statement.type = STATEMENT_TYPE_WHILE;
+    statement.expression = parse_expression(scope->table);
+    match(TOKEN_TYPE_CLOSE_BRACKET, ")");
+
+    statement.sub_scope = parse_scope(function, scope->table);
+    add_statement_to_scope(scope, statement);
+}
+
 static Scope *parse_scope(Function *function, SymbolTable *parent)
 {
     Scope *scope = malloc(sizeof(Scope));
@@ -487,6 +518,9 @@ static Scope *parse_scope(Function *function, SymbolTable *parent)
                 break;
             case TOKEN_TYPE_IF:
                 parse_if(function, scope);
+                break;
+            case TOKEN_TYPE_WHILE:
+                parse_while(function, scope);
                 break;
             default:
                 parse_expression_statement(scope);

@@ -72,7 +72,9 @@ typedef struct X86Argument
     __OP_CODE(POP_REG,                 REG,    NONE,   NONE,   pop)  \
     __OP_CODE(CALL_LABEL,              LABEL,  NONE,   NONE,   call) \
     __OP_CODE(RET,                     NONE,   NONE,   NONE,   ret) \
-    __OP_CODE(JUMP_LABEL_IF_NOT_EQUAL, LABEL,  NONE,   NONE,   jz)
+    __OP_CODE(JUMP_LABEL,              LABEL,  NONE,   NONE,   jmp) \
+    __OP_CODE(JUMP_LABEL_IF_ZERO,      LABEL,  NONE,   NONE,   jz) \
+    __OP_CODE(JUMP_LABEL_IF_NOT_ZERO,  LABEL,  NONE,   NONE,   jnz)
 
 enum X86OpCode
 {

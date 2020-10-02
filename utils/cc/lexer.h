@@ -23,6 +23,7 @@
     __TOKEN_TYPE(IF) \
     __TOKEN_TYPE(LESS_THAN) \
     __TOKEN_TYPE(SUBTRACT) \
+    __TOKEN_TYPE(WHILE) \
 
 enum TokenType
 {

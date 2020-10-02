@@ -6,10 +6,18 @@
 
 #define INST(...) x86_code_add_instruction(code, x86(code, __VA_ARGS__))
 
+enum ExpressionMode
+{
+    EXPRESSION_MODE_LHS,
+    EXPRESSION_MODE_RHS,
+};
+
 typedef struct X86Value
 {
     DataType data_type;
 } X86Value;
+
+static X86Value compile_expression(X86Code *code, Expression *expression, enum ExpressionMode mode);
 
 static void compile_string(X86Code *code, Value *value)
 {
@@ -67,7 +75,7 @@ static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
     return (X86Value) { type };
 }
 
-static X86Value compile_value(X86Code *code, Value *value)
+static X86Value compile_value(X86Code *code, Value *value, enum ExpressionMode mode)
 {
     switch (value->type)
     {
@@ -83,7 +91,8 @@ static X86Value compile_value(X86Code *code, Value *value)
         case VALUE_TYPE_VARIABLE:
             if (!value->v)
                 break;
-
+            if (mode == EXPRESSION_MODE_LHS)
+                return compile_variable_pointer(code, value->v);
             return compile_variable(code, value->v);
     }
 
@@ -153,7 +162,6 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
     return *value;
 }
 
-static X86Value compile_expression(X86Code *code, Expression *expression);
 static X86Value compile_fuction_call(X86Code *code, Expression *expression)
 {
     Symbol *func_symbol = expression->left->value.v;
@@ -166,7 +174,7 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
         if (i < func_symbol->param_count)
             argument_type = func_symbol->params[i].data_type;
 
-        X86Value value = compile_expression(code, expression->arguments[i]);
+        X86Value value = compile_expression(code, expression->arguments[i], EXPRESSION_MODE_RHS);
         compile_cast(code, &value, &argument_type);
     }
 
@@ -177,29 +185,39 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
     return (X86Value) { func_symbol->data_type };
 }
 
-static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression)
+static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression, enum ExpressionMode lhs_mode)
 {
     COMMENT_CODE(code, "Left hand side");
-    X86Value lhs = compile_expression(code, expression->left);
+    X86Value lhs = compile_expression(code, expression->left, lhs_mode);
     compile_cast(code, &lhs, &expression->data_type);
     COMMENT_CODE(code, "Right hand side");
-    X86Value rhs = compile_expression(code, expression->right);
+    X86Value rhs = compile_expression(code, expression->right, EXPRESSION_MODE_RHS);
     compile_cast(code, &rhs, &expression->data_type);
 
     INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
 }
 
-static X86Value compile_expression(X86Code *code, Expression *expression)
+static X86Value compile_expression(X86Code *code, Expression *expression, enum ExpressionMode mode)
 {
     switch (expression->type)
     {
         case EXPRESSION_TYPE_VALUE:
-            return compile_value(code, &expression->value);
+            return compile_value(code, &expression->value, mode);
+        case EXPRESSION_TYPE_ASSIGN:
+        {
+            COMMENT_CODE(code, "Compile assign");
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_LHS);
+
+            COMMENT_CODE(code, "Do assign operation");
+            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EAX, 0, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EBX);
+            return (X86Value) { expression->data_type };
+        }
         case EXPRESSION_TYPE_ADD:
         {
             COMMENT_CODE(code, "Compile add");
-            compile_rhs_eax_lhs_ebx(code, expression);
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
 
             COMMENT_CODE(code, "Do add operation");
             INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
@@ -209,7 +227,7 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
         case EXPRESSION_TYPE_SUB:
         {
             COMMENT_CODE(code, "Compile sub");
-            compile_rhs_eax_lhs_ebx(code, expression);
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
 
             COMMENT_CODE(code, "Do sub operation");
             INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
@@ -219,7 +237,7 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
         case EXPRESSION_TYPE_MUL:
         {
             COMMENT_CODE(code, "Compile mul");
-            compile_rhs_eax_lhs_ebx(code, expression);
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
 
             COMMENT_CODE(code, "Do mul operation");
             INST(X86_OP_CODE_MUL_REG_REG, X86_REG_EAX, X86_REG_EBX);
@@ -229,7 +247,7 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
         case EXPRESSION_TYPE_LESS_THAN:
         {
             COMMENT_CODE(code, "Compile less than");
-            compile_rhs_eax_lhs_ebx(code, expression);
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
 
             COMMENT_CODE(code, "Do add operation");
             INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
@@ -287,7 +305,7 @@ static void compile_decleration(X86Code *code, Statement *statement)
 {
     if (statement->expression)
     {
-        X86Value value = compile_expression(code, statement->expression);
+        X86Value value = compile_expression(code, statement->expression, EXPRESSION_MODE_RHS);
         compile_assign_variable(code, &statement->symbol, &value);
     }
 
@@ -298,18 +316,37 @@ static void compile_decleration(X86Code *code, Statement *statement)
 static void compile_scope(X86Code *code, Scope *scope);
 static void compile_if(X86Code *code, Statement *statement)
 {
-    char end_lable[80];
-    sprintf(end_lable, "if%x", rand());
+    char end_label[80];
+    sprintf(end_label, "if%x", rand());
 
-    X86Value value = compile_expression(code, statement->expression);
+    X86Value value = compile_expression(code, statement->expression, EXPRESSION_MODE_RHS);
     DataType type = dt_int();
     compile_cast(code, &value, &type);
 
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
     INST(X86_OP_CODE_CMP_REG_IMM32, X86_REG_EAX, 0);
-    INST(X86_OP_CODE_JUMP_LABEL_IF_NOT_EQUAL, end_lable);
+    INST(X86_OP_CODE_JUMP_LABEL_IF_ZERO, end_label);
     compile_scope(code, statement->sub_scope);
-    x86_code_add_label(code, end_lable);
+    x86_code_add_label(code, end_label);
+}
+
+static void compile_while(X86Code *code, Statement *statement)
+{
+    char end_label[80], start_label[80];
+    sprintf(end_label, "while%x", rand());
+    sprintf(start_label, "while%x", rand());
+
+    x86_code_add_label(code, start_label);
+    X86Value value = compile_expression(code, statement->expression, EXPRESSION_MODE_RHS);
+    DataType type = dt_int();
+    compile_cast(code, &value, &type);
+
+    INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+    INST(X86_OP_CODE_CMP_REG_IMM32, X86_REG_EAX, 0);
+    INST(X86_OP_CODE_JUMP_LABEL_IF_ZERO, end_label);
+    compile_scope(code, statement->sub_scope);
+    INST(X86_OP_CODE_JUMP_LABEL, start_label);
+    x86_code_add_label(code, end_label);
 }
 
 static void compile_scope(X86Code *code, Scope *scope)
@@ -323,16 +360,19 @@ static void compile_scope(X86Code *code, Scope *scope)
                 compile_decleration(code, statement);
                 break;
             case STATEMENT_TYPE_EXPRESSION:
-                compile_expression(code, statement->expression);
+                compile_expression(code, statement->expression, EXPRESSION_MODE_RHS);
                 INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
                 break;
             case STATEMENT_TYPE_RETURN:
-                compile_expression(code, statement->expression);
+                compile_expression(code, statement->expression, EXPRESSION_MODE_RHS);
                 INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
                 compile_function_return(code);
                 break;
             case STATEMENT_TYPE_IF:
                 compile_if(code, statement);
+                break;
+            case STATEMENT_TYPE_WHILE:
+                compile_while(code, statement);
                 break;
             default:
                 assert (0);
