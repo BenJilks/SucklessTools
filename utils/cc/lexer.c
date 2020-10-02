@@ -22,7 +22,7 @@ static int g_should_reconsume = 0;
 
 void lexer_error(const char *message)
 {
-    printf("Error: %s\n", message);
+    fprintf(stderr, "Error: %s\n", message);
 }
 
 void lexer_open_file(const char *file_path)
@@ -170,6 +170,8 @@ static Token lexer_next()
                         return make_single_char_token(TOKEN_TYPE_AND);
                     case '<':
                         return make_single_char_token(TOKEN_TYPE_LESS_THAN);
+                    case '-':
+                        return make_single_char_token(TOKEN_TYPE_SUBTRACT);
                 }
 
                 assert (0);

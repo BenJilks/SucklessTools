@@ -206,6 +206,26 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             return (X86Value) { expression->data_type };
         }
+        case EXPRESSION_TYPE_SUB:
+        {
+            COMMENT_CODE(code, "Compile sub");
+            compile_rhs_eax_lhs_ebx(code, expression);
+
+            COMMENT_CODE(code, "Do sub operation");
+            INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
+        case EXPRESSION_TYPE_MUL:
+        {
+            COMMENT_CODE(code, "Compile mul");
+            compile_rhs_eax_lhs_ebx(code, expression);
+
+            COMMENT_CODE(code, "Do mul operation");
+            INST(X86_OP_CODE_MUL_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
         case EXPRESSION_TYPE_LESS_THAN:
         {
             COMMENT_CODE(code, "Compile less than");

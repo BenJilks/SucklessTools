@@ -231,6 +231,8 @@ static Expression *parse_term(SymbolTable *table)
         default:
             ERROR("Expected expression, got '%s' instead",
                 lexer_printable_token_data(&token));
+            assert (0);
+            lexer_consume(token.type);
             break;
     }
 
@@ -289,15 +291,52 @@ static Expression *create_operation_expression(Expression *left, enum Expression
     return operation;
 }
 
-static Expression *parse_add_op(SymbolTable *table)
+static enum ExpressionType expression_type_from_token_type(enum TokenType token_type)
+{
+    switch (token_type)
+    {
+        case TOKEN_TYPE_ADD:
+            return EXPRESSION_TYPE_ADD;
+        case TOKEN_TYPE_SUBTRACT:
+            return EXPRESSION_TYPE_SUB;
+        case TOKEN_TYPE_STAR:
+            return EXPRESSION_TYPE_MUL;
+        default:
+            assert (0);
+    }
+}
+
+static Expression *parse_mul_op(SymbolTable *table)
 {
     Expression *left = parse_unary_operator(table);
 
-    while (lexer_peek(0).type == TOKEN_TYPE_ADD)
+    enum TokenType operation_type = lexer_peek(0).type;
+    while (operation_type == TOKEN_TYPE_STAR)
     {
-        match(TOKEN_TYPE_ADD, "+");
+        lexer_consume(operation_type);
+        enum ExpressionType op = expression_type_from_token_type(operation_type);
         Expression *right = parse_unary_operator(table);
-        left = create_operation_expression(left, EXPRESSION_TYPE_ADD, right);
+        left = create_operation_expression(left, op, right);
+
+        operation_type = lexer_peek(0).type;
+    }
+
+    return left;
+}
+
+static Expression *parse_add_op(SymbolTable *table)
+{
+    Expression *left = parse_mul_op(table);
+
+    enum TokenType operation_type = lexer_peek(0).type;
+    while (operation_type == TOKEN_TYPE_ADD || operation_type == TOKEN_TYPE_SUBTRACT)
+    {
+        lexer_consume(operation_type);
+        enum ExpressionType op = expression_type_from_token_type(operation_type);
+        Expression *right = parse_mul_op(table);
+        left = create_operation_expression(left, op, right);
+
+        operation_type = lexer_peek(0).type;
     }
 
     return left;

@@ -21,7 +21,8 @@
     __TOKEN_TYPE(ELLIPSE) \
     __TOKEN_TYPE(AND) \
     __TOKEN_TYPE(IF) \
-    __TOKEN_TYPE(LESS_THAN)
+    __TOKEN_TYPE(LESS_THAN) \
+    __TOKEN_TYPE(SUBTRACT) \
 
 enum TokenType
 {

@@ -45,6 +45,16 @@ static void dump_expression(Expression *expression, int indent)
             dump_expression(expression->left, indent + 1);
             dump_expression(expression->right, indent + 1);
             break;
+        case EXPRESSION_TYPE_SUB:
+            fprintf(stderr, "SUB:\n");
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
+        case EXPRESSION_TYPE_MUL:
+            fprintf(stderr, "MUL:\n");
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
         case EXPRESSION_TYPE_REF:
             fprintf(stderr, "Ref:\n");
             dump_expression(expression->left, indent + 1);
