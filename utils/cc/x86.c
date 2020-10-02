@@ -2,6 +2,7 @@
 #include "dumpast.h"
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define INST(...) x86_code_add_instruction(code, x86(code, __VA_ARGS__))
 
@@ -176,6 +177,19 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
     return (X86Value) { func_symbol->data_type };
 }
 
+static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression)
+{
+    COMMENT_CODE(code, "Left hand side");
+    X86Value lhs = compile_expression(code, expression->left);
+    compile_cast(code, &lhs, &expression->data_type);
+    COMMENT_CODE(code, "Right hand side");
+    X86Value rhs = compile_expression(code, expression->right);
+    compile_cast(code, &rhs, &expression->data_type);
+
+    INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
+    INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+}
+
 static X86Value compile_expression(X86Code *code, Expression *expression)
 {
     switch (expression->type)
@@ -185,17 +199,22 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
         case EXPRESSION_TYPE_ADD:
         {
             COMMENT_CODE(code, "Compile add");
-            COMMENT_CODE(code, "Left hand side");
-            X86Value lhs = compile_expression(code, expression->left);
-            compile_cast(code, &lhs, &expression->data_type);
-            COMMENT_CODE(code, "Right hand side");
-            X86Value rhs = compile_expression(code, expression->right);
-            compile_cast(code, &rhs, &expression->data_type);
+            compile_rhs_eax_lhs_ebx(code, expression);
 
             COMMENT_CODE(code, "Do add operation");
-            INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
-            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
             INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
+        case EXPRESSION_TYPE_LESS_THAN:
+        {
+            COMMENT_CODE(code, "Compile less than");
+            compile_rhs_eax_lhs_ebx(code, expression);
+
+            COMMENT_CODE(code, "Do add operation");
+            INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
+            INST(X86_OP_CODE_SET_REG_IF_LESS, X86_REG_AL);
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             return (X86Value) { expression->data_type };
         }
@@ -209,7 +228,7 @@ static X86Value compile_expression(X86Code *code, Expression *expression)
                 return compile_variable_pointer(code, expression->left->value.v);
             break;
         default:
-            break;
+            assert (0);
     }
 
     return (X86Value) { expression->data_type };
@@ -256,6 +275,23 @@ static void compile_decleration(X86Code *code, Statement *statement)
         compile_decleration(code, statement->next);
 }
 
+static void compile_scope(X86Code *code, Scope *scope);
+static void compile_if(X86Code *code, Statement *statement)
+{
+    char end_lable[80];
+    sprintf(end_lable, "if%x", rand());
+
+    X86Value value = compile_expression(code, statement->expression);
+    DataType type = dt_int();
+    compile_cast(code, &value, &type);
+
+    INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+    INST(X86_OP_CODE_CMP_REG_IMM32, X86_REG_EAX, 0);
+    INST(X86_OP_CODE_JUMP_LABEL_IF_NOT_EQUAL, end_lable);
+    compile_scope(code, statement->sub_scope);
+    x86_code_add_label(code, end_lable);
+}
+
 static void compile_scope(X86Code *code, Scope *scope)
 {
     for (int i = 0; i < scope->statement_count; i++)
@@ -275,8 +311,11 @@ static void compile_scope(X86Code *code, Scope *scope)
                 INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
                 compile_function_return(code);
                 break;
-            default:
+            case STATEMENT_TYPE_IF:
+                compile_if(code, statement);
                 break;
+            default:
+                assert (0);
         }
     }
 }

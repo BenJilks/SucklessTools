@@ -35,6 +35,7 @@ enum ValueType
 #define ENUMERATE_EXPRESSION_TYPE \
     __TYPE(VALUE) \
     __TYPE(ADD) \
+    __TYPE(LESS_THAN) \
     __TYPE(REF) \
     __TYPE(FUNCTION_CALL)
 
@@ -70,6 +71,7 @@ typedef struct Expression
     int argument_length;
 } Expression;
 
+struct Scope;
 typedef struct Statement
 {
     enum StatementType type;
@@ -79,6 +81,7 @@ typedef struct Statement
 
     // NOTE: Used for declaration lists
     struct Statement *next;
+    struct Scope *sub_scope;
 } Statement;
 
 typedef struct Scope

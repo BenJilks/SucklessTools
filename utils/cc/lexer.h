@@ -19,7 +19,9 @@
     __TOKEN_TYPE(STAR) \
     __TOKEN_TYPE(RETURN) \
     __TOKEN_TYPE(ELLIPSE) \
-    __TOKEN_TYPE(AND)
+    __TOKEN_TYPE(AND) \
+    __TOKEN_TYPE(IF) \
+    __TOKEN_TYPE(LESS_THAN)
 
 enum TokenType
 {

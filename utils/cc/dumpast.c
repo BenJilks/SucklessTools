@@ -6,7 +6,7 @@
 static void print_indent(int indent)
 {
     for (int j = 0; j < indent; j++)
-        printf("  ");
+        fprintf(stderr, "  ");
 }
 
 static void dump_value(Value *value, int indent)
@@ -15,13 +15,16 @@ static void dump_value(Value *value, int indent)
     switch (value->type)
     {
         case VALUE_TYPE_INT:
-            printf ("int %i\n", value->i);
+            fprintf(stderr, "int %i\n", value->i);
             break;
         case VALUE_TYPE_FLOAT:
-            printf ("float %f\n", value->f);
+            fprintf(stderr, "float %f\n", value->f);
+            break;
+        case VALUE_TYPE_STRING:
+            fprintf(stderr, "string \"%s\"\n", lexer_printable_token_data(&value->s));
             break;
         case VALUE_TYPE_VARIABLE:
-            printf ("variable %s\n", lexer_printable_token_data(&value->v->name));
+            fprintf(stderr, "variable %s\n", lexer_printable_token_data(&value->v->name));
             break;
         default:
             assert (0);
@@ -34,19 +37,28 @@ static void dump_expression(Expression *expression, int indent)
     switch (expression->type)
     {
         case EXPRESSION_TYPE_VALUE:
-            printf("Value:\n");
+            fprintf(stderr, "Value:\n");
             dump_value(&expression->value, indent + 1);
             break;
         case EXPRESSION_TYPE_ADD:
-            printf("Add:\n");
+            fprintf(stderr, "Add:\n");
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
+        case EXPRESSION_TYPE_REF:
+            fprintf(stderr, "Ref:\n");
+            dump_expression(expression->left, indent + 1);
+            break;
+        case EXPRESSION_TYPE_LESS_THAN:
+            fprintf(stderr, "Less Than:\n");
             dump_expression(expression->left, indent + 1);
             dump_expression(expression->right, indent + 1);
             break;
         case EXPRESSION_TYPE_FUNCTION_CALL:
-            printf("Call:\n");
+            fprintf(stderr, "Call:\n");
             dump_expression(expression->left, indent + 1);
             print_indent(indent);
-            printf("Arguments:\n");
+            fprintf(stderr, "Arguments:\n");
             for (int i = 0; i < expression->argument_length; i++)
                 dump_expression(expression->arguments[i], indent + 1);
             break;
@@ -85,20 +97,28 @@ static void dump_scope(Scope *scope, int indent)
         switch (statement->type)
         {
             case STATEMENT_TYPE_DECLARATION:
-                printf("Dec: %s: ", lexer_printable_token_data(&statement->symbol.name));
-                printf("%s\n", printable_data_type(&statement->symbol.data_type));
+                fprintf(stderr, "Dec: %s: ", lexer_printable_token_data(&statement->symbol.name));
+                fprintf(stderr, "%s\n", printable_data_type(&statement->symbol.data_type));
                 if (statement->expression)
                     dump_expression(statement->expression, indent + 1);
                 break;
 
             case STATEMENT_TYPE_EXPRESSION:
-                printf("Expression:\n");
+                fprintf(stderr, "Expression:\n");
                 dump_expression(statement->expression, indent + 1);
                 break;
 
             case STATEMENT_TYPE_RETURN:
-                printf("Return:\n");
+                fprintf(stderr, "Return:\n");
                 dump_expression(statement->expression, indent + 1);
+                break;
+
+            case STATEMENT_TYPE_IF:
+                fprintf(stderr, "If:\n");
+                dump_expression(statement->expression, indent + 1);
+                print_indent(indent);
+                fprintf(stderr, "Body:\n");
+                dump_scope(statement->sub_scope, indent + 1);
                 break;
 
             default:
@@ -109,23 +129,23 @@ static void dump_scope(Scope *scope, int indent)
 
 static void dump_function(Function *function)
 {
-    printf("  Function %s(", lexer_printable_token_data(&function->func_symbol.name));
+    fprintf(stderr, "  Function %s(", lexer_printable_token_data(&function->func_symbol.name));
     for (int i = 0; i < function->func_symbol.param_count; i++)
     {
         Symbol *param = &function->func_symbol.params[i];
-        printf("%s ", printable_data_type(&param->data_type));
-        printf("%s", lexer_printable_token_data(&param->name));
+        fprintf(stderr, "%s ", printable_data_type(&param->data_type));
+        fprintf(stderr, "%s", lexer_printable_token_data(&param->name));
         if (i != function->func_symbol.param_count - 1)
             printf(", ");
     }
-    printf(") -> %s\n", printable_data_type(&function->func_symbol.data_type));
+    fprintf(stderr, ") -> %s\n", printable_data_type(&function->func_symbol.data_type));
     if (function->body)
         dump_scope(function->body, 2);
 }
 
 void dump_unit(Unit *unit)
 {
-    printf("Unit:\n");
+    fprintf(stderr, "Unit:\n");
     for (int i = 0; i < unit->function_count; i++)
         dump_function(&unit->functions[i]);
 }

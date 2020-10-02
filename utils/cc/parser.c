@@ -276,20 +276,42 @@ static DataType find_data_type_of_operation(
     return *left;
 }
 
-static Expression *parse_expression(SymbolTable *table)
+static Expression *create_operation_expression(Expression *left, enum ExpressionType op, Expression *right)
+{
+    Expression *operation = malloc(sizeof(Expression));
+    operation->type = op;
+    operation->left = left;
+    operation->right = right;
+    operation->data_type = find_data_type_of_operation(
+        &operation->left->data_type, operation->type, &operation->right->data_type);
+    left = operation;
+
+    return operation;
+}
+
+static Expression *parse_add_op(SymbolTable *table)
 {
     Expression *left = parse_unary_operator(table);
 
     while (lexer_peek(0).type == TOKEN_TYPE_ADD)
     {
         match(TOKEN_TYPE_ADD, "+");
-        Expression *operation = malloc(sizeof(Expression));
-        operation->type = EXPRESSION_TYPE_ADD;
-        operation->left = left;
-        operation->right = parse_unary_operator(table);
-        operation->data_type = find_data_type_of_operation(
-            &operation->left->data_type, operation->type, &operation->right->data_type);
-        left = operation;
+        Expression *right = parse_unary_operator(table);
+        left = create_operation_expression(left, EXPRESSION_TYPE_ADD, right);
+    }
+
+    return left;
+}
+
+static Expression *parse_expression(SymbolTable *table)
+{
+    Expression *left = parse_add_op(table);
+
+    while (lexer_peek(0).type == TOKEN_TYPE_LESS_THAN)
+    {
+        match(TOKEN_TYPE_LESS_THAN, "<");
+        Expression *right = parse_add_op(table);
+        left = create_operation_expression(left, EXPRESSION_TYPE_LESS_THAN, right);
     }
 
     return left;
@@ -369,6 +391,7 @@ static void parse_expression_statement(Scope *scope)
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
     statement.expression = parse_expression(scope->table);
+    statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
@@ -381,8 +404,24 @@ static void parse_return(Scope *scope)
     Statement statement;
     statement.type = STATEMENT_TYPE_RETURN;
     statement.expression = parse_expression(scope->table);
+    statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
+    add_statement_to_scope(scope, statement);
+}
+
+static Scope *parse_scope(Function *function, SymbolTable *parent);
+static void parse_if(Function *function, Scope *scope)
+{
+    match(TOKEN_TYPE_IF, "if");
+    match(TOKEN_TYPE_OPEN_BRACKET, "(");
+
+    Statement statement;
+    statement.type = STATEMENT_TYPE_IF;
+    statement.expression = parse_expression(scope->table);
+    match(TOKEN_TYPE_CLOSE_BRACKET, ")");
+
+    statement.sub_scope = parse_scope(function, scope->table);
     add_statement_to_scope(scope, statement);
 }
 
@@ -406,6 +445,9 @@ static Scope *parse_scope(Function *function, SymbolTable *parent)
         {
             case TOKEN_TYPE_RETURN:
                 parse_return(scope);
+                break;
+            case TOKEN_TYPE_IF:
+                parse_if(function, scope);
                 break;
             default:
                 parse_expression_statement(scope);
@@ -552,6 +594,11 @@ void free_scope(Scope *scope)
             {
                 free_expression(statement->expression);
                 free(statement->expression);
+            }
+            if (statement->sub_scope)
+            {
+                free_scope(statement->sub_scope);
+                free(statement->sub_scope);
             }
         }
         free(scope->statements);
