@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include "lexer.h"
 #include "parser.h"
+#include "preproccessor.h"
 #include "dumpast.h"
 #include "x86.h"
 
 int main()
 {
-    lexer_open_file("test.c");
+    int data_len;
+    const char *data = pre_proccess_file("test.c", &data_len);
+    lexer_open_memory(data, data_len);
 
     // Parse
     Unit *unit = parse();

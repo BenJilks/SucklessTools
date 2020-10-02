@@ -6,6 +6,7 @@ set(SOURCES
 	lexer.c
         parser.c
         symbol.c
+        preproccessor.c
         dumpast.c
         x86.c
         x86_asm.c

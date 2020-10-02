@@ -47,6 +47,17 @@ void lexer_open_file(const char *file_path)
     g_peek_queue_count = 0;
 }
 
+void lexer_open_memory(const char *data, int data_len)
+{
+    assert (!g_source);
+    g_source = (char*)data;
+    g_source_length = data_len;
+    g_source_pointer = 0;
+    g_peek_queue_start = 0;
+    g_peek_queue_end = 0;
+    g_peek_queue_count = 0;
+}
+
 static int is_eof()
 {
     return g_source_pointer >= g_source_length;

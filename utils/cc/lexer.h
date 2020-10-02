@@ -40,6 +40,7 @@ typedef struct Token
 } Token;
 
 void lexer_open_file(const char *file_path);
+void lexer_open_memory(const char *data, int data_len);
 void lexer_close();
 
 #define ERROR(...) \
