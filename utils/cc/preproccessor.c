@@ -16,12 +16,7 @@ typedef struct OutBuffer
 enum Mode
 {
     MODE_START_OF_LINE,
-    MODE_STATEMENT_NAME,
-    MODE_DEFINE_NAME,
-    MODE_DEFINE_BODY,
-    MODE_INCLUDE,
-    MODE_INCLUDE_LOCAL,
-    MODE_INCLUDE_GLOBAL,
+    MODE_STATEMENT,
     MODE_CODE_NAME,
 };
 
@@ -39,6 +34,9 @@ typedef struct State
 
     Define definitions[80];
     int definition_count;
+
+    int should_ignore_code_depth;
+    int if_depth;
 } State;
 
 static OutBuffer make_buffer()
@@ -121,6 +119,63 @@ static void include_file(char *file_path, OutBuffer *out_buffer)
     fclose(file);
 }
 
+static void parse_statement(const char *src, OutBuffer *out_buffer, State *state)
+{
+    char buffer[80];
+    int buffer_pointer = 0;
+
+#define READ_UNTIL(condition, into) \
+do { \
+    while(*src != '\0' && !(condition)) \
+        into[buffer_pointer++] = *(src++); \
+    into[buffer_pointer] = '\0'; \
+    buffer_pointer = 0; \
+} while (0)
+#define SKIP_WHITE_SPACE READ_UNTIL(!isspace(*src), buffer)
+
+    READ_UNTIL(isspace(*src), buffer);
+    if (!strcmp(buffer, "define"))
+    {
+        Define *define = &state->definitions[state->definition_count++];
+        SKIP_WHITE_SPACE;
+        READ_UNTIL(isspace(*src), define->name);
+        SKIP_WHITE_SPACE;
+        READ_UNTIL(0, define->value);
+    }
+    else if (!strcmp(buffer, "include"))
+    {
+        SKIP_WHITE_SPACE;
+        src += 1;
+        if (*(src-1) == '"')
+            READ_UNTIL(*src == '"', buffer);
+        else if (*(src-1) == '<')
+            READ_UNTIL(*src == '>', buffer);
+        else
+            assert (0);
+        include_file(buffer, out_buffer);
+    }
+    else if (!strcmp(buffer, "if"))
+    {
+        SKIP_WHITE_SPACE;
+        READ_UNTIL(!isdigit(*src), buffer);
+        state->if_depth += 1;
+
+        if (!atoi(buffer))
+            state->should_ignore_code_depth = state->if_depth;
+    }
+    else if (!strcmp(buffer, "endif"))
+    {
+        state->if_depth -= 1;
+        if (state->if_depth < state->should_ignore_code_depth)
+            state->should_ignore_code_depth = -1;
+    }
+    else
+    {
+        printf("Unkown pre-proccessor statement '%s'\n", buffer);
+        assert (0);
+    }
+}
+
 static void proccess_char(char c, OutBuffer *out_buffer, State *state)
 {
     switch (state->mode)
@@ -128,7 +183,7 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
         case MODE_START_OF_LINE:
             if (c == '#')
             {
-                state->mode = MODE_STATEMENT_NAME;
+                state->mode = MODE_STATEMENT;
                 state->name_buffer_pointer = 0;
                 break;
             }
@@ -143,53 +198,12 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
             }
             append_buffer(out_buffer, c);
             break;
-        case MODE_STATEMENT_NAME:
-            if (c == '\n' || c == '\r')
-                assert (0);
-            if (isspace(c))
-            {
-                state->name_buffer[state->name_buffer_pointer] = '\0';
-                state->name_buffer_pointer = 0;
-                if (!strcmp(state->name_buffer, "define"))
-                    state->mode = MODE_DEFINE_NAME;
-                else if (!strcmp(state->name_buffer, "include"))
-                    state->mode = MODE_INCLUDE;
-                else
-                    assert (0);
-                break;
-            }
-
-            state->name_buffer[state->name_buffer_pointer++] = c;
-            break;
-        case MODE_DEFINE_NAME:
+        case MODE_STATEMENT:
             if (c == '\n' || c == '\r')
             {
                 state->name_buffer[state->name_buffer_pointer] = '\0';
                 state->name_buffer_pointer = 0;
-                strcpy(state->definitions[state->definition_count].name, state->name_buffer);
-                state->definitions[state->definition_count].value[0] = '\0';
-                state->definition_count += 1;
-                state->mode = MODE_START_OF_LINE;
-                break;
-            }
-            if (isspace(c))
-            {
-                state->name_buffer[state->name_buffer_pointer] = '\0';
-                state->name_buffer_pointer = 0;
-                strcpy(state->definitions[state->definition_count].name, state->name_buffer);
-                state->mode = MODE_DEFINE_BODY;
-                break;
-            }
-
-            state->name_buffer[state->name_buffer_pointer++] = c;
-            break;
-        case MODE_DEFINE_BODY:
-            if (c == '\n' || c == '\r')
-            {
-                state->name_buffer[state->name_buffer_pointer] = '\0';
-                state->name_buffer_pointer = 0;
-                strcpy(state->definitions[state->definition_count].value, state->name_buffer);
-                state->definition_count += 1;
+                parse_statement(state->name_buffer, out_buffer, state);
                 state->mode = MODE_START_OF_LINE;
                 break;
             }
@@ -198,44 +212,14 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
         case MODE_CODE_NAME:
             if (c == '\n' || c == '\r')
                 state->mode = MODE_START_OF_LINE;
+            if (state->should_ignore_code_depth != -1 && state->if_depth >= state->should_ignore_code_depth)
+                break;
             if (!isalnum(c))
             {
                 state->name_buffer[state->name_buffer_pointer] = '\0';
                 state->name_buffer_pointer = 0;
                 check_define(state->name_buffer, out_buffer, state);
                 append_buffer(out_buffer, c);
-                break;
-            }
-            state->name_buffer[state->name_buffer_pointer++] = c;
-            break;
-        case MODE_INCLUDE:
-            if (isspace(c))
-                break;
-            if (c == '"')
-                state->mode = MODE_INCLUDE_LOCAL;
-            else if (c == '<')
-                state->mode = MODE_INCLUDE_GLOBAL;
-            else
-                assert (0);
-            break;
-        case MODE_INCLUDE_LOCAL:
-            if (c == '"')
-            {
-                state->name_buffer[state->name_buffer_pointer] = '\0';
-                state->name_buffer_pointer = 0;
-                include_file(state->name_buffer, out_buffer);
-                state->mode = MODE_CODE_NAME;
-                break;
-            }
-            state->name_buffer[state->name_buffer_pointer++] = c;
-            break;
-        case MODE_INCLUDE_GLOBAL:
-            if (c == '>')
-            {
-                state->name_buffer[state->name_buffer_pointer] = '\0';
-                state->name_buffer_pointer = 0;
-                include_file(state->name_buffer, out_buffer);
-                state->mode = MODE_CODE_NAME;
                 break;
             }
             state->name_buffer[state->name_buffer_pointer++] = c;
@@ -253,6 +237,8 @@ const char *pre_proccess_file(const char *file_path, int *out_length)
     State state;
     state.mode = MODE_START_OF_LINE;
     state.definition_count = 0;
+    state.should_ignore_code_depth = -1;
+    state.if_depth = 0;
     for (;;)
     {
         int nread = fread(buffer, sizeof(char), sizeof(buffer), file);
