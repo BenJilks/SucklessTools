@@ -623,11 +623,48 @@ static void parse_function(Unit *unit)
     unit->functions[unit->function_count++] = function;
 }
 
+static void parse_struct(Unit *unit)
+{
+    match(TOKEN_TYPE_STRUCT, "struct");
+
+    Struct struct_;
+    struct_.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    struct_.members = symbol_table_new(NULL);
+
+    int allocator = 0;
+    match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
+    while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
+    {
+        Symbol member;
+        member.data_type = parse_data_type(unit->global_table);
+        member.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+        member.flags = 0;
+        member.params = NULL;
+        member.param_count = 0;
+        member.is_variadic = 0;
+        member.location = allocator;
+        match(TOKEN_TYPE_SEMI, ";");
+
+        allocator += member.data_type.size;
+        symbol_table_add(struct_.members, member);
+    }
+    match(TOKEN_TYPE_CLOSE_SQUIGGLY, "}");
+    match(TOKEN_TYPE_SEMI, ";");
+
+    if (!unit->structs)
+        unit->structs = malloc(sizeof(Struct));
+    else
+        unit->structs = realloc(unit->structs, (unit->struct_count + 1) * sizeof(Struct));
+    unit->structs[unit->struct_count++] = struct_;
+}
+
 Unit *parse()
 {
     Unit *unit = malloc(sizeof (Unit));
     unit->functions = NULL;
     unit->function_count = 0;
+    unit->structs = NULL;
+    unit->struct_count = 0;
     unit->global_table = symbol_table_new(NULL);
 
     for (;;)
@@ -641,11 +678,12 @@ Unit *parse()
             case TOKEN_TYPE_IDENTIFIER:
                 parse_function(unit);
                 break;
-
             case TOKEN_TYPE_TYPEDEF:
                 parse_typedef(unit->global_table);
                 break;
-
+            case TOKEN_TYPE_STRUCT:
+                parse_struct(unit);
+                break;
             default:
                 assert (0);
         }
@@ -718,6 +756,12 @@ void free_function(Function *function)
     }
 }
 
+void free_struct(Struct *struct_)
+{
+    free_symbol_table(struct_->members);
+    free(struct_->members);
+}
+
 void free_unit(Unit *unit)
 {
     if (unit->functions)
@@ -725,6 +769,12 @@ void free_unit(Unit *unit)
         for (int i = 0; i < unit->function_count; i++)
             free_function(&unit->functions[i]);
         free(unit->functions);
+    }
+    if (unit->structs)
+    {
+        for (int i = 0; i < unit->struct_count; i++)
+            free_struct(&unit->structs[i]);
+        free(unit->structs);
     }
 
     free_symbol_table(unit->global_table);

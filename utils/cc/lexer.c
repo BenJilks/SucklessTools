@@ -102,6 +102,8 @@ static enum TokenType check_keyword(Token *token)
         return TOKEN_TYPE_WHILE;
     if (lexer_compair_token_name(token, "typedef"))
         return TOKEN_TYPE_TYPEDEF;
+    if (lexer_compair_token_name(token, "struct"))
+        return TOKEN_TYPE_STRUCT;
     return TOKEN_TYPE_IDENTIFIER;
 }
 

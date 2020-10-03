@@ -104,10 +104,19 @@ typedef struct Function
     int argument_size;
 } Function;
 
+typedef struct Struct
+{
+    Token name;
+    SymbolTable *members;
+} Struct;
+
 typedef struct Unit
 {
     Function *functions;
     int function_count;
+
+    Struct *structs;
+    int struct_count;
 
     SymbolTable *global_table;
 } Unit;

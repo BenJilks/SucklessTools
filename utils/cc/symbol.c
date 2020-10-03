@@ -31,13 +31,13 @@ void symbol_table_define_type(SymbolTable *table, Token name, DataType type)
 {
     // TODO: Don't allocate each time
     if (!table->type_defs)
-        table->type_defs = malloc(sizeof(Symbol*));
+        table->type_defs = malloc(sizeof(TypeDef));
     else
-        table->type_defs = realloc(table->type_defs, (table->type_def_count + 1) * sizeof(Symbol*));
+        table->type_defs = realloc(table->type_defs, (table->type_def_count + 1) * sizeof(TypeDef));
 
-    TypeDef type_def = { name, type };
-    table->type_defs[table->type_def_count] = type_def;
-    table->type_def_count += 1;
+    TypeDef *type_def = &table->type_defs[table->type_def_count++];
+    type_def->name = name;
+    type_def->type = type;
 }
 
 Symbol *symbol_table_lookup(SymbolTable *table, Token *name)
@@ -57,7 +57,7 @@ Symbol *symbol_table_lookup(SymbolTable *table, Token *name)
 
 DataType *symbol_table_lookup_type(SymbolTable *table, Token *name)
 {
-    for (int i = table->type_def_count - 1; i >= 0; i--)
+    for (int i = 0; i < table->type_def_count; i++)
     {
         TypeDef *type_def = &table->type_defs[i];
         if (lexer_compair_token_token(&type_def->name, name))

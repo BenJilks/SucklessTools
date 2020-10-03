@@ -166,9 +166,22 @@ static void dump_function(Function *function)
         dump_scope(function->body, 2);
 }
 
+static void dump_struct(Struct *struct_)
+{
+    fprintf(stderr, "  Struct %s\n", lexer_printable_token_data(&struct_->name));
+    for (int i = 0; i < struct_->members->symbol_count; i++)
+    {
+        Symbol *member = struct_->members->symbols[i];
+        fprintf(stderr, "    %s: ", lexer_printable_token_data(&member->name));
+        fprintf(stderr, "%s\n", printable_data_type(&member->data_type));
+    }
+}
+
 void dump_unit(Unit *unit)
 {
     fprintf(stderr, "Unit:\n");
+    for (int i = 0; i < unit->struct_count; i++)
+        dump_struct(&unit->structs[i]);
     for (int i = 0; i < unit->function_count; i++)
         dump_function(&unit->functions[i]);
 }
