@@ -24,6 +24,7 @@
     __TOKEN_TYPE(LESS_THAN) \
     __TOKEN_TYPE(SUBTRACT) \
     __TOKEN_TYPE(WHILE) \
+    __TOKEN_TYPE(TYPEDEF)
 
 enum TokenType
 {

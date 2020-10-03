@@ -39,6 +39,8 @@ typedef struct State
     int if_depth;
 } State;
 
+static char *pre_proccess_file_with_state(const char *file_path, int *out_length, State *state);
+
 static OutBuffer make_buffer()
 {
     OutBuffer buffer;
@@ -58,14 +60,24 @@ static void append_buffer(OutBuffer *buffer, char c)
     buffer->data[buffer->size++] = c;
 }
 
-static void append_string(OutBuffer *buffer, char *str)
+static void append_string(OutBuffer *buffer, const char *str)
 {
     int len = strlen(str);
     for (int i = 0; i < len; i++)
         append_buffer(buffer, str[i]);
 }
 
-static void check_define(char *name, OutBuffer *out_buffer, State *state)
+static int ifdef(const char *name, State *state)
+{
+    for (int i = 0; i < state->definition_count; i++)
+    {
+        if (!strcmp(name, state->definitions[i].name))
+            return 1;
+    }
+    return 0;
+}
+
+static void check_define(const char *name, OutBuffer *out_buffer, State *state)
 {
     for (int i = 0; i < state->definition_count; i++)
     {
@@ -99,24 +111,16 @@ static void absolute_include_file_path(char *local_file_path, char *out_buffer)
     assert (0);
 }
 
-static void include_file(char *file_path, OutBuffer *out_buffer)
+static void include_file(char *file_path, OutBuffer *out_buffer, State *state)
 {
     char absolute_path[80];
+    int data_len;
     absolute_include_file_path(file_path, absolute_path);
 
-    FILE *file = fopen(absolute_path, "r");
-    char buffer[80];
-    for (;;)
-    {
-        int nread = fread(buffer, sizeof(char), sizeof(buffer), file);
-        if (nread == 0)
-            break;
-
-        for (int i = 0; i < nread; i++)
-            append_buffer(out_buffer, buffer[i]);
-    }
-
-    fclose(file);
+    const char *data = pre_proccess_file_with_state(absolute_path, &data_len, state);
+    for (int i = 0; i < data_len; i++)
+        append_buffer(out_buffer, data[i]);
+    free((void*)data);
 }
 
 static void parse_statement(const char *src, OutBuffer *out_buffer, State *state)
@@ -152,15 +156,30 @@ do { \
             READ_UNTIL(*src == '>', buffer);
         else
             assert (0);
-        include_file(buffer, out_buffer);
+        include_file(buffer, out_buffer, state);
     }
     else if (!strcmp(buffer, "if"))
     {
         SKIP_WHITE_SPACE;
         READ_UNTIL(!isdigit(*src), buffer);
         state->if_depth += 1;
-
         if (!atoi(buffer))
+            state->should_ignore_code_depth = state->if_depth;
+    }
+    else if (!strcmp(buffer, "ifdef"))
+    {
+        SKIP_WHITE_SPACE;
+        READ_UNTIL(isspace(*src), buffer);
+        state->if_depth += 1;
+        if (!ifdef(buffer, state))
+            state->should_ignore_code_depth = state->if_depth;
+    }
+    else if (!strcmp(buffer, "ifndef"))
+    {
+        SKIP_WHITE_SPACE;
+        READ_UNTIL(isspace(*src), buffer);
+        state->if_depth += 1;
+        if (ifdef(buffer, state))
             state->should_ignore_code_depth = state->if_depth;
     }
     else if (!strcmp(buffer, "endif"))
@@ -203,8 +222,8 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
             {
                 state->name_buffer[state->name_buffer_pointer] = '\0';
                 state->name_buffer_pointer = 0;
-                parse_statement(state->name_buffer, out_buffer, state);
                 state->mode = MODE_START_OF_LINE;
+                parse_statement(state->name_buffer, out_buffer, state);
                 break;
             }
             state->name_buffer[state->name_buffer_pointer++] = c;
@@ -228,17 +247,12 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
 
 }
 
-const char *pre_proccess_file(const char *file_path, int *out_length)
+static char *pre_proccess_file_with_state(const char *file_path, int *out_length, State *state)
 {
     FILE *file = fopen(file_path, "r");
     OutBuffer out_buffer = make_buffer();
 
     char buffer[80];
-    State state;
-    state.mode = MODE_START_OF_LINE;
-    state.definition_count = 0;
-    state.should_ignore_code_depth = -1;
-    state.if_depth = 0;
     for (;;)
     {
         int nread = fread(buffer, sizeof(char), sizeof(buffer), file);
@@ -248,11 +262,21 @@ const char *pre_proccess_file(const char *file_path, int *out_length)
         for (int i = 0; i < nread; i++)
         {
             char c = buffer[i];
-            proccess_char(c, &out_buffer, &state);
+            proccess_char(c, &out_buffer, state);
         }
     }
 
     fclose(file);
     *out_length = out_buffer.size;
     return out_buffer.data;
+}
+
+const char *pre_proccess_file(const char *file_path, int *out_length)
+{
+    State state;
+    state.definition_count = 0;
+    state.mode = MODE_START_OF_LINE;
+    state.should_ignore_code_depth = -1;
+    state.if_depth = 0;
+    return pre_proccess_file_with_state(file_path, out_length, &state);
 }

@@ -72,8 +72,18 @@ DataType dt_const_char_pointer()
     return type;
 }
 
-static DataType parse_data_type()
+static DataType parse_data_type(SymbolTable *table)
 {
+    // Check for typedefs
+    Token name = lexer_peek(0);
+    DataType *type_def = symbol_table_lookup_type(table, &name);
+    if (type_def != NULL)
+    {
+        lexer_consume(TOKEN_TYPE_IDENTIFIER);
+        return *type_def;
+    }
+
+    // Otherwise, parse normally
     DataType data_type;
     data_type.flags = 0;
     data_type.pointer_count = 0;
@@ -374,7 +384,7 @@ static Expression *parse_expression(SymbolTable *table)
 
 static void parse_declaration(Function *function, Scope *scope)
 {
-    DataType data_type = parse_data_type();
+    DataType data_type = parse_data_type(scope->table);
     Statement statement;
 
     Statement *curr_statement = NULL;
@@ -425,7 +435,7 @@ static void parse_declaration(Function *function, Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
-static int is_data_type_next()
+static int is_data_type_next(SymbolTable *table)
 {
     Token token = lexer_peek(0);
     switch (token.type)
@@ -433,8 +443,11 @@ static int is_data_type_next()
         case TOKEN_TYPE_CONST:
             return 1;
         case TOKEN_TYPE_IDENTIFIER:
-            if (primitive_from_name(&token) != PRIMITIVE_NONE)
+            if (primitive_from_name(&token) != PRIMITIVE_NONE ||
+                symbol_table_lookup_type(table, &token) != NULL)
+            {
                 return 1;
+            }
             return 0;
         default:
             return 0;
@@ -495,6 +508,15 @@ static void parse_while(Function *function, Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
+static void parse_typedef(SymbolTable *table)
+{
+    match(TOKEN_TYPE_TYPEDEF, "typedef");
+    DataType data_type = parse_data_type(table);
+    Token name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    match(TOKEN_TYPE_SEMI, ";");
+    symbol_table_define_type(table, name, data_type);
+}
+
 static Scope *parse_scope(Function *function, SymbolTable *parent)
 {
     Scope *scope = malloc(sizeof(Scope));
@@ -505,7 +527,7 @@ static Scope *parse_scope(Function *function, SymbolTable *parent)
     match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
     {
-        if (is_data_type_next())
+        if (is_data_type_next(scope->table))
         {
             parse_declaration(function, scope);
             continue;
@@ -521,6 +543,9 @@ static Scope *parse_scope(Function *function, SymbolTable *parent)
                 break;
             case TOKEN_TYPE_WHILE:
                 parse_while(function, scope);
+                break;
+            case TOKEN_TYPE_TYPEDEF:
+                parse_typedef(scope->table);
                 break;
             default:
                 parse_expression_statement(scope);
@@ -549,7 +574,7 @@ static void parse_params(Function *function, Symbol *symbol)
 
         Symbol param;
         param.flags = SYMBOL_ARGUMENT;
-        param.data_type = parse_data_type();
+        param.data_type = parse_data_type(function->table);
         param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
         param.params = NULL;
         param.param_count = 0;
@@ -576,7 +601,7 @@ static void parse_function(Unit *unit)
 
     // Function definition
     Symbol func_symbol;
-    func_symbol.data_type = parse_data_type();
+    func_symbol.data_type = parse_data_type(function.table);
     func_symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     parse_params(&function, &func_symbol);
 
@@ -615,6 +640,10 @@ Unit *parse()
         {
             case TOKEN_TYPE_IDENTIFIER:
                 parse_function(unit);
+                break;
+
+            case TOKEN_TYPE_TYPEDEF:
+                parse_typedef(unit->global_table);
                 break;
 
             default:

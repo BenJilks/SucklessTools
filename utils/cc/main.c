@@ -10,9 +10,6 @@ int main()
 {
     int data_len;
     const char *data = pre_proccess_file("test.c", &data_len);
-    fwrite(data, 1, data_len, stdout);
-    return 0;
-
     lexer_open_memory(data, data_len);
 
     // Parse

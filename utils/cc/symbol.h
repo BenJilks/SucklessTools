@@ -50,16 +50,31 @@ typedef struct Symbol
     int is_variadic;
 } Symbol;
 
+typedef struct TypeDef
+{
+    Token name;
+    DataType type;
+} TypeDef;
+
 typedef struct SymbolTable
 {
     struct SymbolTable *parent;
+
     Symbol **symbols;
     int symbol_count;
+
+    TypeDef *type_defs;
+    int type_def_count;
 } SymbolTable;
 
 SymbolTable *symbol_table_new(SymbolTable *parent);
+
 void symbol_table_add(SymbolTable *table, Symbol symbol);
+void symbol_table_define_type(SymbolTable *table, Token name, DataType type);
+
 Symbol *symbol_table_lookup(SymbolTable *table, Token *name);
+DataType *symbol_table_lookup_type(SymbolTable *table, Token *name);
+
 void free_symbol_table(SymbolTable *table);
 
 #endif // SYMBOL_H
