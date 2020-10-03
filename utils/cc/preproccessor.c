@@ -18,6 +18,9 @@ enum Mode
     MODE_START_OF_LINE,
     MODE_STATEMENT,
     MODE_CODE_NAME,
+    MODE_CODE_COMMENT_SINGLE_LINE,
+    MODE_CODE_COMMENT_MULTI_LINE,
+    MODE_CODE_COMMENT_MULTI_LINE_STAR,
 };
 
 typedef struct Define
@@ -37,6 +40,7 @@ typedef struct State
 
     int should_ignore_code_depth;
     int if_depth;
+    int last_char_slash;
 } State;
 
 static char *pre_proccess_file_with_state(const char *file_path, int *out_length, State *state);
@@ -60,11 +64,39 @@ static void append_buffer(OutBuffer *buffer, char c)
     buffer->data[buffer->size++] = c;
 }
 
-static void append_string(OutBuffer *buffer, const char *str)
+static void on_output_char(char c, OutBuffer *out_buffer, State *state)
+{
+    if (state->last_char_slash)
+    {
+        state->last_char_slash = 0;
+        if (c == '/')
+        {
+            state->mode = MODE_CODE_COMMENT_SINGLE_LINE;
+        }
+        else if (c == '*')
+        {
+            state->mode = MODE_CODE_COMMENT_MULTI_LINE;
+        }
+        else
+        {
+            append_buffer(out_buffer, '/');
+            append_buffer(out_buffer, c);
+        }
+    }
+    else
+    {
+        if (c == '/')
+            state->last_char_slash = 1;
+        else
+            append_buffer(out_buffer, c);
+    }
+}
+
+static void append_string(OutBuffer *buffer, const char *str, State *state)
 {
     int len = strlen(str);
     for (int i = 0; i < len; i++)
-        append_buffer(buffer, str[i]);
+        on_output_char(str[i], buffer, state);
 }
 
 static int ifdef(const char *name, State *state)
@@ -83,12 +115,12 @@ static void check_define(const char *name, OutBuffer *out_buffer, State *state)
     {
         if (!strcmp(name, state->definitions[i].name))
         {
-            append_string(out_buffer, state->definitions[i].value);
+            append_string(out_buffer, state->definitions[i].value, state);
             return;
         }
     }
 
-    append_string(out_buffer, name);
+    append_string(out_buffer, name, state);
 }
 
 static void absolute_include_file_path(char *local_file_path, char *out_buffer)
@@ -211,11 +243,11 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
                 if (isalnum(c))
                     state->name_buffer[state->name_buffer_pointer++] = c;
                 else
-                    append_buffer(out_buffer, c);
+                    on_output_char(c, out_buffer, state);
                 state->mode = MODE_CODE_NAME;
                 break;
             }
-            append_buffer(out_buffer, c);
+            on_output_char(c, out_buffer, state);
             break;
         case MODE_STATEMENT:
             if (c == '\n' || c == '\r')
@@ -238,10 +270,24 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
                 state->name_buffer[state->name_buffer_pointer] = '\0';
                 state->name_buffer_pointer = 0;
                 check_define(state->name_buffer, out_buffer, state);
-                append_buffer(out_buffer, c);
+                on_output_char(c, out_buffer, state);
                 break;
             }
             state->name_buffer[state->name_buffer_pointer++] = c;
+            break;
+        case MODE_CODE_COMMENT_SINGLE_LINE:
+            if (c == '\n' || c == '\r')
+                state->mode = MODE_START_OF_LINE;
+            break;
+        case MODE_CODE_COMMENT_MULTI_LINE:
+            if (c == '*')
+                state->mode = MODE_CODE_COMMENT_MULTI_LINE_STAR;
+            break;
+        case MODE_CODE_COMMENT_MULTI_LINE_STAR:
+            if (c == '/')
+                state->mode = MODE_CODE_NAME;
+            else
+                state->mode = MODE_CODE_COMMENT_MULTI_LINE;
             break;
     }
 
@@ -278,5 +324,6 @@ const char *pre_proccess_file(const char *file_path, int *out_length)
     state.mode = MODE_START_OF_LINE;
     state.should_ignore_code_depth = -1;
     state.if_depth = 0;
+    state.last_char_slash = 0;
     return pre_proccess_file_with_state(file_path, out_length, &state);
 }
