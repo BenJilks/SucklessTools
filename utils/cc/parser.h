@@ -40,6 +40,7 @@ enum ValueType
     __TYPE(SUB) \
     __TYPE(LESS_THAN) \
     __TYPE(REF) \
+    __TYPE(DOT) \
     __TYPE(FUNCTION_CALL)
 
 enum ExpressionType

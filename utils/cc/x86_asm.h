@@ -8,7 +8,8 @@
     __REG(EBP, ebp) \
     __REG(EAX, eax) \
     __REG(EBX, ebx) \
-    __REG(AL, al)
+    __REG(AL, al) \
+    __REG(BL, bl)
 
 enum X86Reg
 {

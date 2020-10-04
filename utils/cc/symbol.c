@@ -70,6 +70,18 @@ DataType *symbol_table_lookup_type(SymbolTable *table, Token *name)
     return NULL;
 }
 
+int symbol_table_size(SymbolTable *table)
+{
+    int total_size = 0;
+    for (int i = 0; i < table->symbol_count; i++)
+        total_size += table->symbols[i]->data_type.size;
+
+    if (table->parent)
+        total_size += symbol_table_size(table->parent);
+
+    return total_size;
+}
+
 void free_symbol_table(SymbolTable *table)
 {
     if (table->symbols)

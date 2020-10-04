@@ -34,6 +34,8 @@ static int get_variable_location(Symbol *variable)
         location = -4 - variable->location;
     else if (variable->flags & SYMBOL_ARGUMENT)
         location = 8 + variable->location;
+    else if (variable->flags & SYMBOL_MEMBER)
+        location = variable->location;
     else
         assert (0);
 
@@ -63,12 +65,19 @@ static X86Value compile_variable(X86Code *code, Symbol *variable)
 static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
 {
     int location = get_variable_location(variable);
-    INST(X86_OP_CODE_MOV_REG_REG, X86_REG_EAX, X86_REG_EBP);
-    if (location > 0)
-        INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_EAX, location);
-    else if (location < 0)
-        INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_EAX, -location);
-    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    if (variable->flags & SYMBOL_MEMBER)
+    {
+        INST(X86_OP_CODE_PUSH_IMM32, location);
+    }
+    else
+    {
+        INST(X86_OP_CODE_MOV_REG_REG, X86_REG_EAX, X86_REG_EBP);
+        if (location > 0)
+            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_EAX, location);
+        else if (location < 0)
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_EAX, -location);
+        INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    }
 
     DataType type = variable->data_type;
     type.pointer_count += 1;
@@ -189,13 +198,33 @@ static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression, enum 
 {
     COMMENT_CODE(code, "Left hand side");
     X86Value lhs = compile_expression(code, expression->left, lhs_mode);
-    compile_cast(code, &lhs, &expression->data_type);
+    if (lhs_mode == EXPRESSION_MODE_RHS)
+        compile_cast(code, &lhs, &expression->data_type);
     COMMENT_CODE(code, "Right hand side");
     X86Value rhs = compile_expression(code, expression->right, EXPRESSION_MODE_RHS);
     compile_cast(code, &rhs, &expression->data_type);
 
     INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+}
+
+static void get_value_from_address(X86Code *code, DataType *type)
+{
+    switch (type->size)
+    {
+        case 1:
+            INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_BL, X86_REG_EAX, 0);
+            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, -1, X86_REG_BL);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 1);
+            break;
+        case 4:
+            INST(X86_OP_CODE_MOV_REG_MEM32_REG_OFF, X86_REG_EBX, X86_REG_EAX, 0);
+            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_ESP, -4, X86_REG_EBX);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
+            break;
+        default:
+            assert (0);
+    }
 }
 
 static X86Value compile_expression(X86Code *code, Expression *expression, enum ExpressionMode mode)
@@ -254,6 +283,24 @@ static X86Value compile_expression(X86Code *code, Expression *expression, enum E
             INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
             INST(X86_OP_CODE_SET_REG_IF_LESS, X86_REG_AL);
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
+        case EXPRESSION_TYPE_DOT:
+        {
+            COMMENT_CODE(code, "Compile dot");
+
+            COMMENT_CODE(code, "Left hand side");
+            compile_expression(code, expression->left, EXPRESSION_MODE_LHS);
+            compile_expression(code, expression->right, EXPRESSION_MODE_LHS);
+            INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
+            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
+
+            if (mode == EXPRESSION_MODE_LHS)
+                INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            else
+                get_value_from_address(code, &expression->data_type);
+
             return (X86Value) { expression->data_type };
         }
         case EXPRESSION_TYPE_FUNCTION_CALL:

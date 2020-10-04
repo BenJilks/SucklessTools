@@ -6,7 +6,8 @@
 enum DataTypeFlags
 {
     DATA_TYPE_CONST     = 1 << 0,
-    DATA_TYPE_PRIMITIVE = 1 << 1
+    DATA_TYPE_PRIMITIVE = 1 << 1,
+    DATA_TYPE_STRUCT    = 1 << 2,
 };
 
 enum Primitive
@@ -19,6 +20,7 @@ enum Primitive
     PRIMITIVE_CHAR,
 };
 
+struct SymbolTable;
 typedef struct DataType
 {
     Token name;
@@ -26,6 +28,7 @@ typedef struct DataType
 
     enum DataTypeFlags flags;
     enum Primitive primitive;
+    struct SymbolTable *members;
     int pointer_count;
 } DataType;
 
@@ -36,6 +39,7 @@ enum SymbolFlags
     SYMBOL_GLOBAL   = 1 << 2,
     SYMBOL_FUNCTION = 1 << 3,
     SYMBOL_ARGUMENT = 1 << 4,
+    SYMBOL_MEMBER   = 1 << 5,
 };
 
 typedef struct Symbol
@@ -74,6 +78,7 @@ void symbol_table_define_type(SymbolTable *table, Token name, DataType type);
 
 Symbol *symbol_table_lookup(SymbolTable *table, Token *name);
 DataType *symbol_table_lookup_type(SymbolTable *table, Token *name);
+int symbol_table_size(SymbolTable *table);
 
 void free_symbol_table(SymbolTable *table);
 

@@ -256,10 +256,9 @@ static Token lexer_next()
                     break;
                 }
 
-                ERROR("Unexpected char '%c'", g_c);
                 state = STATE_INITIAL;
                 g_should_reconsume = 1;
-                break;
+                return make_single_char_token(TOKEN_TYPE_DOT);
 
             case STATE_DOT_DOT:
                 if (g_c == '.')

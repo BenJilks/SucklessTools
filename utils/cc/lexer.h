@@ -25,7 +25,8 @@
     __TOKEN_TYPE(SUBTRACT) \
     __TOKEN_TYPE(WHILE) \
     __TOKEN_TYPE(TYPEDEF) \
-    __TOKEN_TYPE(STRUCT)
+    __TOKEN_TYPE(STRUCT) \
+    __TOKEN_TYPE(DOT)
 
 enum TokenType
 {
