@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <memory.h>
 
-#define DEBUG(...) fprintf(stderr, __VA_ARGS__)
+static Expression *parse_expression(SymbolTable *table);
+static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type);
+static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent);
 
 static void match(enum TokenType type, const char *name)
 {
@@ -206,7 +208,6 @@ static void add_statement_to_scope(Scope *scope, Statement statement)
     scope->statement_count += 1;
 }
 
-static Expression *parse_expression(SymbolTable *table);
 static Expression *parse_function_call(SymbolTable *table, Expression *left)
 {
     Symbol *function_symbol = left->value.v;
@@ -311,7 +312,6 @@ static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
     return expression;
 }
 
-static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type);
 static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType type, DataType *lhs_data_type)
 {
     Expression *expression = malloc(sizeof(Expression));
@@ -535,7 +535,6 @@ static int is_data_type_next(SymbolTable *table)
 
 static void parse_expression_statement(Scope *scope)
 {
-    DEBUG("Expression statement\n");
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
     statement.expression = parse_expression(scope->table);
@@ -558,7 +557,6 @@ static void parse_return(Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
-static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent);
 static void parse_if(Function *function, Unit *unit, Scope *scope)
 {
     match(TOKEN_TYPE_IF, "if");

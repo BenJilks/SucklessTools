@@ -79,6 +79,7 @@ void symbol_table_define_type(SymbolTable *table, Token name, DataType type);
 Symbol *symbol_table_lookup(SymbolTable *table, Token *name);
 DataType *symbol_table_lookup_type(SymbolTable *table, Token *name);
 int symbol_table_size(SymbolTable *table);
+int data_type_equals(DataType *lhs, DataType *rhs);
 
 void free_symbol_table(SymbolTable *table);
 

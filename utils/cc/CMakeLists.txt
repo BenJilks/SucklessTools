@@ -9,6 +9,7 @@ set(SOURCES
         preproccessor.c
         dumpast.c
         x86.c
+        x86_expression.c
         x86_asm.c
 )
 

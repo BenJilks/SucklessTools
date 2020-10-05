@@ -164,7 +164,7 @@ static void dump_function(Function *function)
         fprintf(stderr, "%s ", printable_data_type(&param->data_type));
         fprintf(stderr, "%s", lexer_printable_token_data(&param->name));
         if (i != function->func_symbol.param_count - 1)
-            printf(", ");
+            fprintf(stderr, ", ");
     }
     fprintf(stderr, ") -> %s\n", printable_data_type(&function->func_symbol.data_type));
     if (function->body)
