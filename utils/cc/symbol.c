@@ -93,6 +93,13 @@ int data_type_equals(DataType *lhs, DataType *rhs)
     return 1;
 }
 
+int data_type_size(DataType *data_type)
+{
+    if (data_type->pointer_count > 0)
+        return 4; // NOTE: 32bit only
+    return data_type->size;
+}
+
 void free_symbol_table(SymbolTable *table)
 {
     if (table->symbols)

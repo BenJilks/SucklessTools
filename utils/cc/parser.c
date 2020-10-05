@@ -489,7 +489,7 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
         symbol.params = NULL;
         symbol.param_count = 0;
         symbol_table_add(scope->table, symbol);
-        function->stack_size += symbol.data_type.size;
+        function->stack_size += data_type_size(&symbol.data_type);
 
         // Create statement
         curr_statement->type = STATEMENT_TYPE_DECLARATION;
@@ -657,7 +657,7 @@ static void parse_params(Function *function, Unit *unit, Symbol *symbol)
         param.param_count = 0;
 
         param.location = function->argument_size;
-        function->argument_size += param.data_type.size;
+        function->argument_size += data_type_size(&param.data_type);
 
         append_buffer(&params_buffer, &param);
         symbol_table_add(function->table, param);

@@ -77,7 +77,7 @@ static int get_variable_location(Symbol *variable)
 {
     int location;
     if (variable->flags & SYMBOL_LOCAL)
-        location = -variable->data_type.size - variable->location;
+        location = -data_type_size(&variable->data_type) - variable->location;
     else if (variable->flags & SYMBOL_ARGUMENT)
         location = 8 + variable->location;
     else if (variable->flags & SYMBOL_MEMBER)
@@ -90,7 +90,7 @@ static int get_variable_location(Symbol *variable)
 
 static void get_value_from_address(X86Code *code, DataType *type)
 {
-    switch (type->size)
+    switch (data_type_size(type))
     {
         case 1:
             INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_BL, X86_REG_EAX, 0);
@@ -110,7 +110,8 @@ static void get_value_from_address(X86Code *code, DataType *type)
 static X86Value compile_variable(X86Code *code, Symbol *variable)
 {
     int location = get_variable_location(variable);
-    switch (variable->data_type.size)
+    int type_size = data_type_size(&variable->data_type);
+    switch (type_size)
     {
         case 1:
             INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_EBP, location);
@@ -121,12 +122,12 @@ static X86Value compile_variable(X86Code *code, Symbol *variable)
             INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
             break;
         default:
-            for (int i = 0; i < variable->data_type.size; i++)
+            for (int i = 0; i < type_size; i++)
             {
                 INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_EBP, location + i);
-                INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, -variable->data_type.size + i, X86_REG_AL);
+                INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, -type_size + i, X86_REG_AL);
             }
-            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, variable->data_type.size);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, type_size);
             break;
     }
 
@@ -202,15 +203,15 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
 
         X86Value value = compile_expression(code, expression->arguments[i], EXPRESSION_MODE_RHS);
         compile_cast(code, &value, &argument_type);
-        argument_size += argument_type.size;
+        argument_size += data_type_size(&argument_type);
     }
 
     COMMENT_CODE(code, "Do call");
     INST(X86_OP_CODE_CALL_LABEL, lexer_printable_token_data(&func_name));
     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, argument_size);
-    if (func_symbol->data_type.size == 4)
+    if (data_type_size(&func_symbol->data_type) == 4)
         INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-    else if (func_symbol->data_type.size != 0)
+    else if (data_type_size(&func_symbol->data_type) != 0)
         assert (0);
     return (X86Value) { func_symbol->data_type };
 }
@@ -240,7 +241,7 @@ static X86Value compile_assign_expression(X86Code *code, Expression *expression)
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
 
     COMMENT_CODE(code, "Do assign operation");
-    switch (expression->data_type.size)
+    switch (data_type_size(&expression->data_type))
     {
         case 1:
             INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
@@ -251,7 +252,7 @@ static X86Value compile_assign_expression(X86Code *code, Expression *expression)
             INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EAX, 0, X86_REG_EBX);
             break;
         default:
-            for (int i = 0; i < expression->data_type.size; i++)
+            for (int i = 0; i < data_type_size(&expression->data_type); i++)
             {
                 INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_BL, X86_REG_ESP, i);
                 INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EAX, i, X86_REG_BL);
@@ -268,7 +269,7 @@ void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
     compile_cast(code, value, &variable->data_type);
 
     int location = get_variable_location(variable);
-    switch (variable->data_type.size)
+    switch (data_type_size(&variable->data_type))
     {
         case 1:
             // FIXME: This doesn't look right to me
@@ -280,12 +281,12 @@ void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
             INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
             break;
         default:
-            for (int i = 0; i < variable->data_type.size; i++)
+            for (int i = 0; i < data_type_size(&variable->data_type); i++)
             {
                 INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, i);
                 INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location + i, X86_REG_AL);
             }
-            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, variable->data_type.size);
+            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, data_type_size(&variable->data_type));
             break;
     }
 }

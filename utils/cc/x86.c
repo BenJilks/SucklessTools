@@ -67,7 +67,7 @@ static void compile_expression_statement(X86Code *code, Statement *statement)
     X86Value value = compile_expression(code, statement->expression, EXPRESSION_MODE_RHS);
 
     COMMENT_CODE(code, "Pop unused value");
-    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, value.data_type.size);
+    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, data_type_size(&value.data_type));
 }
 
 static void compile_scope(X86Code *code, Scope *scope)
