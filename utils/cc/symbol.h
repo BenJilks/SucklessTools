@@ -40,6 +40,7 @@ enum SymbolFlags
     SYMBOL_FUNCTION = 1 << 3,
     SYMBOL_ARGUMENT = 1 << 4,
     SYMBOL_MEMBER   = 1 << 5,
+    SYMBOL_ARRAY    = 1 << 6,
 };
 
 typedef struct Symbol
@@ -48,6 +49,7 @@ typedef struct Symbol
     DataType data_type;
     int flags;
     int location;
+    int array_count;
 
     struct Symbol *params;
     int param_count;
@@ -81,6 +83,7 @@ DataType *symbol_table_lookup_type(SymbolTable *table, Token *name);
 int symbol_table_size(SymbolTable *table);
 int data_type_equals(DataType *lhs, DataType *rhs);
 int data_type_size(DataType *data_type);
+int symbol_size(Symbol *symbol);
 
 void free_symbol_table(SymbolTable *table);
 

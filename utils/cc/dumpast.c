@@ -74,6 +74,11 @@ static void dump_expression(Expression *expression, int indent)
             dump_expression(expression->left, indent + 1);
             dump_expression(expression->right, indent + 1);
             break;
+        case EXPRESSION_TYPE_INDEX:
+            fprintf(stderr, "Index:\n");
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
         case EXPRESSION_TYPE_FUNCTION_CALL:
             fprintf(stderr, "Call:\n");
             dump_expression(expression->left, indent + 1);

@@ -63,6 +63,7 @@ typedef struct X86Argument
     __OP_CODE(ADD_REG_REG,             REG,    REG,    NONE,   add)  \
     __OP_CODE(ADD_REG_IMM8,            REG,    IMM8,   NONE,   add)  \
     __OP_CODE(MUL_REG_REG,             REG,    REG,    NONE,   imul)  \
+    __OP_CODE(MUL_REG_IMM8,            REG,    IMM8,   NONE,   imul)  \
     __OP_CODE(CMP_REG_IMM32,           REG,    IMM32,  NONE,   cmp)  \
     __OP_CODE(CMP_REG_REG,             REG,    REG,    NONE,   cmp)  \
     __OP_CODE(AND_REG_IMM32,           REG,    IMM32,  NONE,   and)  \

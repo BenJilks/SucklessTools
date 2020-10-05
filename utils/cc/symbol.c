@@ -100,6 +100,15 @@ int data_type_size(DataType *data_type)
     return data_type->size;
 }
 
+int symbol_size(Symbol *symbol)
+{
+    int type_size = data_type_size(&symbol->data_type);
+    if (symbol->flags & SYMBOL_ARRAY)
+        return type_size * symbol->array_count;
+    else
+        return type_size;
+}
+
 void free_symbol_table(SymbolTable *table)
 {
     if (table->symbols)

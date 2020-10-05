@@ -77,7 +77,7 @@ static int get_variable_location(Symbol *variable)
 {
     int location;
     if (variable->flags & SYMBOL_LOCAL)
-        location = -data_type_size(&variable->data_type) - variable->location;
+        location = -symbol_size(variable) - variable->location;
     else if (variable->flags & SYMBOL_ARGUMENT)
         location = 8 + variable->location;
     else if (variable->flags & SYMBOL_MEMBER)
@@ -107,10 +107,37 @@ static void get_value_from_address(X86Code *code, DataType *type)
     }
 }
 
+static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
+{
+    int location = get_variable_location(variable);
+    if (variable->flags & SYMBOL_MEMBER)
+    {
+        INST(X86_OP_CODE_PUSH_IMM32, location);
+    }
+    else
+    {
+        INST(X86_OP_CODE_MOV_REG_REG, X86_REG_EAX, X86_REG_EBP);
+        if (location > 0)
+            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_EAX, location);
+        else if (location < 0)
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_EAX, -location);
+        INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    }
+
+    DataType type = variable->data_type;
+    type.pointer_count += 1;
+    return (X86Value) { type };
+}
+
 static X86Value compile_variable(X86Code *code, Symbol *variable)
 {
     int location = get_variable_location(variable);
     int type_size = data_type_size(&variable->data_type);
+
+    // NOTE: Arrays should return their pointer
+    if (variable->flags & SYMBOL_ARRAY)
+        return compile_variable_pointer(code, variable);
+
     switch (type_size)
     {
         case 1:
@@ -132,28 +159,6 @@ static X86Value compile_variable(X86Code *code, Symbol *variable)
     }
 
     return (X86Value) { variable->data_type };
-}
-
-static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
-{
-    int location = get_variable_location(variable);
-    if (variable->flags & SYMBOL_MEMBER)
-    {
-        INST(X86_OP_CODE_PUSH_IMM32, location);
-    }
-    else
-    {
-        INST(X86_OP_CODE_MOV_REG_REG, X86_REG_EAX, X86_REG_EBP);
-        if (location > 0)
-            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_EAX, location);
-        else if (location < 0)
-            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_EAX, -location);
-        INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-    }
-
-    DataType type = variable->data_type;
-    type.pointer_count += 1;
-    return (X86Value) { type };
 }
 
 static void compile_string(X86Code *code, Value *value)
@@ -230,6 +235,34 @@ static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression, enum 
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
 }
 
+void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
+{
+    COMMENT_CODE(code, "Assign vairable %s", lexer_printable_token_data(&variable->name));
+    compile_cast(code, value, &variable->data_type);
+
+    int location = get_variable_location(variable);
+    switch (data_type_size(&variable->data_type))
+    {
+        case 1:
+            // FIXME: This doesn't look right to me
+            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location, X86_REG_AL);
+            break;
+        case 4:
+            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
+            break;
+        default:
+            for (int i = 0; i < data_type_size(&variable->data_type); i++)
+            {
+                INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, i);
+                INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location + i, X86_REG_AL);
+            }
+            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, data_type_size(&variable->data_type));
+            break;
+    }
+}
+
 static X86Value compile_assign_expression(X86Code *code, Expression *expression)
 {
     COMMENT_CODE(code, "Compile assign");
@@ -263,32 +296,29 @@ static X86Value compile_assign_expression(X86Code *code, Expression *expression)
     return (X86Value) { expression->data_type };
 }
 
-void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
+static X86Value compile_index_expression(X86Code *code, Expression *expression, enum ExpressionMode mode)
 {
-    COMMENT_CODE(code, "Assign vairable %s", lexer_printable_token_data(&variable->name));
-    compile_cast(code, value, &variable->data_type);
+    DataType offset_type = dt_int();
 
-    int location = get_variable_location(variable);
-    switch (data_type_size(&variable->data_type))
-    {
-        case 1:
-            // FIXME: This doesn't look right to me
-            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
-            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location, X86_REG_AL);
-            break;
-        case 4:
-            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
-            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
-            break;
-        default:
-            for (int i = 0; i < data_type_size(&variable->data_type); i++)
-            {
-                INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, i);
-                INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location + i, X86_REG_AL);
-            }
-            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, data_type_size(&variable->data_type));
-            break;
-    }
+    COMMENT_CODE(code, "Compile index");
+    COMMENT_CODE(code, "Compile value");
+    compile_expression(code, expression->left, EXPRESSION_MODE_LHS);
+    COMMENT_CODE(code, "Compile offset");
+    X86Value offset = compile_expression(code, expression->right, EXPRESSION_MODE_RHS);
+    compile_cast(code, &offset, &offset_type);
+
+    COMMENT_CODE(code, "Add pointer and offset");
+    INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
+    INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+    INST(X86_OP_CODE_MUL_REG_IMM8, X86_REG_EBX, data_type_size(&expression->data_type));
+    INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
+
+    if (mode == EXPRESSION_MODE_LHS)
+        INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    else
+        get_value_from_address(code, &expression->data_type);
+
+    return (X86Value) { expression->data_type };
 }
 
 X86Value compile_expression(X86Code *code, Expression *expression, enum ExpressionMode mode)
@@ -359,6 +389,8 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
 
             return (X86Value) { expression->data_type };
         }
+        case EXPRESSION_TYPE_INDEX:
+            return compile_index_expression(code, expression, mode);
         case EXPRESSION_TYPE_FUNCTION_CALL:
             return compile_fuction_call(code, expression);
         case EXPRESSION_TYPE_REF:

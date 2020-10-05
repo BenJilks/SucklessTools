@@ -371,6 +371,8 @@ static enum ExpressionType expression_type_from_token_type(enum TokenType token_
             return EXPRESSION_TYPE_MUL;
         case TOKEN_TYPE_DOT:
             return EXPRESSION_TYPE_DOT;
+        case TOKEN_TYPE_OPEN_SQUARE:
+            return EXPRESSION_TYPE_INDEX;
         default:
             assert (0);
     }
@@ -381,7 +383,7 @@ static Expression *parse_access_op(SymbolTable *table, DataType *lhs_data_type)
     Expression *left = parse_unary_operator(table, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
-    while (operation_type == TOKEN_TYPE_DOT)
+    while (operation_type == TOKEN_TYPE_DOT || operation_type == TOKEN_TYPE_OPEN_SQUARE)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);
@@ -389,6 +391,8 @@ static Expression *parse_access_op(SymbolTable *table, DataType *lhs_data_type)
         left = create_operation_expression(left, op, right);
         left->data_type = right->data_type;
 
+        if (operation_type == TOKEN_TYPE_OPEN_SQUARE)
+            match(TOKEN_TYPE_CLOSE_SQUARE, "]");
         operation_type = lexer_peek(0).type;
     }
 
@@ -488,8 +492,20 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
         symbol.location = function->stack_size;
         symbol.params = NULL;
         symbol.param_count = 0;
+        symbol.array_count = 1;
+
+        // Parse array size, if there is any
+        if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUARE)
+        {
+            match(TOKEN_TYPE_OPEN_SQUARE, "[");
+            Token count_token = lexer_consume(TOKEN_TYPE_INTEGER);
+            symbol.array_count = atoi(lexer_printable_token_data(&count_token));
+            symbol.flags |= SYMBOL_ARRAY;
+            match(TOKEN_TYPE_CLOSE_SQUARE, "]");
+        }
+
         symbol_table_add(scope->table, symbol);
-        function->stack_size += data_type_size(&symbol.data_type);
+        function->stack_size += symbol_size(&symbol);
 
         // Create statement
         curr_statement->type = STATEMENT_TYPE_DECLARATION;
@@ -657,7 +673,7 @@ static void parse_params(Function *function, Unit *unit, Symbol *symbol)
         param.param_count = 0;
 
         param.location = function->argument_size;
-        function->argument_size += data_type_size(&param.data_type);
+        function->argument_size += symbol_size(&param);
 
         append_buffer(&params_buffer, &param);
         symbol_table_add(function->table, param);
