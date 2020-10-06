@@ -95,6 +95,12 @@ static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
             }
             expression->data_type = value->v->data_type;
             break;
+        case TOKEN_TYPE_OPEN_BRACKET:
+            match(TOKEN_TYPE_OPEN_BRACKET, "(");
+            free(expression);
+            expression = parse_expression(table);
+            match(TOKEN_TYPE_CLOSE_BRACKET, ")");
+            break;
         default:
             ERROR("Expected expression, got '%s' instead",
                 lexer_printable_token_data(&token));
