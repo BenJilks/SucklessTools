@@ -24,7 +24,9 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                     return *value;
                 case PRIMITIVE_CHAR:
                     COMMENT_CODE(code, "Cast int to char");
-                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
+                    INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
+                    INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
                     return (X86Value) { dt_char() };
                 default:
                     break;
@@ -244,9 +246,9 @@ void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
     switch (data_type_size(&variable->data_type))
     {
         case 1:
-            // FIXME: This doesn't look right to me
-            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
             INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_EBP, location, X86_REG_AL);
+            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 1);
             break;
         case 4:
             INST(X86_OP_CODE_POP_REG, X86_REG_EAX);

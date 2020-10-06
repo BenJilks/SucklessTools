@@ -3,6 +3,7 @@
 
 #include "lexer.h"
 #include "symbol.h"
+#include "expression.h"
 
 #define ENUMERATE_STATEMENT_TYPE \
     __TYPE(DECLARATION) \
@@ -18,63 +19,6 @@ enum StatementType
     ENUMERATE_STATEMENT_TYPE
 #undef __TYPE
 };
-
-#define ENUMERATE_VALUE_TYPE \
-    __TYPE(INT) \
-    __TYPE(FLOAT) \
-    __TYPE(STRING) \
-    __TYPE(VARIABLE)
-
-enum ValueType
-{
-#define __TYPE(x) VALUE_TYPE_##x,
-    ENUMERATE_VALUE_TYPE
-#undef __TYPE
-};
-
-#define ENUMERATE_EXPRESSION_TYPE \
-    __TYPE(VALUE) \
-    __TYPE(ASSIGN) \
-    __TYPE(ADD) \
-    __TYPE(MUL) \
-    __TYPE(SUB) \
-    __TYPE(LESS_THAN) \
-    __TYPE(REF) \
-    __TYPE(DOT) \
-    __TYPE(INDEX) \
-    __TYPE(FUNCTION_CALL)
-
-enum ExpressionType
-{
-#define __TYPE(x) EXPRESSION_TYPE_##x,
-    ENUMERATE_EXPRESSION_TYPE
-#undef __TYPE
-};
-
-typedef struct Value
-{
-    enum ValueType type;
-    union
-    {
-        int i;
-        float f;
-        Symbol *v;
-        Token s;
-    };
-} Value;
-
-typedef struct Expression
-{
-    enum ExpressionType type;
-    DataType data_type;
-
-    Value value;
-    struct Expression *left;
-    struct Expression *right;
-
-    struct Expression **arguments;
-    int argument_length;
-} Expression;
 
 struct Scope;
 typedef struct Statement
@@ -123,6 +67,18 @@ typedef struct Unit
     SymbolTable *global_table;
 } Unit;
 
+typedef struct Buffer
+{
+    void *memory;
+    int unit_size;
+
+    int *count;
+    int buffer;
+} Buffer;
+Buffer make_buffer(void **memory, int *count, int unit_size);
+void append_buffer(Buffer*, void *item);
+
+void match(enum TokenType, const char *name);
 Unit *parse();
 void free_unit(Unit *unit);
 
