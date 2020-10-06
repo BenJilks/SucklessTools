@@ -137,11 +137,78 @@ static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_t
 static DataType find_data_type_of_operation(
     DataType *left, enum ExpressionType operation, DataType *right)
 {
-    // FIXME: This should actully find the correct type. For
-    //        now we just take the left hand side one
-    (void)operation;
-    (void)right;
-    return *left;
+    (void) operation;
+    if (!(left->flags & DATA_TYPE_PRIMITIVE) || !(right->flags & DATA_TYPE_PRIMITIVE))
+        assert (0); // FIXME: Handle this
+
+    switch (left->primitive)
+    {
+        case PRIMITIVE_INT:
+            switch (right->primitive)
+            {
+                case PRIMITIVE_INT:
+                    return *left;
+                case PRIMITIVE_CHAR:
+                    return *left;
+                case PRIMITIVE_FLOAT:
+                    return *right;
+                case PRIMITIVE_DOUBLE:
+                    return *right;
+                default:
+                    break;
+            }
+            break;
+        case PRIMITIVE_CHAR:
+            switch (right->primitive)
+            {
+                case PRIMITIVE_INT:
+                    return *right;
+                case PRIMITIVE_CHAR:
+                    return *left;
+                case PRIMITIVE_FLOAT:
+                    return *right;
+                case PRIMITIVE_DOUBLE:
+                    return *right;
+                default:
+                    break;
+            }
+            break;
+        case PRIMITIVE_FLOAT:
+            switch (right->primitive)
+            {
+                case PRIMITIVE_INT:
+                    return *left;
+                case PRIMITIVE_CHAR:
+                    return *left;
+                case PRIMITIVE_FLOAT:
+                    return *left;
+                case PRIMITIVE_DOUBLE:
+                    return *right;
+                default:
+                    break;
+            }
+            break;
+        case PRIMITIVE_DOUBLE:
+            switch (right->primitive)
+            {
+                case PRIMITIVE_INT:
+                    return *left;
+                case PRIMITIVE_CHAR:
+                    return *left;
+                case PRIMITIVE_FLOAT:
+                    return *left;
+                case PRIMITIVE_DOUBLE:
+                    return *left;
+                default:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+
+    printf("Invalid operation\n");
+    assert (0);
 }
 
 static Expression *create_operation_expression(Expression *left, enum ExpressionType op, Expression *right)
