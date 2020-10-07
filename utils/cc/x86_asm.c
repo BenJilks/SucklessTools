@@ -137,6 +137,14 @@ static X86Argument imm32(uint32_t imm32, X86Code *code)
     arg.imm32 = imm32;
     return arg;
 }
+static X86Argument off64(uint8_t off, X86Code *code)
+{
+    (void)code;
+    X86Argument arg;
+    arg.type = X86_ARGUMENT_TYPE_OFF64;
+    arg.off = off;
+    return arg;
+}
 static X86Argument off32(uint8_t off, X86Code *code)
 {
     (void)code;
@@ -190,6 +198,8 @@ X86Instruction x86(X86Code *code, enum X86OpCode op_code, ...)
 #define ARG_TYPE_IMM32 int
 #define ARG_FUNC_OFF32 off32
 #define ARG_TYPE_OFF32 int
+#define ARG_FUNC_OFF64 off64
+#define ARG_TYPE_OFF64 int
 #define ARG_FUNC_OFF8 off8
 #define ARG_TYPE_OFF8 int
 #define ARG_FUNC_LABEL label
@@ -250,7 +260,9 @@ static void dump_argument(X86Argument *argument, int is_first)
 
 static int is_offset(enum X86ArgumentType type)
 {
-    return type == X86_ARGUMENT_TYPE_OFF32 || type == X86_ARGUMENT_TYPE_OFF8;
+    return type == X86_ARGUMENT_TYPE_OFF64 ||
+           type == X86_ARGUMENT_TYPE_OFF32 ||
+           type == X86_ARGUMENT_TYPE_OFF8;
 }
 
 static void dump_offset(X86Argument *a, X86Argument *b, int is_first)
@@ -262,6 +274,9 @@ static void dump_offset(X86Argument *a, X86Argument *b, int is_first)
             break;
         case X86_ARGUMENT_TYPE_OFF32:
             printf("%sdword [", is_first ? "" : ", ");
+            break;
+        case X86_ARGUMENT_TYPE_OFF64:
+            printf("%sqword [", is_first ? "" : ", ");
             break;
         default:
             assert (0);

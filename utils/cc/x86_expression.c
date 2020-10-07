@@ -28,6 +28,10 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
                     INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
                     return (X86Value) { dt_char() };
+                case PRIMITIVE_FLOAT:
+                    INST(X86_OP_CODE_FLOAD_INT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_float() };
                 default:
                     break;
             }
@@ -37,6 +41,11 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
             {
                 case PRIMITIVE_FLOAT:
                     return *value;
+                case PRIMITIVE_DOUBLE:
+                    INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM64_REG_OFF, X86_REG_ESP, -4);
+                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
+                    return (X86Value) { dt_double() };
                 default:
                     break;
             }
@@ -150,6 +159,10 @@ static X86Value compile_variable(X86Code *code, Symbol *variable)
         case 4:
             INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
             break;
+        case 8:
+            INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location+4);
+            INST(X86_OP_CODE_PUSH_MEM32_REG_OFF, X86_REG_EBP, location);
+            break;
         default:
             for (int i = 0; i < type_size; i++)
             {
@@ -179,7 +192,7 @@ static X86Value compile_value(X86Code *code, Value *value, enum ExpressionMode m
             INST(X86_OP_CODE_PUSH_IMM32, value->i);
             return (X86Value) { dt_int() };
         case VALUE_TYPE_FLOAT:
-            INST(X86_OP_CODE_PUSH_IMM32, value->f);
+            INST(X86_OP_CODE_PUSH_IMM32, *(int*)&value->f);
             return (X86Value) { dt_float() };
         case VALUE_TYPE_STRING:
             compile_string(code, value);
@@ -204,11 +217,22 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
     for (int i = expression->argument_length - 1; i >= 0; i--)
     {
         COMMENT_CODE(code, "Argument %i", i);
-        DataType argument_type = dt_int();
-        if (i < func_symbol->param_count)
-            argument_type = func_symbol->params[i].data_type;
-
         X86Value value = compile_expression(code, expression->arguments[i], EXPRESSION_MODE_RHS);
+
+        DataType argument_type = func_symbol->params[i].data_type;
+        if (i >= func_symbol->param_count)
+        {
+            argument_type = value.data_type;
+            if (argument_type.flags & DATA_TYPE_PRIMITIVE)
+            {
+                // NOTE: I think this is how it works?
+                if (argument_type.primitive == PRIMITIVE_FLOAT)
+                    argument_type = dt_double();
+                else if (argument_type.primitive == PRIMITIVE_CHAR)
+                    argument_type = dt_char();
+            }
+        }
+
         compile_cast(code, &value, &argument_type);
         argument_size += data_type_size(&argument_type);
     }
@@ -223,15 +247,16 @@ static X86Value compile_fuction_call(X86Code *code, Expression *expression)
     return (X86Value) { func_symbol->data_type };
 }
 
-static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression, enum ExpressionMode lhs_mode)
+static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression, enum ExpressionMode lhs_mode,
+    X86Value *lhs, X86Value *rhs)
 {
     COMMENT_CODE(code, "Left hand side");
-    X86Value lhs = compile_expression(code, expression->left, lhs_mode);
+    *lhs = compile_expression(code, expression->left, lhs_mode);
     if (lhs_mode == EXPRESSION_MODE_RHS)
-        compile_cast(code, &lhs, &expression->data_type);
+        compile_cast(code, lhs, &expression->data_type);
     COMMENT_CODE(code, "Right hand side");
-    X86Value rhs = compile_expression(code, expression->right, EXPRESSION_MODE_RHS);
-    compile_cast(code, &rhs, &expression->data_type);
+    *rhs = compile_expression(code, expression->right, EXPRESSION_MODE_RHS);
+    compile_cast(code, rhs, &expression->data_type);
 
     INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
@@ -253,6 +278,12 @@ void compile_assign_variable(X86Code *code, Symbol *variable, X86Value *value)
         case 4:
             INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
             INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
+            break;
+        case 8:
+            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location, X86_REG_EAX);
+            INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_MOV_MEM32_REG_OFF_REG, X86_REG_EBP, location+4, X86_REG_EAX);
             break;
         default:
             for (int i = 0; i < data_type_size(&variable->data_type); i++)
@@ -323,6 +354,42 @@ static X86Value compile_index_expression(X86Code *code, Expression *expression, 
     return (X86Value) { expression->data_type };
 }
 
+X86Value compile_add_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *return_type)
+{
+    // NOTE: we'll need this when we optimise, but not yet
+    (void) lhs;
+    (void) rhs;
+
+    assert (return_type->flags & DATA_TYPE_PRIMITIVE);
+    switch (return_type->primitive)
+    {
+        case PRIMITIVE_INT:
+            INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            break;
+        case PRIMITIVE_CHAR:
+            INST(X86_OP_CODE_ADD_REG_REG, X86_REG_AL, X86_REG_BL);
+            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 1);
+            break;
+        case PRIMITIVE_FLOAT:
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EBX);
+            INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
+            INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 8);
+
+            INST(X86_OP_CODE_FADD_POP_REG_REG, X86_REG_ST1, X86_REG_ST0);
+            INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, -4);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
+            break;
+        default:
+            assert (0);
+    }
+
+    return (X86Value) { *return_type };
+}
+
 X86Value compile_expression(X86Code *code, Expression *expression, enum ExpressionMode mode)
 {
     switch (expression->type)
@@ -334,17 +401,17 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
         case EXPRESSION_TYPE_ADD:
         {
             COMMENT_CODE(code, "Compile add");
-            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do add operation");
-            INST(X86_OP_CODE_ADD_REG_REG, X86_REG_EAX, X86_REG_EBX);
-            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-            return (X86Value) { expression->data_type };
+            return compile_add_operation(code, &lhs, &rhs, &expression->data_type);
         }
         case EXPRESSION_TYPE_SUB:
         {
             COMMENT_CODE(code, "Compile sub");
-            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do sub operation");
             INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
@@ -354,7 +421,8 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
         case EXPRESSION_TYPE_MUL:
         {
             COMMENT_CODE(code, "Compile mul");
-            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do mul operation");
             INST(X86_OP_CODE_MUL_REG_REG, X86_REG_EAX, X86_REG_EBX);
@@ -364,7 +432,8 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
         case EXPRESSION_TYPE_LESS_THAN:
         {
             COMMENT_CODE(code, "Compile less than");
-            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS);
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do add operation");
             INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);

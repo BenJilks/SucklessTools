@@ -56,7 +56,7 @@ static int size_from_primitive(enum Primitive primitive)
 #define PRIMITIVE_DATA_TYPE(name, primitive) \
     DataType dt_##name() \
     { \
-        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER }, 4, DATA_TYPE_PRIMITIVE, primitive, NULL, 0 }; \
+        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER }, sizeof(name), DATA_TYPE_PRIMITIVE, primitive, NULL, 0 }; \
     }
 
 PRIMITIVE_DATA_TYPE(void, PRIMITIVE_VOID);
@@ -142,6 +142,27 @@ static DataType parse_struct_type(Unit *unit)
     return data_type;
 }
 
+static DataType parse_unsigned_type()
+{
+    match(TOKEN_TYPE_UNSIGNED, "unsigned");
+
+    // The default base type is 'int'
+    DataType data_type = dt_int();
+    if (lexer_peek(0).type == TOKEN_TYPE_IDENTIFIER)
+    {
+        // Check if the next token contains a primitive type
+        Token name = lexer_peek(0);
+        enum Primitive primitive = primitive_from_name(&name);
+
+        // If so, parse it and use it as the base type
+        if (primitive != PRIMITIVE_NONE)
+            data_type = parse_primitive();
+    }
+
+    data_type.flags |= DATA_TYPE_UNSIGNED;
+    return data_type;
+}
+
 static DataType parse_data_type(Unit *unit, SymbolTable *table)
 {
     // Check for typedefs
@@ -156,6 +177,8 @@ static DataType parse_data_type(Unit *unit, SymbolTable *table)
 
     if (name.type == TOKEN_TYPE_STRUCT)
         return parse_struct_type(unit);
+    else if (name.type == TOKEN_TYPE_UNSIGNED)
+        return parse_unsigned_type();
 
     // Otherwise, parse normally
     return parse_primitive();
@@ -270,6 +293,8 @@ static int is_data_type_next(SymbolTable *table)
         case TOKEN_TYPE_CONST:
             return 1;
         case TOKEN_TYPE_STRUCT:
+            return 1;
+        case TOKEN_TYPE_UNSIGNED:
             return 1;
         case TOKEN_TYPE_IDENTIFIER:
             if (primitive_from_name(&token) != PRIMITIVE_NONE ||

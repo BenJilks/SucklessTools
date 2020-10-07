@@ -101,6 +101,11 @@ char *printable_data_type(DataType *data_type)
         sprintf(buffer, "const ");
         buffer_pointer += 6;
     }
+    if (data_type->flags & DATA_TYPE_UNSIGNED)
+    {
+        sprintf(buffer, "unsigned ");
+        buffer_pointer += 9;
+    }
     sprintf(buffer + buffer_pointer, "%s", lexer_printable_token_data(&data_type->name));
     buffer_pointer = strlen(buffer);
 
