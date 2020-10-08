@@ -35,6 +35,7 @@ typedef struct Value
     __TYPE(MUL) \
     __TYPE(SUB) \
     __TYPE(LESS_THAN) \
+    __TYPE(GREATER_THAN) \
     __TYPE(REF) \
     __TYPE(DOT) \
     __TYPE(INDEX) \

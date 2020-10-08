@@ -189,6 +189,8 @@ static Token lexer_next()
                         return make_single_char_token(TOKEN_TYPE_AND);
                     case '<':
                         return make_single_char_token(TOKEN_TYPE_LESS_THAN);
+                    case '>':
+                        return make_single_char_token(TOKEN_TYPE_GREATER_THAN);
                     case '-':
                         return make_single_char_token(TOKEN_TYPE_SUBTRACT);
                     case '[':

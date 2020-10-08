@@ -69,6 +69,11 @@ static void dump_expression(Expression *expression, int indent)
             dump_expression(expression->left, indent + 1);
             dump_expression(expression->right, indent + 1);
             break;
+        case EXPRESSION_TYPE_GREATER_THAN:
+            fprintf(stderr, "Greater Than:\n");
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
         case EXPRESSION_TYPE_DOT:
             fprintf(stderr, "Dot:\n");
             dump_expression(expression->left, indent + 1);

@@ -411,6 +411,9 @@ X86Value compile_subtract_operation(X86Code *code, X86Value *lhs, X86Value *rhs,
     return (X86Value) { *return_type };
 }
 
+// NOTE: We only can do some operation for ints right now
+#define CHECK_INT_TYPES assert (expression->data_type.flags & DATA_TYPE_PRIMITIVE && expression->data_type.primitive == PRIMITIVE_INT)
+
 X86Value compile_expression(X86Code *code, Expression *expression, enum ExpressionMode mode)
 {
     switch (expression->type)
@@ -439,6 +442,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
         }
         case EXPRESSION_TYPE_MUL:
         {
+            CHECK_INT_TYPES;
             COMMENT_CODE(code, "Compile mul");
             X86Value lhs, rhs;
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
@@ -450,6 +454,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
         }
         case EXPRESSION_TYPE_LESS_THAN:
         {
+            CHECK_INT_TYPES;
             COMMENT_CODE(code, "Compile less than");
             X86Value lhs, rhs;
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
@@ -458,6 +463,20 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
             INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
             INST(X86_OP_CODE_SET_REG_IF_LESS, X86_REG_AL);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
+        case EXPRESSION_TYPE_GREATER_THAN:
+        {
+            CHECK_INT_TYPES;
+            COMMENT_CODE(code, "Compile greater than");
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
+
+            COMMENT_CODE(code, "Do add operation");
+            INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
+            INST(X86_OP_CODE_SET_REG_IF_GREATER, X86_REG_AL);
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             return (X86Value) { expression->data_type };
         }
@@ -485,8 +504,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             return compile_fuction_call(code, expression);
         case EXPRESSION_TYPE_INVERT:
         {
-            // NOTE: We only can do this for ints for now
-            assert (expression->data_type.flags & DATA_TYPE_PRIMITIVE && expression->data_type.primitive == PRIMITIVE_INT);
+            CHECK_INT_TYPES;
 
             compile_expression(code, expression->left, EXPRESSION_MODE_RHS);
             INST(X86_OP_CODE_POP_REG, X86_REG_EBX);

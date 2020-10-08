@@ -247,6 +247,10 @@ static enum ExpressionType expression_type_from_token_type(enum TokenType token_
             return EXPRESSION_TYPE_DOT;
         case TOKEN_TYPE_OPEN_SQUARE:
             return EXPRESSION_TYPE_INDEX;
+        case TOKEN_TYPE_LESS_THAN:
+            return EXPRESSION_TYPE_LESS_THAN;
+        case TOKEN_TYPE_GREATER_THAN:
+            return EXPRESSION_TYPE_GREATER_THAN;
         default:
             assert (0);
     }
@@ -313,11 +317,15 @@ static Expression *parse_logical(SymbolTable *table, DataType *lhs_data_type)
 {
     Expression *left = parse_add_op(table, lhs_data_type);
 
-    while (lexer_peek(0).type == TOKEN_TYPE_LESS_THAN)
+    enum TokenType operation_type = lexer_peek(0).type;
+    while (operation_type == TOKEN_TYPE_LESS_THAN || operation_type == TOKEN_TYPE_GREATER_THAN)
     {
-        match(TOKEN_TYPE_LESS_THAN, "<");
+        lexer_consume(operation_type);
+        enum ExpressionType op = expression_type_from_token_type(operation_type);
         Expression *right = parse_add_op(table, &left->data_type);
-        left = create_operation_expression(left, EXPRESSION_TYPE_LESS_THAN, right);
+        left = create_operation_expression(left, op, right);
+
+        operation_type = lexer_peek(0).type;
     }
 
     return left;
