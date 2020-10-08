@@ -368,6 +368,7 @@ X86Value compile_add_operation(X86Code *code, X86Value *lhs, X86Value *rhs, Data
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             break;
         case PRIMITIVE_CHAR:
+            // NOTE: This doesn't look right to me
             INST(X86_OP_CODE_ADD_REG_REG, X86_REG_AL, X86_REG_BL);
             INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
             INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 1);
@@ -382,6 +383,26 @@ X86Value compile_add_operation(X86Code *code, X86Value *lhs, X86Value *rhs, Data
             INST(X86_OP_CODE_FADD_POP_REG_REG, X86_REG_ST1, X86_REG_ST0);
             INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, -4);
             INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
+            break;
+        default:
+            assert (0);
+    }
+
+    return (X86Value) { *return_type };
+}
+
+X86Value compile_subtract_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *return_type)
+{
+    // NOTE: we'll need this when we optimise, but not yet
+    (void) lhs;
+    (void) rhs;
+
+    assert (return_type->flags & DATA_TYPE_PRIMITIVE);
+    switch (return_type->primitive)
+    {
+        case PRIMITIVE_INT:
+            INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             break;
         default:
             assert (0);
@@ -414,9 +435,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do sub operation");
-            INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
-            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-            return (X86Value) { expression->data_type };
+            return compile_subtract_operation(code, &lhs, &rhs, &expression->data_type);
         }
         case EXPRESSION_TYPE_MUL:
         {
@@ -464,6 +483,18 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             return compile_index_expression(code, expression, mode);
         case EXPRESSION_TYPE_FUNCTION_CALL:
             return compile_fuction_call(code, expression);
+        case EXPRESSION_TYPE_INVERT:
+        {
+            // NOTE: We only can do this for ints for now
+            assert (expression->data_type.flags & DATA_TYPE_PRIMITIVE && expression->data_type.primitive == PRIMITIVE_INT);
+
+            compile_expression(code, expression->left, EXPRESSION_MODE_RHS);
+            INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
+            INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
+            INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
         case EXPRESSION_TYPE_REF:
             assert(expression->left->type == EXPRESSION_TYPE_VALUE);
             if (expression->left->value.type != VALUE_TYPE_VARIABLE)

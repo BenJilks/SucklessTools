@@ -38,6 +38,7 @@ typedef struct Value
     __TYPE(REF) \
     __TYPE(DOT) \
     __TYPE(INDEX) \
+    __TYPE(INVERT) \
     __TYPE(FUNCTION_CALL)
 
 enum ExpressionType

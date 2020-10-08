@@ -135,6 +135,9 @@ static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_t
         case TOKEN_TYPE_AND:
             match(TOKEN_TYPE_AND, "&");
             return make_unary_expression(table, EXPRESSION_TYPE_REF, lhs_data_type);
+        case TOKEN_TYPE_SUBTRACT:
+            match(TOKEN_TYPE_SUBTRACT, "-");
+            return make_unary_expression(table, EXPRESSION_TYPE_INVERT, lhs_data_type);
         default:
             return parse_term(table, lhs_data_type);
     }
