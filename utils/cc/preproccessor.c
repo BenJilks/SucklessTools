@@ -265,7 +265,7 @@ static void proccess_char(char c, OutBuffer *out_buffer, State *state)
                 state->mode = MODE_START_OF_LINE;
             if (state->should_ignore_code_depth != -1 && state->if_depth >= state->should_ignore_code_depth)
                 break;
-            if (!isalnum(c))
+            if (!isalnum(c) && c != '_')
             {
                 state->name_buffer[state->name_buffer_pointer] = '\0';
                 state->name_buffer_pointer = 0;
