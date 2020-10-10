@@ -6,6 +6,7 @@ set(SOURCES
 	lexer.c
         parser.c
         expression.c
+        datatype.c
         symbol.c
         preproccessor.c
         dumpast.c

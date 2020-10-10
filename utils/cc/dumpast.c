@@ -48,6 +48,12 @@ static void dump_expression(Expression *expression, int indent)
             fprintf(stderr, "Invert:\n");
             dump_expression(expression->left, indent + 1);
             break;
+        case EXPRESSION_TYPE_CAST:
+            fprintf(stderr, "Cast:\n");
+            dump_expression(expression->left, indent + 1);
+            print_indent(indent + 1);
+            fprintf(stderr, "To '%s'\n", printable_data_type(&expression->data_type));
+            break;
         case EXPRESSION_TYPE_FUNCTION_CALL:
             fprintf(stderr, "Call:\n");
             dump_expression(expression->left, indent + 1);

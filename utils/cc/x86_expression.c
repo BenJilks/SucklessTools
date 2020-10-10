@@ -412,17 +412,32 @@ X86Value compile_subtract_operation(X86Code *code, X86Value *lhs, X86Value *rhs,
     return (X86Value) { *return_type };
 }
 
-X86Value compile_greater_than_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *return_type)
+X86Value compile_greater_than_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *common_type, DataType *return_type)
 {
     (void) lhs;
     (void) rhs;
 
     INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
     INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
-    if (return_type->flags & DATA_TYPE_UNSIGNED)
+    if (common_type->flags & DATA_TYPE_UNSIGNED)
         INST(X86_OP_CODE_SET_REG_IF_GREATER_UNSIGNED, X86_REG_AL);
     else
         INST(X86_OP_CODE_SET_REG_IF_GREATER, X86_REG_AL);
+    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    return (X86Value) { *return_type };
+}
+
+X86Value compile_less_than_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *common_type, DataType *return_type)
+{
+    (void) lhs;
+    (void) rhs;
+
+    INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
+    INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
+    if (common_type->flags & DATA_TYPE_UNSIGNED)
+        INST(X86_OP_CODE_SET_REG_IF_LESS_UNSIGNED, X86_REG_AL);
+    else
+        INST(X86_OP_CODE_SET_REG_IF_LESS, X86_REG_AL);
     INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
     return (X86Value) { *return_type };
 }
@@ -498,11 +513,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do operation");
-            INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
-            INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
-            INST(X86_OP_CODE_SET_REG_IF_LESS, X86_REG_AL);
-            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-            return (X86Value) { expression->data_type };
+            return compile_less_than_operation(code, &lhs, &rhs, &expression->common_type, &expression->data_type);
         }
         case EXPRESSION_TYPE_GREATER_THAN:
         {
@@ -512,7 +523,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
             COMMENT_CODE(code, "Do operation");
-            return compile_greater_than_operation(code, &lhs, &rhs, &expression->data_type);
+            return compile_greater_than_operation(code, &lhs, &rhs, &expression->common_type, &expression->data_type);
         }
         case EXPRESSION_TYPE_NOT_EQUALS:
         {
@@ -554,6 +565,12 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
             INST(X86_OP_CODE_SUB_REG_REG, X86_REG_EAX, X86_REG_EBX);
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
+        case EXPRESSION_TYPE_CAST:
+        {
+            X86Value value = compile_expression(code, expression->left, EXPRESSION_MODE_RHS);
+            compile_cast(code, &value, &expression->data_type);
             return (X86Value) { expression->data_type };
         }
         case EXPRESSION_TYPE_REF:

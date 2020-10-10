@@ -82,24 +82,6 @@ int symbol_table_size(SymbolTable *table)
     return total_size;
 }
 
-int data_type_equals(DataType *lhs, DataType *rhs)
-{
-    if (lhs->flags != rhs->flags)
-        return 0;
-    if (lhs->pointer_count != rhs->pointer_count)
-        return 0;
-    if (!lexer_compair_token_token(&lhs->name, &rhs->name))
-        return 0;
-    return 1;
-}
-
-int data_type_size(DataType *data_type)
-{
-    if (data_type->pointer_count > 0)
-        return 4; // NOTE: 32bit only
-    return data_type->size;
-}
-
 int symbol_size(Symbol *symbol)
 {
     int type_size = data_type_size(&symbol->data_type);

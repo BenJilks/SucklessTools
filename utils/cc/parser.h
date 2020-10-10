@@ -82,11 +82,4 @@ void match(enum TokenType, const char *name);
 Unit *parse();
 void free_unit(Unit *unit);
 
-DataType dt_void();
-DataType dt_int();
-DataType dt_float();
-DataType dt_double();
-DataType dt_char();
-DataType dt_const_char_pointer();
-
 #endif // PARSER_H

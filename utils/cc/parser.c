@@ -19,172 +19,6 @@ void match(enum TokenType type, const char *name)
     }
 }
 
-static enum Primitive primitive_from_name(Token *name)
-{
-    if (lexer_compair_token_name(name, "void"))
-        return PRIMITIVE_VOID;
-    else if (lexer_compair_token_name(name, "int"))
-        return PRIMITIVE_INT;
-    else if (lexer_compair_token_name(name, "float"))
-        return PRIMITIVE_FLOAT;
-    else if (lexer_compair_token_name(name, "double"))
-        return PRIMITIVE_DOUBLE;
-    else if (lexer_compair_token_name(name, "char"))
-        return PRIMITIVE_CHAR;
-
-    return PRIMITIVE_NONE;
-}
-
-static int size_from_primitive(enum Primitive primitive)
-{
-    switch (primitive)
-    {
-        case PRIMITIVE_VOID:
-            return 0;
-        case PRIMITIVE_INT:
-            return 4;
-        case PRIMITIVE_FLOAT:
-            return 4;
-        case PRIMITIVE_DOUBLE:
-            return 8;
-        case PRIMITIVE_CHAR:
-            return 1;
-        default:
-            return 0;
-    }
-}
-
-#define PRIMITIVE_DATA_TYPE(name, primitive) \
-    DataType dt_##name() \
-    { \
-        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER }, sizeof(name), DATA_TYPE_PRIMITIVE, primitive, NULL, 0 }; \
-    }
-
-PRIMITIVE_DATA_TYPE(void, PRIMITIVE_VOID);
-PRIMITIVE_DATA_TYPE(int, PRIMITIVE_INT);
-PRIMITIVE_DATA_TYPE(float, PRIMITIVE_FLOAT);
-PRIMITIVE_DATA_TYPE(double, PRIMITIVE_DOUBLE);
-PRIMITIVE_DATA_TYPE(char, PRIMITIVE_CHAR);
-DataType dt_const_char_pointer()
-{
-    DataType type = dt_char();
-    type.pointer_count += 1;
-    type.flags |= DATA_TYPE_CONST;
-    return type;
-}
-
-static void parse_type_pointers(DataType *data_type)
-{
-    while (lexer_peek(0).type == TOKEN_TYPE_STAR)
-    {
-        match(TOKEN_TYPE_STAR, "*");
-        data_type->pointer_count += 1;
-    }
-}
-
-static DataType parse_primitive()
-{
-    DataType data_type;
-    data_type.flags = 0;
-    data_type.pointer_count = 0;
-    data_type.members = NULL;
-    if (lexer_peek(0).type == TOKEN_TYPE_CONST)
-    {
-        match(TOKEN_TYPE_CONST, "const");
-        data_type.flags |= DATA_TYPE_CONST;
-    }
-
-    data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    data_type.primitive = primitive_from_name(&data_type.name);
-    if (data_type.primitive == PRIMITIVE_NONE)
-        ERROR("Expected datatype, got '%s' instead", lexer_printable_token_data(&data_type.name));
-
-    data_type.size = size_from_primitive(data_type.primitive);
-    data_type.flags |= DATA_TYPE_PRIMITIVE;
-    parse_type_pointers(&data_type);
-    return data_type;
-}
-
-static Struct *find_struct(Unit *unit, Token *name)
-{
-    for (int i = 0; i < unit->struct_count; i++)
-    {
-        if (lexer_compair_token_token(&unit->structs[i].name, name))
-            return &unit->structs[i];
-    }
-
-    return NULL;
-}
-
-static DataType parse_struct_type(Unit *unit)
-{
-    DataType data_type;
-    data_type.flags = DATA_TYPE_STRUCT;
-    data_type.pointer_count = 0;
-    data_type.primitive = PRIMITIVE_NONE;
-
-    match(TOKEN_TYPE_STRUCT, "struct");
-    Token name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    Struct *struct_ = find_struct(unit, &name);
-    data_type.name = name;
-
-    if (struct_ == NULL)
-    {
-        ERROR("No struct with the name '%s' found\n",
-            lexer_printable_token_data(&name));
-    }
-    else
-    {
-        data_type.size = symbol_table_size(struct_->members);
-        data_type.members = struct_->members;
-    }
-
-    parse_type_pointers(&data_type);
-    return data_type;
-}
-
-static DataType parse_unsigned_type()
-{
-    match(TOKEN_TYPE_UNSIGNED, "unsigned");
-
-    // The default base type is 'int'
-    DataType data_type = dt_int();
-    if (lexer_peek(0).type == TOKEN_TYPE_IDENTIFIER)
-    {
-        // Check if the next token contains a primitive type
-        Token name = lexer_peek(0);
-        enum Primitive primitive = primitive_from_name(&name);
-
-        // If so, parse it and use it as the base type
-        if (primitive != PRIMITIVE_NONE)
-            data_type = parse_primitive();
-    }
-
-    data_type.flags |= DATA_TYPE_UNSIGNED;
-    return data_type;
-}
-
-static DataType parse_data_type(Unit *unit, SymbolTable *table)
-{
-    // Check for typedefs
-    Token name = lexer_peek(0);
-    DataType *type_def = symbol_table_lookup_type(table, &name);
-    if (type_def != NULL)
-    {
-        lexer_consume(TOKEN_TYPE_IDENTIFIER);
-        parse_type_pointers(type_def);
-        return *type_def;
-    }
-
-    if (name.type == TOKEN_TYPE_STRUCT)
-        return parse_struct_type(unit);
-    else if (name.type == TOKEN_TYPE_UNSIGNED)
-        return parse_unsigned_type();
-
-    // Otherwise, parse normally
-    return parse_primitive();
-}
-
 Buffer make_buffer(void **memory, int *count, int unit_size)
 {
     Buffer buffer;
@@ -274,7 +108,7 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
         if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
         {
             match(TOKEN_TYPE_EQUALS, "=");
-            curr_statement->expression = parse_expression(scope->table);
+            curr_statement->expression = parse_expression(scope->table, unit);
         }
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
@@ -286,47 +120,24 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
-static int is_data_type_next(SymbolTable *table)
-{
-    Token token = lexer_peek(0);
-    switch (token.type)
-    {
-        case TOKEN_TYPE_CONST:
-            return 1;
-        case TOKEN_TYPE_STRUCT:
-            return 1;
-        case TOKEN_TYPE_UNSIGNED:
-            return 1;
-        case TOKEN_TYPE_IDENTIFIER:
-            if (primitive_from_name(&token) != PRIMITIVE_NONE ||
-                symbol_table_lookup_type(table, &token) != NULL)
-            {
-                return 1;
-            }
-            return 0;
-        default:
-            return 0;
-    }
-}
-
-static void parse_expression_statement(Scope *scope)
+static void parse_expression_statement(Scope *scope, Unit *unit)
 {
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
-    statement.expression = parse_expression(scope->table);
+    statement.expression = parse_expression(scope->table, unit);
     statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
 }
 
-static void parse_return(Scope *scope)
+static void parse_return(Scope *scope, Unit *unit)
 {
     match(TOKEN_TYPE_RETURN, "return");
 
     Statement statement;
     statement.type = STATEMENT_TYPE_RETURN;
-    statement.expression = parse_expression(scope->table);
+    statement.expression = parse_expression(scope->table, unit);
     statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
@@ -353,7 +164,7 @@ static void parse_if(Function *function, Unit *unit, Scope *scope)
 
     Statement statement;
     statement.type = STATEMENT_TYPE_IF;
-    statement.expression = parse_expression(scope->table);
+    statement.expression = parse_expression(scope->table, unit);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
 
     statement.sub_scope = parse_block_or_statement(function, unit, scope->table);
@@ -367,7 +178,7 @@ static void parse_while(Function *function, Unit *unit, Scope *scope)
 
     Statement statement;
     statement.type = STATEMENT_TYPE_WHILE;
-    statement.expression = parse_expression(scope->table);
+    statement.expression = parse_expression(scope->table, unit);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
 
     statement.sub_scope = parse_scope(function, unit, scope->table);
@@ -394,7 +205,7 @@ static void parse_statement(Function *function, Unit *unit, Scope *scope)
     switch (lexer_peek(0).type)
     {
         case TOKEN_TYPE_RETURN:
-            parse_return(scope);
+            parse_return(scope, unit);
             break;
         case TOKEN_TYPE_IF:
             parse_if(function, unit, scope);
@@ -406,7 +217,7 @@ static void parse_statement(Function *function, Unit *unit, Scope *scope)
             parse_typedef(unit, scope->table);
             break;
         default:
-            parse_expression_statement(scope);
+            parse_expression_statement(scope, unit);
             break;
     }
 }

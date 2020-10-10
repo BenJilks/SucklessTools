@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type);
+static Expression *parse_unary_operator(SymbolTable *table, Unit *unit, DataType *lhs_data_type);
 
 const char *expression_type_name(enum ExpressionType type)
 {
@@ -17,7 +17,46 @@ const char *expression_type_name(enum ExpressionType type)
     return "UNKOWN";
 }
 
-static Expression *parse_function_call(SymbolTable *table, Expression *left)
+enum Primitive primitive_from_name(Token *name)
+{
+    if (lexer_compair_token_name(name, "void"))
+        return PRIMITIVE_VOID;
+    else if (lexer_compair_token_name(name, "int"))
+        return PRIMITIVE_INT;
+    else if (lexer_compair_token_name(name, "float"))
+        return PRIMITIVE_FLOAT;
+    else if (lexer_compair_token_name(name, "double"))
+        return PRIMITIVE_DOUBLE;
+    else if (lexer_compair_token_name(name, "char"))
+        return PRIMITIVE_CHAR;
+
+    return PRIMITIVE_NONE;
+}
+
+int is_data_type_next(SymbolTable *table)
+{
+    Token token = lexer_peek(0);
+    switch (token.type)
+    {
+        case TOKEN_TYPE_CONST:
+            return 1;
+        case TOKEN_TYPE_STRUCT:
+            return 1;
+        case TOKEN_TYPE_UNSIGNED:
+            return 1;
+        case TOKEN_TYPE_IDENTIFIER:
+            if (primitive_from_name(&token) != PRIMITIVE_NONE ||
+                symbol_table_lookup_type(table, &token) != NULL)
+            {
+                return 1;
+            }
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+static Expression *parse_function_call(SymbolTable *table, Unit *unit, Expression *left)
 {
     Symbol *function_symbol = left->value.v;
     int argument_count = 0;
@@ -30,7 +69,7 @@ static Expression *parse_function_call(SymbolTable *table, Expression *left)
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_BRACKET)
     {
-        Expression *argument = parse_expression(table);
+        Expression *argument = parse_expression(table, unit);
         append_buffer(&buffer, &argument);
         argument_count += 1;
 
@@ -61,7 +100,7 @@ static Expression *parse_function_call(SymbolTable *table, Expression *left)
     return call;
 }
 
-static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_term(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
 {
     Expression *expression = malloc(sizeof(Expression));
     expression->type = EXPRESSION_TYPE_VALUE;
@@ -106,12 +145,6 @@ static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
             }
             expression->data_type = value->v->data_type;
             break;
-        case TOKEN_TYPE_OPEN_BRACKET:
-            match(TOKEN_TYPE_OPEN_BRACKET, "(");
-            free(expression);
-            expression = parse_expression(table);
-            match(TOKEN_TYPE_CLOSE_BRACKET, ")");
-            break;
         default:
             ERROR("Expected expression, got '%s' instead",
                 lexer_printable_token_data(&token));
@@ -122,15 +155,15 @@ static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
 
     // Parse function call
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_BRACKET)
-        return parse_function_call(table, expression);
+        return parse_function_call(table, unit, expression);
 
     return expression;
 }
 
-static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType type, DataType *lhs_data_type)
+static Expression *make_unary_expression(SymbolTable *table, Unit *unit, enum ExpressionType type, DataType *lhs_data_type)
 {
     Expression *expression = malloc(sizeof(Expression));
-    expression->left = parse_unary_operator(table, lhs_data_type);
+    expression->left = parse_unary_operator(table, unit, lhs_data_type);
     expression->type = type;
 
     expression->data_type = expression->left->data_type;
@@ -139,18 +172,38 @@ static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType
     return expression;
 }
 
-static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_sub_expression_or_cast(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
+{
+    match(TOKEN_TYPE_OPEN_BRACKET, "(");
+    if (is_data_type_next(table))
+    {
+        Expression *expression = malloc(sizeof(Expression));
+        expression->data_type = parse_data_type(unit, table);
+        match(TOKEN_TYPE_CLOSE_BRACKET, ")");
+        expression->left = parse_unary_operator(table, unit, lhs_data_type);
+        expression->type = EXPRESSION_TYPE_CAST;
+        return expression;
+    }
+
+    Expression *sub_expression = parse_expression(table, unit);
+    match(TOKEN_TYPE_CLOSE_BRACKET, ")");
+    return sub_expression;
+}
+
+static Expression *parse_unary_operator(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
 {
     switch (lexer_peek(0).type)
     {
         case TOKEN_TYPE_AND:
             match(TOKEN_TYPE_AND, "&");
-            return make_unary_expression(table, EXPRESSION_TYPE_REF, lhs_data_type);
+            return make_unary_expression(table, unit, EXPRESSION_TYPE_REF, lhs_data_type);
         case TOKEN_TYPE_SUBTRACT:
             match(TOKEN_TYPE_SUBTRACT, "-");
-            return make_unary_expression(table, EXPRESSION_TYPE_INVERT, lhs_data_type);
+            return make_unary_expression(table, unit, EXPRESSION_TYPE_INVERT, lhs_data_type);
+        case TOKEN_TYPE_OPEN_BRACKET:
+            return parse_sub_expression_or_cast(table, unit, lhs_data_type);
         default:
-            return parse_term(table, lhs_data_type);
+            return parse_term(table, unit, lhs_data_type);
     }
 }
 
@@ -280,16 +333,16 @@ static enum ExpressionType expression_type_from_token_type(enum TokenType token_
     }
 }
 
-static Expression *parse_access_op(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_access_op(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
 {
-    Expression *left = parse_unary_operator(table, lhs_data_type);
+    Expression *left = parse_unary_operator(table, unit, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
     while (operation_type == TOKEN_TYPE_DOT || operation_type == TOKEN_TYPE_OPEN_SQUARE)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);
-        Expression *right = parse_unary_operator(table, &left->data_type);
+        Expression *right = parse_unary_operator(table, unit, &left->data_type);
         left = create_operation_expression(left, op, right);
         left->data_type = right->data_type;
 
@@ -301,16 +354,16 @@ static Expression *parse_access_op(SymbolTable *table, DataType *lhs_data_type)
     return left;
 }
 
-static Expression *parse_mul_op(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_mul_op(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
 {
-    Expression *left = parse_access_op(table, lhs_data_type);
+    Expression *left = parse_access_op(table, unit, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
     while (operation_type == TOKEN_TYPE_STAR)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);
-        Expression *right = parse_access_op(table, &left->data_type);
+        Expression *right = parse_access_op(table, unit, &left->data_type);
         left = create_operation_expression(left, op, right);
 
         operation_type = lexer_peek(0).type;
@@ -319,16 +372,16 @@ static Expression *parse_mul_op(SymbolTable *table, DataType *lhs_data_type)
     return left;
 }
 
-static Expression *parse_add_op(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_add_op(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
 {
-    Expression *left = parse_mul_op(table, lhs_data_type);
+    Expression *left = parse_mul_op(table, unit, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
     while (operation_type == TOKEN_TYPE_ADD || operation_type == TOKEN_TYPE_SUBTRACT)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);
-        Expression *right = parse_mul_op(table, &left->data_type);
+        Expression *right = parse_mul_op(table, unit, &left->data_type);
         left = create_operation_expression(left, op, right);
 
         operation_type = lexer_peek(0).type;
@@ -337,9 +390,9 @@ static Expression *parse_add_op(SymbolTable *table, DataType *lhs_data_type)
     return left;
 }
 
-static Expression *parse_logical(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_logical(SymbolTable *table, Unit *unit, DataType *lhs_data_type)
 {
-    Expression *left = parse_add_op(table, lhs_data_type);
+    Expression *left = parse_add_op(table, unit, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
     while (operation_type == TOKEN_TYPE_LESS_THAN ||
@@ -348,7 +401,7 @@ static Expression *parse_logical(SymbolTable *table, DataType *lhs_data_type)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);
-        Expression *right = parse_add_op(table, &left->data_type);
+        Expression *right = parse_add_op(table, unit, &left->data_type);
         left = create_operation_expression(left, op, right);
 
         operation_type = lexer_peek(0).type;
@@ -357,14 +410,14 @@ static Expression *parse_logical(SymbolTable *table, DataType *lhs_data_type)
     return left;
 }
 
-Expression *parse_expression(SymbolTable *table)
+Expression *parse_expression(SymbolTable *table, Unit *unit)
 {
-    Expression *left = parse_logical(table, NULL);
+    Expression *left = parse_logical(table, unit, NULL);
 
     while (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
     {
         match(TOKEN_TYPE_EQUALS, "=");
-        Expression *right = parse_logical(table, &left->data_type);
+        Expression *right = parse_logical(table, unit, &left->data_type);
         left = create_operation_expression(left, EXPRESSION_TYPE_ASSIGN, right);
     }
 

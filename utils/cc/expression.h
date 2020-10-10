@@ -41,6 +41,7 @@ typedef struct Value
     __TYPE(DOT) \
     __TYPE(INDEX) \
     __TYPE(INVERT) \
+    __TYPE(CAST) \
     __TYPE(FUNCTION_CALL)
 
 enum ExpressionType
@@ -66,6 +67,8 @@ typedef struct Expression
     int argument_length;
 } Expression;
 
-Expression *parse_expression(SymbolTable *table);
+enum Primitive primitive_from_name(Token *name);
+int is_data_type_next(SymbolTable *table);
+Expression *parse_expression(SymbolTable *table, struct Unit *unit);
 
 #endif // EXPRESSION_H

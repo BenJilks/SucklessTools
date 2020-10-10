@@ -2,36 +2,7 @@
 #define SYMBOL_H
 
 #include "lexer.h"
-
-enum DataTypeFlags
-{
-    DATA_TYPE_CONST     = 1 << 0,
-    DATA_TYPE_PRIMITIVE = 1 << 1,
-    DATA_TYPE_STRUCT    = 1 << 2,
-    DATA_TYPE_UNSIGNED  = 1 << 3,
-};
-
-enum Primitive
-{
-    PRIMITIVE_NONE,
-    PRIMITIVE_VOID,
-    PRIMITIVE_INT,
-    PRIMITIVE_FLOAT,
-    PRIMITIVE_DOUBLE,
-    PRIMITIVE_CHAR,
-};
-
-struct SymbolTable;
-typedef struct DataType
-{
-    Token name;
-    int size;
-
-    enum DataTypeFlags flags;
-    enum Primitive primitive;
-    struct SymbolTable *members;
-    int pointer_count;
-} DataType;
+#include "datatype.h"
 
 enum SymbolFlags
 {
@@ -82,8 +53,6 @@ void symbol_table_define_type(SymbolTable *table, Token name, DataType type);
 Symbol *symbol_table_lookup(SymbolTable *table, Token *name);
 DataType *symbol_table_lookup_type(SymbolTable *table, Token *name);
 int symbol_table_size(SymbolTable *table);
-int data_type_equals(DataType *lhs, DataType *rhs);
-int data_type_size(DataType *data_type);
 int symbol_size(Symbol *symbol);
 
 void free_symbol_table(SymbolTable *table);
