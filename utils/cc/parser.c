@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <memory.h>
 
-static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent);
+static void parse_statement(Function*, Unit*, Scope*);
+static Scope *parse_scope(Function*, Unit*, SymbolTable *parent);
 
 void match(enum TokenType type, const char *name)
 {
@@ -332,6 +333,19 @@ static void parse_return(Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
+static Scope *parse_block_or_statement(Function *function, Unit *unit, SymbolTable *parent)
+{
+    if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
+        return parse_scope(function, unit, parent);
+
+    Scope *scope = malloc(sizeof(Scope));
+    scope->statements = NULL;
+    scope->statement_count = 0;
+    scope->table = symbol_table_new(parent);
+    parse_statement(function, unit, scope);
+    return scope;
+}
+
 static void parse_if(Function *function, Unit *unit, Scope *scope)
 {
     match(TOKEN_TYPE_IF, "if");
@@ -342,7 +356,7 @@ static void parse_if(Function *function, Unit *unit, Scope *scope)
     statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
 
-    statement.sub_scope = parse_scope(function, unit, scope->table);
+    statement.sub_scope = parse_block_or_statement(function, unit, scope->table);
     add_statement_to_scope(scope, statement);
 }
 
@@ -369,6 +383,34 @@ static void parse_typedef(Unit *unit, SymbolTable *table)
     symbol_table_define_type(table, name, data_type);
 }
 
+static void parse_statement(Function *function, Unit *unit, Scope *scope)
+{
+    if (is_data_type_next(scope->table))
+    {
+        parse_declaration(function, unit, scope);
+        return;
+    }
+
+    switch (lexer_peek(0).type)
+    {
+        case TOKEN_TYPE_RETURN:
+            parse_return(scope);
+            break;
+        case TOKEN_TYPE_IF:
+            parse_if(function, unit, scope);
+            break;
+        case TOKEN_TYPE_WHILE:
+            parse_while(function, unit, scope);
+            break;
+        case TOKEN_TYPE_TYPEDEF:
+            parse_typedef(unit, scope->table);
+            break;
+        default:
+            parse_expression_statement(scope);
+            break;
+    }
+}
+
 static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent)
 {
     Scope *scope = malloc(sizeof(Scope));
@@ -378,32 +420,7 @@ static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent)
 
     match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
-    {
-        if (is_data_type_next(scope->table))
-        {
-            parse_declaration(function, unit, scope);
-            continue;
-        }
-
-        switch (lexer_peek(0).type)
-        {
-            case TOKEN_TYPE_RETURN:
-                parse_return(scope);
-                break;
-            case TOKEN_TYPE_IF:
-                parse_if(function, unit, scope);
-                break;
-            case TOKEN_TYPE_WHILE:
-                parse_while(function, unit, scope);
-                break;
-            case TOKEN_TYPE_TYPEDEF:
-                parse_typedef(unit, scope->table);
-                break;
-            default:
-                parse_expression_statement(scope);
-                break;
-        }
-    }
+        parse_statement(function, unit, scope);
     match(TOKEN_TYPE_CLOSE_SQUIGGLY, "}");
 
     return scope;
