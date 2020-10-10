@@ -6,6 +6,17 @@
 
 static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type);
 
+const char *expression_type_name(enum ExpressionType type)
+{
+    switch (type)
+    {
+#define __TYPE(x) case EXPRESSION_TYPE_##x: return #x;
+        ENUMERATE_EXPRESSION_TYPE
+#undef __TYPE
+    }
+    return "UNKOWN";
+}
+
 static Expression *parse_function_call(SymbolTable *table, Expression *left)
 {
     Symbol *function_symbol = left->value.v;
@@ -144,70 +155,75 @@ static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_t
 }
 
 static DataType find_data_type_of_operation(
-    DataType *left, enum ExpressionType operation, DataType *right)
+    DataType left, enum ExpressionType operation, DataType right)
 {
     (void) operation;
-    if (!(left->flags & DATA_TYPE_PRIMITIVE) || !(right->flags & DATA_TYPE_PRIMITIVE))
+
+    if (!(left.flags & DATA_TYPE_PRIMITIVE) || !(right.flags & DATA_TYPE_PRIMITIVE))
         assert (0); // FIXME: Handle this
 
-    switch (left->primitive)
+    // If one of them is signed, make them both signed
+    left.flags &= ~(right.flags & DATA_TYPE_UNSIGNED);
+    right.flags &= ~(left.flags & DATA_TYPE_UNSIGNED);
+
+    switch (left.primitive)
     {
         case PRIMITIVE_INT:
-            switch (right->primitive)
+            switch (right.primitive)
             {
                 case PRIMITIVE_INT:
-                    return *left;
+                    return left;
                 case PRIMITIVE_CHAR:
-                    return *left;
+                    return left;
                 case PRIMITIVE_FLOAT:
-                    return *right;
+                    return right;
                 case PRIMITIVE_DOUBLE:
-                    return *right;
+                    return right;
                 default:
                     break;
             }
             break;
         case PRIMITIVE_CHAR:
-            switch (right->primitive)
+            switch (right.primitive)
             {
                 case PRIMITIVE_INT:
-                    return *right;
+                    return right;
                 case PRIMITIVE_CHAR:
-                    return *left;
+                    return left;
                 case PRIMITIVE_FLOAT:
-                    return *right;
+                    return right;
                 case PRIMITIVE_DOUBLE:
-                    return *right;
+                    return right;
                 default:
                     break;
             }
             break;
         case PRIMITIVE_FLOAT:
-            switch (right->primitive)
+            switch (right.primitive)
             {
                 case PRIMITIVE_INT:
-                    return *left;
+                    return left;
                 case PRIMITIVE_CHAR:
-                    return *left;
+                    return left;
                 case PRIMITIVE_FLOAT:
-                    return *left;
+                    return left;
                 case PRIMITIVE_DOUBLE:
-                    return *right;
+                    return right;
                 default:
                     break;
             }
             break;
         case PRIMITIVE_DOUBLE:
-            switch (right->primitive)
+            switch (right.primitive)
             {
                 case PRIMITIVE_INT:
-                    return *left;
+                    return left;
                 case PRIMITIVE_CHAR:
-                    return *left;
+                    return left;
                 case PRIMITIVE_FLOAT:
-                    return *left;
+                    return left;
                 case PRIMITIVE_DOUBLE:
-                    return *left;
+                    return left;
                 default:
                     break;
             }
@@ -226,10 +242,16 @@ static Expression *create_operation_expression(Expression *left, enum Expression
     operation->type = op;
     operation->left = left;
     operation->right = right;
-    operation->data_type = find_data_type_of_operation(
-        &operation->left->data_type, operation->type, &operation->right->data_type);
-    left = operation;
+    operation->common_type = find_data_type_of_operation(
+        left->data_type, op, right->data_type);
+    operation->data_type = operation->common_type;
 
+    if (op == EXPRESSION_TYPE_LESS_THAN ||
+        op == EXPRESSION_TYPE_GREATER_THAN ||
+        op == EXPRESSION_TYPE_NOT_EQUALS)
+    {
+        operation->data_type = dt_int();
+    }
     return operation;
 }
 
@@ -251,6 +273,8 @@ static enum ExpressionType expression_type_from_token_type(enum TokenType token_
             return EXPRESSION_TYPE_LESS_THAN;
         case TOKEN_TYPE_GREATER_THAN:
             return EXPRESSION_TYPE_GREATER_THAN;
+        case TOKEN_TYPE_NOT_EQUALS:
+            return EXPRESSION_TYPE_NOT_EQUALS;
         default:
             assert (0);
     }
@@ -318,7 +342,9 @@ static Expression *parse_logical(SymbolTable *table, DataType *lhs_data_type)
     Expression *left = parse_add_op(table, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
-    while (operation_type == TOKEN_TYPE_LESS_THAN || operation_type == TOKEN_TYPE_GREATER_THAN)
+    while (operation_type == TOKEN_TYPE_LESS_THAN ||
+           operation_type == TOKEN_TYPE_GREATER_THAN ||
+           operation_type == TOKEN_TYPE_NOT_EQUALS)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);

@@ -72,6 +72,7 @@ enum State
     STATE_STRING,
     STATE_DOT,
     STATE_DOT_DOT,
+    STATE_EXCLAMATION,
 };
 
 typedef struct Buffer
@@ -160,6 +161,14 @@ static Token lexer_next()
                 if (g_c == '.')
                 {
                     state = STATE_DOT;
+                    token.data = g_source + g_source_pointer - 1;
+                    token.length = 1;
+                    break;
+                }
+
+                if (g_c == '!')
+                {
+                    state = STATE_EXCLAMATION;
                     token.data = g_source + g_source_pointer - 1;
                     token.length = 1;
                     break;
@@ -280,6 +289,17 @@ static Token lexer_next()
                 ERROR("Unexpected char '%c'", g_c);
                 state = STATE_INITIAL;
                 g_should_reconsume = 1;
+                break;
+            case STATE_EXCLAMATION:
+                if (g_c == '=')
+                {
+                    state = STATE_INITIAL;
+                    token.length += 1;
+                    token.type = TOKEN_TYPE_NOT_EQUALS;
+                    return token;
+                }
+
+                assert (0);
                 break;
         }
 	}

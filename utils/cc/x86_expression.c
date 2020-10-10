@@ -47,6 +47,7 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
                     INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
                     return (X86Value) { dt_double() };
                 default:
+                    assert (0);
                     break;
             }
             break;
@@ -253,10 +254,10 @@ static void compile_rhs_eax_lhs_ebx(X86Code *code, Expression *expression, enum 
     COMMENT_CODE(code, "Left hand side");
     *lhs = compile_expression(code, expression->left, lhs_mode);
     if (lhs_mode == EXPRESSION_MODE_RHS)
-        compile_cast(code, lhs, &expression->data_type);
+        compile_cast(code, lhs, &expression->common_type);
     COMMENT_CODE(code, "Right hand side");
     *rhs = compile_expression(code, expression->right, EXPRESSION_MODE_RHS);
-    compile_cast(code, rhs, &expression->data_type);
+    compile_cast(code, rhs, &expression->common_type);
 
     INST(X86_OP_CODE_POP_REG, X86_REG_EBX);
     INST(X86_OP_CODE_POP_REG, X86_REG_EAX);
@@ -411,6 +412,43 @@ X86Value compile_subtract_operation(X86Code *code, X86Value *lhs, X86Value *rhs,
     return (X86Value) { *return_type };
 }
 
+X86Value compile_greater_than_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *return_type)
+{
+    (void) lhs;
+    (void) rhs;
+
+    INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
+    INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
+    if (return_type->flags & DATA_TYPE_UNSIGNED)
+        INST(X86_OP_CODE_SET_REG_IF_GREATER_UNSIGNED, X86_REG_AL);
+    else
+        INST(X86_OP_CODE_SET_REG_IF_GREATER, X86_REG_AL);
+    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+    return (X86Value) { *return_type };
+}
+
+X86Value compile_not_equals_operation(X86Code *code, X86Value *lhs, X86Value *rhs, DataType *return_type)
+{
+    (void) lhs;
+    (void) rhs;
+    assert (return_type->flags & DATA_TYPE_PRIMITIVE);
+
+    switch (return_type->primitive)
+    {
+        case PRIMITIVE_CHAR:
+        case PRIMITIVE_INT:
+        case PRIMITIVE_FLOAT:
+            INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
+            INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
+            INST(X86_OP_CODE_SET_REG_IF_NOT_ZERO, X86_REG_AL);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            break;
+        default:
+            assert (0);
+    }
+    return (X86Value) { *return_type };
+}
+
 // NOTE: We only can do some operation for ints right now
 #define CHECK_INT_TYPES assert (expression->data_type.flags & DATA_TYPE_PRIMITIVE && expression->data_type.primitive == PRIMITIVE_INT)
 
@@ -459,7 +497,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             X86Value lhs, rhs;
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
-            COMMENT_CODE(code, "Do add operation");
+            COMMENT_CODE(code, "Do operation");
             INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
             INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
             INST(X86_OP_CODE_SET_REG_IF_LESS, X86_REG_AL);
@@ -473,12 +511,17 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             X86Value lhs, rhs;
             compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
 
-            COMMENT_CODE(code, "Do add operation");
-            INST(X86_OP_CODE_CMP_REG_REG, X86_REG_EAX, X86_REG_EBX);
-            INST(X86_OP_CODE_MOV_REG_IMM32, X86_REG_EAX, 0);
-            INST(X86_OP_CODE_SET_REG_IF_GREATER, X86_REG_AL);
-            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
-            return (X86Value) { expression->data_type };
+            COMMENT_CODE(code, "Do operation");
+            return compile_greater_than_operation(code, &lhs, &rhs, &expression->data_type);
+        }
+        case EXPRESSION_TYPE_NOT_EQUALS:
+        {
+            COMMENT_CODE(code, "Compile not equals");
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
+
+            COMMENT_CODE(code, "Do operation");
+            return compile_not_equals_operation(code, &lhs, &rhs, &expression->data_type);
         }
         case EXPRESSION_TYPE_DOT:
         {

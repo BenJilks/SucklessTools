@@ -60,8 +60,10 @@ typedef struct X86Argument
     __OP_CODE(MOV_MEM8_REG_OFF_REG,           REG,    OFF8,   REG,    mov)   \
     __OP_CODE(LOAD_AH_F,                      NONE,   NONE,   NONE,   lahf)  \
     __OP_CODE(SET_REG_IF_ZERO,                REG,    NONE,   NONE,   sete)  \
+    __OP_CODE(SET_REG_IF_NOT_ZERO,            REG,    NONE,   NONE,   setne) \
     __OP_CODE(SET_REG_IF_LESS,                REG,    NONE,   NONE,   setl)  \
     __OP_CODE(SET_REG_IF_GREATER,             REG,    NONE,   NONE,   setg)  \
+    __OP_CODE(SET_REG_IF_GREATER_UNSIGNED,    REG,    NONE,   NONE,   seta)  \
     __OP_CODE(SUB_REG_IMM8,                   REG,    IMM8,   NONE,   sub)   \
     __OP_CODE(SUB_REG_REG,                    REG,    REG,    NONE,   sub)   \
     __OP_CODE(ADD_REG_REG,                    REG,    REG,    NONE,   add)   \

@@ -40,49 +40,9 @@ static void dump_expression(Expression *expression, int indent)
             fprintf(stderr, "Value:\n");
             dump_value(&expression->value, indent + 1);
             break;
-        case EXPRESSION_TYPE_ASSIGN:
-            fprintf(stderr, "Assign:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
-        case EXPRESSION_TYPE_ADD:
-            fprintf(stderr, "Add:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
-        case EXPRESSION_TYPE_SUB:
-            fprintf(stderr, "SUB:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
-        case EXPRESSION_TYPE_MUL:
-            fprintf(stderr, "MUL:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
         case EXPRESSION_TYPE_REF:
             fprintf(stderr, "Ref:\n");
             dump_expression(expression->left, indent + 1);
-            break;
-        case EXPRESSION_TYPE_LESS_THAN:
-            fprintf(stderr, "Less Than:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
-        case EXPRESSION_TYPE_GREATER_THAN:
-            fprintf(stderr, "Greater Than:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
-        case EXPRESSION_TYPE_DOT:
-            fprintf(stderr, "Dot:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
-            break;
-        case EXPRESSION_TYPE_INDEX:
-            fprintf(stderr, "Index:\n");
-            dump_expression(expression->left, indent + 1);
-            dump_expression(expression->right, indent + 1);
             break;
         case EXPRESSION_TYPE_INVERT:
             fprintf(stderr, "Invert:\n");
@@ -97,7 +57,10 @@ static void dump_expression(Expression *expression, int indent)
                 dump_expression(expression->arguments[i], indent + 1);
             break;
         default:
-            assert (0);
+            fprintf(stderr, "%s:\n", expression_type_name(expression->type));
+            dump_expression(expression->left, indent + 1);
+            dump_expression(expression->right, indent + 1);
+            break;
     }
 }
 

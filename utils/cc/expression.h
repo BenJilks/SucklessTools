@@ -36,6 +36,7 @@ typedef struct Value
     __TYPE(SUB) \
     __TYPE(LESS_THAN) \
     __TYPE(GREATER_THAN) \
+    __TYPE(NOT_EQUALS) \
     __TYPE(REF) \
     __TYPE(DOT) \
     __TYPE(INDEX) \
@@ -49,10 +50,13 @@ enum ExpressionType
 #undef __TYPE
 };
 
+const char *expression_type_name(enum ExpressionType);
+
 typedef struct Expression
 {
     enum ExpressionType type;
     DataType data_type;
+    DataType common_type;
 
     Value value;
     struct Expression *left;
