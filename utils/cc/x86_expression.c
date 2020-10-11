@@ -505,6 +505,20 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
             INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
             return (X86Value) { expression->data_type };
         }
+        case EXPRESSION_TYPE_DIV:
+        {
+            CHECK_INT_TYPES;
+            COMMENT_CODE(code, "Compile div");
+            X86Value lhs, rhs;
+            compile_rhs_eax_lhs_ebx(code, expression, EXPRESSION_MODE_RHS, &lhs, &rhs);
+
+            COMMENT_CODE(code, "Do div operation");
+            INST(X86_OP_CODE_MOV_REG_REG, X86_REG_ECX, X86_REG_EBX);
+            INST(X86_OP_CODE_DOUBLE_TO_QUADWORD);
+            INST(X86_OP_CODE_DIV_REG, X86_REG_ECX);
+            INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+            return (X86Value) { expression->data_type };
+        }
         case EXPRESSION_TYPE_LESS_THAN:
         {
             CHECK_INT_TYPES;

@@ -33,6 +33,7 @@ typedef struct Value
     __TYPE(ASSIGN) \
     __TYPE(ADD) \
     __TYPE(MUL) \
+    __TYPE(DIV) \
     __TYPE(SUB) \
     __TYPE(LESS_THAN) \
     __TYPE(GREATER_THAN) \

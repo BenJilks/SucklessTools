@@ -318,6 +318,8 @@ static enum ExpressionType expression_type_from_token_type(enum TokenType token_
             return EXPRESSION_TYPE_SUB;
         case TOKEN_TYPE_STAR:
             return EXPRESSION_TYPE_MUL;
+        case TOKEN_TYPE_FORWARD_SLASH:
+            return EXPRESSION_TYPE_DIV;
         case TOKEN_TYPE_DOT:
             return EXPRESSION_TYPE_DOT;
         case TOKEN_TYPE_OPEN_SQUARE:
@@ -359,7 +361,7 @@ static Expression *parse_mul_op(SymbolTable *table, Unit *unit, DataType *lhs_da
     Expression *left = parse_access_op(table, unit, lhs_data_type);
 
     enum TokenType operation_type = lexer_peek(0).type;
-    while (operation_type == TOKEN_TYPE_STAR)
+    while (operation_type == TOKEN_TYPE_STAR || operation_type == TOKEN_TYPE_FORWARD_SLASH)
     {
         lexer_consume(operation_type);
         enum ExpressionType op = expression_type_from_token_type(operation_type);

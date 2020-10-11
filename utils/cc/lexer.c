@@ -206,6 +206,8 @@ static Token lexer_next()
                         return make_single_char_token(TOKEN_TYPE_OPEN_SQUARE);
                     case ']':
                         return make_single_char_token(TOKEN_TYPE_CLOSE_SQUARE);
+                    case '/':
+                        return make_single_char_token(TOKEN_TYPE_FORWARD_SLASH);
                 }
 
                 assert (0);

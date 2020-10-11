@@ -8,6 +8,7 @@
     __REG(EBP, ebp) \
     __REG(EAX, eax) \
     __REG(EBX, ebx) \
+    __REG(ECX, ecx) \
     __REG(AL, al) \
     __REG(BL, bl) \
     __REG(ST0, st0) \
@@ -71,6 +72,7 @@ typedef struct X86Argument
     __OP_CODE(ADD_REG_IMM8,                   REG,    IMM8,   NONE,   add)   \
     __OP_CODE(MUL_REG_REG,                    REG,    REG,    NONE,   imul)  \
     __OP_CODE(MUL_REG_IMM8,                   REG,    IMM8,   NONE,   imul)  \
+    __OP_CODE(DIV_REG,                        REG,    NONE,   NONE,   idiv)  \
     __OP_CODE(CMP_REG_IMM32,                  REG,    IMM32,  NONE,   cmp)   \
     __OP_CODE(CMP_REG_REG,                    REG,    REG,    NONE,   cmp)   \
     __OP_CODE(AND_REG_IMM32,                  REG,    IMM32,  NONE,   and)   \
@@ -88,7 +90,8 @@ typedef struct X86Argument
     __OP_CODE(FLOAD_INT_MEM32_REG_OFF,        REG,    OFF32,  NONE,   fild)  \
     __OP_CODE(FSTORE_FLOAT_POP_MEM32_REG_OFF, REG,    OFF32,  NONE,   fstp)  \
     __OP_CODE(FSTORE_FLOAT_POP_MEM64_REG_OFF, REG,    OFF64,  NONE,   fstp)  \
-    __OP_CODE(FADD_POP_REG_REG,               REG,    REG,    NONE,   faddp)
+    __OP_CODE(FADD_POP_REG_REG,               REG,    REG,    NONE,   faddp) \
+    __OP_CODE(DOUBLE_TO_QUADWORD,             NONE,   NONE,   NONE,   cdq)
 
 enum X86OpCode
 {
