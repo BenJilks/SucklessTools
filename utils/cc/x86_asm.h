@@ -2,6 +2,7 @@
 #define X86_ASM_H
 
 #include <sys/types.h>
+#include <inttypes.h>
 
 #define ENUMERATE_X86_REG \
     __REG(ESP, esp) \
