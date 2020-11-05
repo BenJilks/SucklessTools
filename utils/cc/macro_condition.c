@@ -74,7 +74,7 @@ static Token next_token(Stream *input)
         switch (state)
         {
             case STATE_DEFAULT:
-                if (input->peek == EOF)
+                if (input->peek == (char)EOF)
                     return (Token) { {}, TOKEN_TYPE_EOF };
                 if (isspace(input->peek))
                     break;
