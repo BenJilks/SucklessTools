@@ -10,6 +10,8 @@ set(SOURCES
         symbol.c
         preproccessor.c
         dumpast.c
+        stream.c
+        macro_condition.c
         x86.c
         x86_expression.c
         x86_asm.c

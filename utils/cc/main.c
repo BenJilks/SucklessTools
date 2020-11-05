@@ -8,12 +8,15 @@
 
 int main()
 {
-    int data_len;
-    const char *data = pre_proccess_file("test.c", &data_len);
-    fwrite(data, 1, data_len, stderr);
+    Stream input_stream = stream_create_input_file("test.c");
+    Stream output_stream = stream_create_output_memory();
+    pre_proccess_file(&input_stream, &output_stream);
+    fwrite(output_stream.memory, 1, output_stream.memory_length, stdout);
 
+    stream_close(&input_stream);
+    stream_close(&output_stream);
     return 0;
-    lexer_open_memory(data, data_len);
+    //lexer_open_memory(data, data_len);
 
     // Parse
     Unit *unit = parse();
