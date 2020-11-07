@@ -528,8 +528,11 @@ static void parse_macro(Stream *input, Stream *output, enum BlockMode mode,
 static DefinitionScope parse_identifier_arguments(
     Stream *input, Define *def, DefinitionScope *scope)
 {
-    enum IdentifierState state = IDENTIFIER_STATE_DEFAULT;
     DefinitionScope arguments = definition_scope_copy(scope);
+    if (def->param_count <= 0)
+        return arguments;
+
+    enum IdentifierState state = IDENTIFIER_STATE_DEFAULT;
     Define current_argument;
     int buffer_pointer = 0;
     int arguement_count = 0;
