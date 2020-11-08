@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define DEBUG_PRE_PROCCESSOR
+//#define DEBUG_PRE_PROCCESSOR
 
 #ifdef DEBUG_PRE_PROCCESSOR
 static int g_debug_indent = 0;
@@ -536,6 +536,7 @@ static DefinitionScope parse_identifier_arguments(
     Define current_argument;
     int buffer_pointer = 0;
     int arguement_count = 0;
+    int brace_depth = 1;
     for (;;)
     {
         stream_read_next_char(input);
@@ -561,9 +562,14 @@ static DefinitionScope parse_identifier_arguments(
 
                     buffer_pointer = 0;
                     if (input->peek == ')')
+                        brace_depth -= 1;
+                    if (brace_depth <= 0)
                         return arguments;
                     break;
                 }
+
+                if (input->peek == '(')
+                    brace_depth += 1;
                 current_argument.value[buffer_pointer++] = input->peek;
                 break;
         }
@@ -783,7 +789,10 @@ void dump_macro_map(DefinitionScope *scope)
     for (int i = 0; i < scope->count; i++)
     {
         Define *def = &scope->defines[i];
-        printf("\"%s\",\"%s\"\n", def->name, def->value);
+        printf("\"%s\"", def->name);
+        for (int i = 0; i < def->param_count; i++)
+            printf(",\"%s\"", def->params[i]);
+        printf(",\"%s\"\n", def->value);
     }
 }
 
