@@ -558,6 +558,7 @@ static DefinitionScope parse_identifier_arguments(
                 {
                     strcpy(current_argument.name, def->params[arguement_count++]);
                     current_argument.value[buffer_pointer] = '\0';
+                    current_argument.param_count = 0;
                     definition_scope_add(&arguments, current_argument);
 
                     buffer_pointer = 0;
@@ -801,5 +802,5 @@ void pre_proccess_file(
 {
     DefinitionScope scope = definition_scope_create();
     parse_block(input, output, "Main", BLOCK_MODE_DEFUALT, &scope);
-    dump_macro_map(&scope);
+    //dump_macro_map(&scope);
 }
