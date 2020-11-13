@@ -16,13 +16,32 @@ static Token g_null_token = { NULL, 0, TOKEN_TYPE_NONE };
 static char *g_source = NULL;
 static int g_source_length;
 static int g_source_pointer;
+static int g_source_line;
+static int g_source_column;
+static int g_source_start_of_line;
 
 static char g_c = '\0';
 static int g_should_reconsume = 0;
 
 void lexer_error(const char *message)
 {
-    fprintf(stderr, "Error: %s\n", message);
+    fprintf(stderr, "[Error %i:%i] %s\n",
+        g_source_line, g_source_column, message);
+    fprintf(stderr, "%5i | ", g_source_line);
+
+    int pointer = g_source_start_of_line;
+    while (pointer < g_source_length)
+    {
+        char c = g_source[pointer++];
+        if (c == '\n')
+            break;
+        fprintf(stderr, "%c", c);
+    }
+    fprintf(stderr, "\n");
+
+    for (int i = 0; i < 8 + g_source_column - 4; i++)
+        fprintf(stderr, " ");
+    fprintf(stderr, "^^^^\n\n");
 }
 
 void lexer_open_file(const char *file_path)
@@ -42,6 +61,9 @@ void lexer_open_file(const char *file_path)
 
     // Setup pointers
     g_source_pointer = 0;
+    g_source_line = 1;
+    g_source_column = 1;
+    g_source_start_of_line = 0;
     g_peek_queue_start = 0;
     g_peek_queue_end = 0;
     g_peek_queue_count = 0;
@@ -53,6 +75,9 @@ void lexer_open_memory(const char *data, int data_len)
     g_source = (char*)data;
     g_source_length = data_len;
     g_source_pointer = 0;
+    g_source_line = 1;
+    g_source_column = 1;
+    g_source_start_of_line = 0;
     g_peek_queue_start = 0;
     g_peek_queue_end = 0;
     g_peek_queue_count = 0;
@@ -125,6 +150,14 @@ static Token lexer_next()
         if (!g_should_reconsume)
         {
             g_c = is_eof() ? '\0' : g_source[g_source_pointer++];
+
+            g_source_column += 1;
+            if (g_c == '\n')
+            {
+                g_source_start_of_line = g_source_pointer + 1;
+                g_source_line += 1;
+                g_source_column = 1;
+            }
         }
         g_should_reconsume = 0;
 

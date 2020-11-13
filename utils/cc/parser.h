@@ -84,7 +84,7 @@ typedef struct Buffer
 Buffer make_buffer(void **memory, int *count, int unit_size);
 void append_buffer(Buffer*, void *item);
 
-void match(enum TokenType, const char *name);
+Token match(enum TokenType, const char *name);
 Unit *parse();
 void free_unit(Unit *unit);
 

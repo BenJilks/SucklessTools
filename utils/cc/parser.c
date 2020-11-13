@@ -8,7 +8,7 @@
 static void parse_statement(Function*, Unit*, Scope*);
 static Scope *parse_scope(Function*, Unit*, SymbolTable *parent);
 
-void match(enum TokenType type, const char *name)
+Token match(enum TokenType type, const char *name)
 {
     Token token = lexer_consume(type);
     if (type != TOKEN_TYPE_NONE && token.type == TOKEN_TYPE_NONE)
@@ -17,6 +17,7 @@ void match(enum TokenType type, const char *name)
         ERROR("Expected token '%s', got '%s' instead",
             name, lexer_printable_token_data(&got));
     }
+    return token;
 }
 
 Buffer make_buffer(void **memory, int *count, int unit_size)
@@ -371,7 +372,7 @@ static void parse_enum(Unit *unit)
         {
             // TODO: We should allow constant expressions
             match(TOKEN_TYPE_EQUALS, "==");
-            Token number = lexer_consume(TOKEN_TYPE_INTEGER);
+            Token number = match(TOKEN_TYPE_INTEGER, "Enum Value");
             auto_allocator = atoi(lexer_printable_token_data(&number));
         }
 
