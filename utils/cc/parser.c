@@ -361,11 +361,21 @@ static void parse_enum(Unit *unit)
         member.data_type = enum_type;
         member.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
         member.flags = SYMBOL_ENUM;
-        member.location = auto_allocator++;
         member.param_count = 0;
         member.is_variadic = 0;
         member.array_count = 0;
         member.params = NULL;
+
+        // If there's an '==', we have a value
+        if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
+        {
+            // TODO: We should allow constant expressions
+            match(TOKEN_TYPE_EQUALS, "==");
+            Token number = lexer_consume(TOKEN_TYPE_INTEGER);
+            auto_allocator = atoi(lexer_printable_token_data(&number));
+        }
+
+        member.location = auto_allocator++;
         symbol_table_add(enum_.members, member);
         symbol_table_add(unit->global_table, member);
 
