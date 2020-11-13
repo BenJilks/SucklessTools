@@ -56,6 +56,12 @@ typedef struct Struct
     SymbolTable *members;
 } Struct;
 
+typedef struct Enum
+{
+    Token name;
+    SymbolTable *members;
+} Enum;
+
 typedef struct Unit
 {
     Function *functions;

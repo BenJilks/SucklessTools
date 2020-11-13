@@ -107,6 +107,8 @@ static enum TokenType check_keyword(Token *token)
         return TOKEN_TYPE_STRUCT;
     if (lexer_compair_token_name(token, "unsigned"))
         return TOKEN_TYPE_UNSIGNED;
+    if (lexer_compair_token_name(token, "enum"))
+        return TOKEN_TYPE_ENUM;
     return TOKEN_TYPE_IDENTIFIER;
 }
 

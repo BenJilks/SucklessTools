@@ -121,6 +121,8 @@ static void get_value_from_address(X86Code *code, DataType *type)
 
 static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
 {
+    assert (!(variable->flags & SYMBOL_ENUM));
+
     int location = get_variable_location(variable);
     if (variable->flags & SYMBOL_MEMBER)
     {
@@ -143,6 +145,12 @@ static X86Value compile_variable_pointer(X86Code *code, Symbol *variable)
 
 static X86Value compile_variable(X86Code *code, Symbol *variable)
 {
+    if (variable->flags & SYMBOL_ENUM)
+    {
+        INST(X86_OP_CODE_PUSH_IMM32, variable->location);
+        return (X86Value) { dt_int() };
+    }
+
     int location = get_variable_location(variable);
     int type_size = data_type_size(&variable->data_type);
 

@@ -12,6 +12,7 @@ enum DataTypeFlags
     DATA_TYPE_PRIMITIVE = 1 << 1,
     DATA_TYPE_STRUCT    = 1 << 2,
     DATA_TYPE_UNSIGNED  = 1 << 3,
+    DATA_TYPE_ENUM      = 1 << 4,
 };
 
 enum Primitive

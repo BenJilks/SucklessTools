@@ -536,7 +536,7 @@ static DefinitionScope parse_identifier_arguments(
     Define current_argument;
     int buffer_pointer = 0;
     int arguement_count = 0;
-    int brace_depth = 1;
+    int brace_depth = 0;
     for (;;)
     {
         stream_read_next_char(input);
@@ -556,6 +556,13 @@ static DefinitionScope parse_identifier_arguments(
             case IDENTIFIER_STATE_ARGUMENT:
                 if (input->peek == ',' || input->peek == ')')
                 {
+                    if (input->peek == ')' && brace_depth > 0)
+                    {
+                        brace_depth -= 1;
+                        current_argument.value[buffer_pointer++] = input->peek;
+                        break;
+                    }
+
                     strcpy(current_argument.name, def->params[arguement_count++]);
                     current_argument.value[buffer_pointer] = '\0';
                     current_argument.param_count = 0;
@@ -563,8 +570,6 @@ static DefinitionScope parse_identifier_arguments(
 
                     buffer_pointer = 0;
                     if (input->peek == ')')
-                        brace_depth -= 1;
-                    if (brace_depth <= 0)
                         return arguments;
                     break;
                 }
@@ -802,5 +807,5 @@ void pre_proccess_file(
 {
     DefinitionScope scope = definition_scope_create();
     parse_block(input, output, "Main", BLOCK_MODE_DEFUALT, &scope);
-    //dump_macro_map(&scope);
+    dump_macro_map(&scope);
 }

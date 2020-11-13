@@ -33,12 +33,10 @@ int main()
     pre_proccess_file(&input_stream, &output_stream);
 
     //fwrite(output_stream.memory, 1, output_stream.memory_length, stdout);
-    debug_dump_no_empty_lines(&output_stream);
+    //debug_dump_no_empty_lines(&output_stream);
 
     stream_close(&input_stream);
-    stream_close(&output_stream);
-    return 0;
-    //lexer_open_memory(data, data_len);
+    lexer_open_memory(output_stream.memory, output_stream.memory_length);
 
     // Parse
     Unit *unit = parse();

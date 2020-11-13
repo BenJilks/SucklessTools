@@ -13,6 +13,7 @@ enum SymbolFlags
     SYMBOL_ARGUMENT = 1 << 4,
     SYMBOL_MEMBER   = 1 << 5,
     SYMBOL_ARRAY    = 1 << 6,
+    SYMBOL_ENUM     = 1 << 7,
 };
 
 typedef struct Symbol

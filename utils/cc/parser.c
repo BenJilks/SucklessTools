@@ -338,6 +338,45 @@ static void parse_struct(Unit *unit)
     unit->structs[unit->struct_count++] = struct_;
 }
 
+static void parse_enum(Unit *unit)
+{
+    match(TOKEN_TYPE_ENUM, "enum");
+
+    Enum enum_;
+    enum_.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+    enum_.members = symbol_table_new(NULL);
+
+    DataType enum_type;
+    enum_type.name = enum_.name;
+    enum_type.flags = DATA_TYPE_ENUM | DATA_TYPE_PRIMITIVE;
+    enum_type.pointer_count = 0;
+    enum_type.primitive = PRIMITIVE_INT;
+    enum_type.size = 4;
+
+    match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
+    int auto_allocator = 0;
+    while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
+    {
+        Symbol member;
+        member.data_type = enum_type;
+        member.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
+        member.flags = SYMBOL_ENUM;
+        member.location = auto_allocator++;
+        member.param_count = 0;
+        member.is_variadic = 0;
+        member.array_count = 0;
+        member.params = NULL;
+        symbol_table_add(enum_.members, member);
+        symbol_table_add(unit->global_table, member);
+
+        if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
+            break;
+        match(TOKEN_TYPE_COMMA, ",");
+    }
+    match(TOKEN_TYPE_CLOSE_SQUIGGLY, "}");
+    match(TOKEN_TYPE_SEMI, ";");
+}
+
 Unit *parse()
 {
     Unit *unit = malloc(sizeof (Unit));
@@ -363,6 +402,9 @@ Unit *parse()
                 break;
             case TOKEN_TYPE_STRUCT:
                 parse_struct(unit);
+                break;
+            case TOKEN_TYPE_ENUM:
+                parse_enum(unit);
                 break;
             default:
                 assert (0);
