@@ -11,25 +11,46 @@ static Token g_peek_queue[PEEK_QUEUE_SIZE];
 static int g_peek_queue_start = 0;
 static int g_peek_queue_end = 0;
 static int g_peek_queue_count = 0;
-static Token g_null_token = { NULL, 0, TOKEN_TYPE_NONE };
+static Token g_null_token = { NULL, 0, TOKEN_TYPE_NONE, { "null", 0, 0, 0 } };
 
 static char *g_source = NULL;
 static int g_source_length;
 static int g_source_pointer;
 static int g_source_line;
 static int g_source_column;
-static int g_source_start_of_line;
+static SourceMap *g_source_map;
 
 static char g_c = '\0';
 static int g_should_reconsume = 0;
 
-void lexer_error(const char *message)
+static int find_start_of_line(SourceLine *line)
 {
-    fprintf(stderr, "[Error %i:%i] %s\n",
-        g_source_line, g_source_column, message);
-    fprintf(stderr, "%5i | ", g_source_line);
+    int index = line->source_index;
+    for (;;)
+    {
+        if (index < 0)
+            break;
+        if (g_source[index] == '\n')
+            break;
+        index -= 1;
+    }
 
-    int pointer = g_source_start_of_line;
+    return index + 1;
+}
+
+void lexer_error(Token *token, const char *message)
+{
+    SourceLine line;
+    if (!token)
+        line = source_map_entry_for_line(g_source_map, g_source_pointer, g_source_line, g_source_column);
+    else
+        line = token->line;
+
+    fprintf(stderr, "[Error '%s' %i:%i] %s\n",
+        line.file_name, line.line_no, line.column_no, message);
+    fprintf(stderr, "%5i | ", line.line_no);
+
+    int pointer = find_start_of_line(&line);
     while (pointer < g_source_length)
     {
         char c = g_source[pointer++];
@@ -44,7 +65,7 @@ void lexer_error(const char *message)
     fprintf(stderr, "^^^^\n\n");
 }
 
-void lexer_open_file(const char *file_path)
+void lexer_open_file(const char *file_path, SourceMap *source_map)
 {
     assert (!g_source);
 
@@ -63,13 +84,13 @@ void lexer_open_file(const char *file_path)
     g_source_pointer = 0;
     g_source_line = 1;
     g_source_column = 1;
-    g_source_start_of_line = 0;
+    g_source_map = source_map;
     g_peek_queue_start = 0;
     g_peek_queue_end = 0;
     g_peek_queue_count = 0;
 }
 
-void lexer_open_memory(const char *data, int data_len)
+void lexer_open_memory(const char *data, int data_len, SourceMap *source_map)
 {
     assert (!g_source);
     g_source = (char*)data;
@@ -77,7 +98,7 @@ void lexer_open_memory(const char *data, int data_len)
     g_source_pointer = 0;
     g_source_line = 1;
     g_source_column = 1;
-    g_source_start_of_line = 0;
+    g_source_map = source_map;
     g_peek_queue_start = 0;
     g_peek_queue_end = 0;
     g_peek_queue_count = 0;
@@ -111,6 +132,7 @@ static Token make_single_char_token(enum TokenType type)
 {
     Token token;
     token.data = g_source + g_source_pointer - 1;
+    token.line = source_map_entry_for_line(g_source_map, g_source_pointer - 1, g_source_line, g_source_column);
     token.length = 1;
     token.type = type;
     return token;
@@ -154,7 +176,6 @@ static Token lexer_next()
             g_source_column += 1;
             if (g_c == '\n')
             {
-                g_source_start_of_line = g_source_pointer + 1;
                 g_source_line += 1;
                 g_source_column = 1;
             }
@@ -170,6 +191,7 @@ static Token lexer_next()
                 if (isspace(g_c))
 					break;
 
+                token.line = source_map_entry_for_line(g_source_map, g_source_pointer, g_source_line, g_source_column);
                 if (isalpha(g_c))
 				{
                     state = STATE_IDENTIFIER;
@@ -323,7 +345,7 @@ static Token lexer_next()
                     return token;
                 }
 
-                ERROR("Unexpected char '%c'", g_c);
+                ERROR(NULL, "Unexpected char '%c'", g_c);
                 state = STATE_INITIAL;
                 g_should_reconsume = 1;
                 break;

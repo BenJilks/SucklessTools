@@ -85,13 +85,13 @@ static Expression *parse_function_call(SymbolTable *table, Unit *unit, Expressio
         {
             if (argument_count < function_symbol->param_count)
             {
-                ERROR("Expected at least %i argument(s) for variadic function '%s', got %i instead",
+                ERROR(NULL, "Expected at least %i argument(s) for variadic function '%s', got %i instead",
                       function_symbol->param_count, lexer_printable_token_data(&function_symbol->name), argument_count);
             }
         }
         else
         {
-            ERROR("Expected %i argument(s) to function '%s', got %i instead",
+            ERROR(NULL, "Expected %i argument(s) to function '%s', got %i instead",
                   function_symbol->param_count, lexer_printable_token_data(&function_symbol->name), argument_count);
         }
     }
@@ -138,7 +138,7 @@ static Expression *parse_term(SymbolTable *table, Unit *unit, DataType *lhs_data
 
                 if (!value->v)
                 {
-                    ERROR("No symbol with the name '%s' found",
+                    ERROR(&token, "No symbol with the name '%s' found",
                         lexer_printable_token_data(&token));
                     break;
                 }
@@ -146,7 +146,7 @@ static Expression *parse_term(SymbolTable *table, Unit *unit, DataType *lhs_data
             expression->data_type = value->v->data_type;
             break;
         default:
-            ERROR("Expected expression, got '%s' instead",
+            ERROR(&token, "Expected expression, got '%s' instead",
                 lexer_printable_token_data(&token));
             assert (0);
             lexer_consume(token.type);

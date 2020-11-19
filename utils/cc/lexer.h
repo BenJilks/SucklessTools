@@ -1,6 +1,8 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#include "source_map.h"
+
 #define ENUMERATE_TOKEN_TYPES \
     __TOKEN_TYPE(NONE) \
     __TOKEN_TYPE(IDENTIFIER) \
@@ -47,20 +49,21 @@ typedef struct Token
 	char *data;
     int length;
 	enum TokenType type;
+    SourceLine line;
 } Token;
 
-void lexer_open_file(const char *file_path);
-void lexer_open_memory(const char *data, int data_len);
+void lexer_open_file(const char *file_path, SourceMap *source_map);
+void lexer_open_memory(const char *data, int data_len, SourceMap *source_map);
 void lexer_close();
 
-#define ERROR(...) \
+#define ERROR(token, ...) \
 { \
     char buffer[80]; \
     sprintf(buffer, __VA_ARGS__); \
-    lexer_error(buffer); \
+    lexer_error(token, buffer); \
 }
 
-void lexer_error(const char *message);
+void lexer_error(Token *token, const char *message);
 
 char *lexer_printable_token_data(Token*);
 int lexer_compair_token_name(Token*, const char *name);

@@ -6,7 +6,7 @@
 #define PRIMITIVE_DATA_TYPE(name, primitive) \
     DataType dt_##name() \
     { \
-        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER }, sizeof(name), DATA_TYPE_PRIMITIVE, primitive, NULL, 0 }; \
+        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER, { "null", 0, 0, 0 } }, sizeof(name), DATA_TYPE_PRIMITIVE, primitive, NULL, 0 }; \
     }
 
 PRIMITIVE_DATA_TYPE(void, PRIMITIVE_VOID);
@@ -83,7 +83,7 @@ static DataType parse_primitive()
     data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     data_type.primitive = primitive_from_name(&data_type.name);
     if (data_type.primitive == PRIMITIVE_NONE)
-        ERROR("Expected datatype, got '%s' instead", lexer_printable_token_data(&data_type.name));
+        ERROR(&data_type.name, "Expected datatype, got '%s' instead", lexer_printable_token_data(&data_type.name));
 
     data_type.size = size_from_primitive(data_type.primitive);
     data_type.flags |= DATA_TYPE_PRIMITIVE;
@@ -116,7 +116,7 @@ static DataType parse_struct_type(Unit *unit)
 
     if (struct_ == NULL)
     {
-        ERROR("No struct with the name '%s' found\n",
+        ERROR(&name, "No struct with the name '%s' found\n",
             lexer_printable_token_data(&name));
     }
     else

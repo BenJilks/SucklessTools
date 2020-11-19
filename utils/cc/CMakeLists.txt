@@ -12,6 +12,7 @@ set(SOURCES
         dumpast.c
         stream.c
         macro_condition.c
+        source_map.c
         x86.c
         x86_expression.c
         x86_asm.c

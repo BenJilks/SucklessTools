@@ -598,7 +598,7 @@ X86Value compile_expression(X86Code *code, Expression *expression, enum Expressi
         case EXPRESSION_TYPE_REF:
             assert(expression->left->type == EXPRESSION_TYPE_VALUE);
             if (expression->left->value.type != VALUE_TYPE_VARIABLE)
-                lexer_error("Can only take pointer of non literals");
+                lexer_error(NULL, "Can only take pointer of non literals");
             else
                 return compile_variable_pointer(code, expression->left->value.v);
             break;

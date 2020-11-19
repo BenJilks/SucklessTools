@@ -98,7 +98,7 @@ typedef struct DefinitionScope
 } DefinitionScope;
 
 static enum EndBlockMode parse_block(Stream *input, Stream *output, const char *type_name,
-    enum BlockMode mode, DefinitionScope *scope);
+    enum BlockMode mode, DefinitionScope *scope, SourceMap *map);
 
 static DefinitionScope definition_scope_create()
 {
@@ -141,6 +141,7 @@ static void skip_macro(Stream *input)
         if (input->peek == '\n' || input->peek == (char)EOF)
             break;
     }
+    input->should_reconsume = 1;
 }
 
 static void parse_define(
@@ -270,7 +271,7 @@ static int parse_if_condition(Stream *input, DefinitionScope *scope)
     stream_memory_output_to_input(&condition_value);
 
     Stream raw_condition = stream_create_output_memory();
-    parse_block(&condition_value, &raw_condition, "If", BLOCK_MODE_CONDITION, scope);
+    parse_block(&condition_value, &raw_condition, "If", BLOCK_MODE_CONDITION, scope, NULL);
     stream_memory_output_to_input(&raw_condition);
     raw_condition.memory[raw_condition.memory_length] = '\0';
     DEBUG("Condition: %s\n", raw_condition.memory);
@@ -282,31 +283,31 @@ static int parse_if_condition(Stream *input, DefinitionScope *scope)
 }
 
 static void parse_if_block(
-    Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, int condition_result)
+    Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, int condition_result, SourceMap *map)
 {
     int is_disabled = (mode == BLOCK_MODE_DISABLED);
 
     enum EndBlockMode end_mode = parse_block(input, output, "Scope",
-        condition_result && !is_disabled ? BLOCK_MODE_DEFUALT : BLOCK_MODE_DISABLED, scope);
+        condition_result && !is_disabled ? BLOCK_MODE_DEFUALT : BLOCK_MODE_DISABLED, scope, map);
 
     while (end_mode == END_BLOCK_MODE_ELIF)
     {
         int elif_result = parse_if_condition(input, scope);
         if (!condition_result && elif_result && !is_disabled)
-            end_mode = parse_block(input, output, "Else Scope", BLOCK_MODE_DEFUALT, scope);
+            end_mode = parse_block(input, output, "Else Scope", BLOCK_MODE_DEFUALT, scope, map);
         else
-            end_mode = parse_block(input, output, "Else Scope", BLOCK_MODE_DISABLED, scope);
+            end_mode = parse_block(input, output, "Else Scope", BLOCK_MODE_DISABLED, scope, map);
         condition_result |= elif_result;
     }
     if (end_mode == END_BLOCK_MODE_ELSE)
     {
         parse_block(input, output, "Else Scope",
-            condition_result || is_disabled ? BLOCK_MODE_DISABLED : BLOCK_MODE_DEFUALT, scope);
+            condition_result || is_disabled ? BLOCK_MODE_DISABLED : BLOCK_MODE_DEFUALT, scope, map);
     }
 }
 
 static void parse_if(
-    Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope)
+    Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
 {
     int condition_result = 0;
     if (mode == BLOCK_MODE_DISABLED)
@@ -315,7 +316,7 @@ static void parse_if(
         condition_result = parse_if_condition(input, scope);
 
     DEBUG("If\n");
-    parse_if_block(input, output, mode, scope, condition_result);
+    parse_if_block(input, output, mode, scope, condition_result, map);
 }
 
 static void parse_message(Stream *input, enum BlockMode mode, const char *name)
@@ -368,27 +369,28 @@ static void parse_name(Stream *input, char *buffer)
             buffer[buffer_pointer++] = input->peek;
         }
     }
+    input->should_reconsume = 1;
     buffer[buffer_pointer] = '\0';
 }
 
-static void parse_ifdef(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope)
+static void parse_ifdef(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
 {
     char buffer[80];
     parse_name(input, buffer);
     DEBUG("Ifdef %s\n", buffer);
 
     Define *def = find_definition(scope, buffer);
-    parse_if_block(input, output, mode, scope, def != NULL);
+    parse_if_block(input, output, mode, scope, def != NULL, map);
 }
 
-static void parse_ifndef(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope)
+static void parse_ifndef(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
 {
     char buffer[80];
     parse_name(input, buffer);
     DEBUG("Ifndef %s\n", buffer);
 
     Define *def = find_definition(scope, buffer);
-    parse_if_block(input, output, mode, scope, def == NULL);
+    parse_if_block(input, output, mode, scope, def == NULL, map);
 }
 
 static void absolute_include_file_path(char *local_file_path, char *out_buffer)
@@ -417,7 +419,8 @@ static void absolute_include_file_path(char *local_file_path, char *out_buffer)
     assert (0);
 }
 
-static void parse_include(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope)
+static void parse_include(Stream *input, Stream *output, enum BlockMode mode,
+    DefinitionScope *scope, SourceMap *map)
 {
     if (mode == BLOCK_MODE_DISABLED)
     {
@@ -450,7 +453,7 @@ static void parse_include(Stream *input, Stream *output, enum BlockMode mode, De
                 {
                     buffer[buffer_pointer] = '\0';
                     is_end = 1;
-                    stream_read_next_char(input);
+                    skip_macro(input);
                     break;
                 }
                 buffer[buffer_pointer++] = input->peek;
@@ -461,20 +464,32 @@ static void parse_include(Stream *input, Stream *output, enum BlockMode mode, De
                 {
                     buffer[buffer_pointer] = '\0';
                     is_end = 1;
-                    stream_read_next_char(input);
+                    skip_macro(input);
                     break;
                 }
                 buffer[buffer_pointer++] = input->peek;
                 break;
         }
     }
+    stream_write_char(output, '\n');
 
+    // Create new source map entry
+    assert (map);
+    SourceMapEntry *map_entry = source_map_create_entry(map, buffer);
+    map_entry->from_line = output->line_no;
+
+    // Find the include path
     char include_path[80];
     absolute_include_file_path(buffer, include_path);
 
+    // Parse the file
     Stream file_stream = stream_create_input_file(include_path);
-    parse_block(&file_stream, output, include_path, BLOCK_MODE_DEFUALT, scope);
+    parse_block(&file_stream, output, include_path, BLOCK_MODE_DEFUALT, scope, map);
     stream_close(&file_stream);
+
+    // Add the source map entry
+    map_entry->to_line = output->line_no;
+    source_map_entry_finish(map);
 }
 
 static void parse_undef(Stream *input, enum BlockMode mode, DefinitionScope *scope)
@@ -500,22 +515,22 @@ static void parse_undef(Stream *input, enum BlockMode mode, DefinitionScope *sco
 }
 
 static void parse_macro(Stream *input, Stream *output, enum BlockMode mode,
-    char *macro_name, DefinitionScope *scope)
+    char *macro_name, DefinitionScope *scope, SourceMap *map)
 {
     if (!strcmp(macro_name, "define"))
         parse_define(input, mode, scope);
     else if (!strcmp(macro_name, "if"))
-        parse_if(input, output, mode, scope);
+        parse_if(input, output, mode, scope, map);
     else if (!strcmp(macro_name, "ifdef"))
-        parse_ifdef(input, output, mode, scope);
+        parse_ifdef(input, output, mode, scope, map);
     else if (!strcmp(macro_name, "ifndef"))
-        parse_ifndef(input, output, mode, scope);
+        parse_ifndef(input, output, mode, scope, map);
     else if (!strcmp(macro_name, "error"))
         parse_message(input, mode, "Error");
     else if (!strcmp(macro_name, "warning"))
         parse_message(input, mode, "Warning");
     else if (!strcmp(macro_name, "include"))
-        parse_include(input, output, mode, scope);
+        parse_include(input, output, mode, scope, map);
     else if (!strcmp(macro_name, "undef"))
         parse_undef(input, mode, scope);
     else
@@ -594,7 +609,7 @@ static void parse_identifier(
 
     DefinitionScope argument_scope = parse_identifier_arguments(input, def, scope);
     Stream macro_value_stream = stream_create_input_memory(def->value, strlen(def->value));
-    parse_block(&macro_value_stream, output, def->name, BLOCK_MODE_IGNORE_MACROS, &argument_scope);
+    parse_block(&macro_value_stream, output, def->name, BLOCK_MODE_IGNORE_MACROS, &argument_scope, NULL);
     free(argument_scope.defines);
 }
 
@@ -655,7 +670,7 @@ static void parse_defined_call(Stream *input, Stream *output, DefinitionScope *s
 }
 
 static enum EndBlockMode parse_block(Stream *input, Stream *output, const char *type_name,
-    enum BlockMode mode, DefinitionScope *scope)
+    enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
 {
     DEBUG("Block %s%s\n", type_name, mode == BLOCK_MODE_DISABLED ? " (disabled)" : "");
     DEBUG_START_SCOPE;
@@ -779,7 +794,7 @@ static enum EndBlockMode parse_block(Stream *input, Stream *output, const char *
                         return END_BLOCK_MODE_ELIF;
                     }
 
-                    parse_macro(input, output, mode, buffer, scope);
+                    parse_macro(input, output, mode, buffer, scope, map);
                     state = CODE_BLOCK_STATE_DEFAULT;
                     input->should_reconsume = 1;
                     break;
@@ -790,7 +805,8 @@ static enum EndBlockMode parse_block(Stream *input, Stream *output, const char *
     }
 }
 
-void dump_macro_map(DefinitionScope *scope)
+#ifdef DEBUG_PRE_PROCCESSOR
+static void dump_macro_map(DefinitionScope *scope)
 {
     for (int i = 0; i < scope->count; i++)
     {
@@ -801,11 +817,18 @@ void dump_macro_map(DefinitionScope *scope)
         printf(",\"%s\"\n", def->value);
     }
 }
+#endif
 
-void pre_proccess_file(
+SourceMap pre_proccess_file(
     Stream *input, Stream *output)
 {
+    SourceMap map = source_map_new();
     DefinitionScope scope = definition_scope_create();
-    parse_block(input, output, "Main", BLOCK_MODE_DEFUALT, &scope);
+    parse_block(input, output, "Main", BLOCK_MODE_DEFUALT, &scope, &map);
+
+#ifdef DEBUG_PRE_PROCCESSOR
     dump_macro_map(&scope);
+#endif
+
+    return map;
 }

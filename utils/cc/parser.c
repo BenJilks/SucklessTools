@@ -14,7 +14,7 @@ Token match(enum TokenType type, const char *name)
     if (type != TOKEN_TYPE_NONE && token.type == TOKEN_TYPE_NONE)
     {
         Token got = lexer_peek(0);
-        ERROR("Expected token '%s', got '%s' instead",
+        ERROR(&got, "Expected token '%s', got '%s' instead",
             name, lexer_printable_token_data(&got));
     }
     return token;
@@ -275,6 +275,14 @@ static void parse_params(Function *function, Unit *unit, Symbol *symbol)
 
 static void parse_function(Unit *unit)
 {
+    if (!is_data_type_next(unit->global_table))
+    {
+        Token token = lexer_consume(TOKEN_TYPE_NONE);
+        ERROR(&token, "Expected datatype, got '%s' instead",
+            lexer_printable_token_data(&token));
+        return;
+    }
+
     Function function;
     function.table = symbol_table_new(unit->global_table);
     function.stack_size = 0;

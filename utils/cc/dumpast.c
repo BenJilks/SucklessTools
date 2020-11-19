@@ -24,7 +24,10 @@ static void dump_value(Value *value, int indent)
             fprintf(stderr, "string \"%s\"\n", lexer_printable_token_data(&value->s));
             break;
         case VALUE_TYPE_VARIABLE:
-            fprintf(stderr, "variable %s\n", lexer_printable_token_data(&value->v->name));
+            if (value->v == NULL)
+                fprintf(stderr, "variable %s\n", "!! Unkown !!");
+            else
+                fprintf(stderr, "variable %s\n", lexer_printable_token_data(&value->v->name));
             break;
         default:
             assert (0);

@@ -7,6 +7,7 @@
 #include "x86.h"
 #include <ctype.h>
 
+#if 0
 static void debug_dump_no_empty_lines(Stream *stream)
 {
     int is_start_of_line = 1;
@@ -25,18 +26,33 @@ static void debug_dump_no_empty_lines(Stream *stream)
             is_start_of_line = 1;
     }
 }
+#endif
 
 int main()
 {
     Stream input_stream = stream_create_input_file("test.c");
     Stream output_stream = stream_create_output_memory();
-    pre_proccess_file(&input_stream, &output_stream);
+    SourceMap source_map = pre_proccess_file(&input_stream, &output_stream);
 
     //fwrite(output_stream.memory, 1, output_stream.memory_length, stdout);
     //debug_dump_no_empty_lines(&output_stream);
+    int line_no = 0;
+    SourceLine curr_line = source_map_entry_for_line(&source_map, 0, ++line_no, 0);
+    printf("%s %4i | ", curr_line.file_name, curr_line.line_no);
+    for (int i = 0; i < output_stream.memory_length; i++)
+    {
+        char c = output_stream.memory[i];
+        printf("%c", c);
+        if (c == '\n')
+        {
+            curr_line = source_map_entry_for_line(&source_map, i, ++line_no, 0);
+            printf("%s %4i | ", curr_line.file_name, curr_line.line_no);
+        }
+    }
+    printf("\n");
 
     stream_close(&input_stream);
-    lexer_open_memory(output_stream.memory, output_stream.memory_length);
+    lexer_open_memory(output_stream.memory, output_stream.memory_length, &source_map);
 
     // Parse
     Unit *unit = parse();
@@ -52,5 +68,6 @@ int main()
     free(unit);
 
     lexer_close();
+    free_source_map(&source_map);
     return 0;
 }

@@ -14,6 +14,7 @@ Stream stream_create_input_file(const char *file_name)
     stream.mode = STREAM_MODE_INPUT;
     stream.peek = 0;
     stream.should_reconsume = 0;
+    stream.line_no = 1;
     return stream;
 }
 
@@ -23,6 +24,7 @@ Stream stream_create_input_memory(char *memory, int memory_length)
     stream.memory = memory;
     stream.memory_length = memory_length;
     stream.memory_pointer = 0;
+    stream.line_no = 1;
     stream.type = STREAM_TYPE_MEMORY;
     stream.mode = STREAM_MODE_INPUT;
     stream.peek = 0;
@@ -36,6 +38,7 @@ Stream stream_create_output_memory()
     stream.memory = malloc(STREAM_BUFFER_SIZE);
     stream.memory_pointer = STREAM_BUFFER_SIZE;
     stream.memory_length = 0;
+    stream.line_no = 1;
     stream.type = STREAM_TYPE_MEMORY;
     stream.mode = STREAM_MODE_OUTPUT;
     return stream;
@@ -47,6 +50,7 @@ void stream_memory_output_to_input(Stream *stream)
     stream->memory_pointer = 0;
     stream->peek = 0;
     stream->should_reconsume = 0;
+    stream->line_no = 1;
 }
 
 void stream_read_next_char(Stream *stream)
@@ -70,6 +74,8 @@ void stream_read_next_char(Stream *stream)
             stream->peek = fgetc(stream->file);
             return;
     }
+    if (stream->peek == '\n')
+        stream->line_no += 1;
     assert (0);
 }
 
@@ -88,6 +94,8 @@ void stream_write_char(Stream *stream, char c)
     assert (stream->type == STREAM_TYPE_MEMORY);
     ensure_size(stream, 1);
     stream->memory[stream->memory_length++] = c;
+    if (c == '\n')
+        stream->line_no += 1;
 }
 
 void stream_write_string(Stream *stream, const char *str)
@@ -95,6 +103,12 @@ void stream_write_string(Stream *stream, const char *str)
     assert (stream->mode == STREAM_MODE_OUTPUT);
     assert (stream->type == STREAM_TYPE_MEMORY);
     int str_len = strlen(str);
+
+    for (int i = 0; i < str_len; i++)
+    {
+        if (str[i] == '\n')
+            stream->line_no += 1;
+    }
 
     ensure_size(stream, str_len);
     strcpy(stream->memory + stream->memory_length, str);

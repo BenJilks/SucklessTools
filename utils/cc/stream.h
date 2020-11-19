@@ -29,6 +29,7 @@ typedef struct Stream
     enum StreamMode mode;
     char peek;
     int should_reconsume;
+    int line_no;
 } Stream;
 
 Stream stream_create_input_file(const char *file_name);
