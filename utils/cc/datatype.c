@@ -2,12 +2,31 @@
 #include "parser.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 
-#define PRIMITIVE_DATA_TYPE(name, primitive) \
-    DataType dt_##name() \
+#define PRIMITIVE_DATA_TYPE(_name, _primitive) \
+    DataType dt_##_name() \
     { \
-        return (DataType){ { #name, sizeof(#name), TOKEN_TYPE_IDENTIFIER, { "null", 0, 0, 0 } }, sizeof(name), DATA_TYPE_PRIMITIVE, primitive, NULL, 0 }; \
+        DataType type = new_data_type(); \
+        type.name = (Token) { #_name, sizeof(#_name), \
+            TOKEN_TYPE_IDENTIFIER, { "null", 0, 0, 0 } }; \
+         \
+        type.flags = DATA_TYPE_PRIMITIVE; \
+        type.primitive = _primitive; \
+        return type; \
     }
+
+static DataType new_data_type()
+{
+    // Create a completely empty type
+    DataType type;
+    type.name = (Token) { "null", 4 };
+    type.pointer_count = 0;
+    type.array_count = 0;
+    type.flags = 0;
+    type.members = NULL;
+    return type;
+}
 
 PRIMITIVE_DATA_TYPE(void, PRIMITIVE_VOID);
 PRIMITIVE_DATA_TYPE(int, PRIMITIVE_INT);
@@ -33,13 +52,6 @@ int data_type_equals(DataType *lhs, DataType *rhs)
     return 1;
 }
 
-int data_type_size(DataType *data_type)
-{
-    if (data_type->pointer_count > 0)
-        return 4; // NOTE: 32bit only
-    return data_type->size;
-}
-
 static int size_from_primitive(enum Primitive primitive)
 {
     switch (primitive)
@@ -59,6 +71,27 @@ static int size_from_primitive(enum Primitive primitive)
     }
 }
 
+int data_type_size(DataType *data_type)
+{
+    // TODO: This can be easily cached.
+
+    // Find the base type size, ignoring arrays
+    int base_size;
+    if (data_type->pointer_count > 0)
+        base_size = 4; // NOTE: 32bit only
+    else if (data_type->flags & DATA_TYPE_PRIMITIVE)
+        base_size = size_from_primitive(data_type->primitive);
+    else if (data_type->flags & DATA_TYPE_STRUCT)
+        base_size = symbol_table_size(data_type->members);
+    else
+        assert(0);
+
+    // Calculate total size from arrays
+    for (int i = 0; i < data_type->array_count; i++)
+        base_size *= data_type->array_sizes[i];
+    return base_size;
+}
+
 static void parse_type_pointers(DataType *data_type)
 {
     while (lexer_peek(0).type == TOKEN_TYPE_STAR)
@@ -70,10 +103,7 @@ static void parse_type_pointers(DataType *data_type)
 
 static DataType parse_primitive()
 {
-    DataType data_type;
-    data_type.flags = 0;
-    data_type.pointer_count = 0;
-    data_type.members = NULL;
+    DataType data_type = new_data_type();
     if (lexer_peek(0).type == TOKEN_TYPE_CONST)
     {
         match(TOKEN_TYPE_CONST, "const");
@@ -83,9 +113,11 @@ static DataType parse_primitive()
     data_type.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     data_type.primitive = primitive_from_name(&data_type.name);
     if (data_type.primitive == PRIMITIVE_NONE)
-        ERROR(&data_type.name, "Expected datatype, got '%s' instead", lexer_printable_token_data(&data_type.name));
+    {
+        ERROR(&data_type.name, "Expected datatype, got '%s' instead",
+            lexer_printable_token_data(&data_type.name));
+    }
 
-    data_type.size = size_from_primitive(data_type.primitive);
     data_type.flags |= DATA_TYPE_PRIMITIVE;
     parse_type_pointers(&data_type);
     return data_type;
@@ -104,9 +136,8 @@ static Struct *find_struct(Unit *unit, Token *name)
 
 static DataType parse_struct_type(Unit *unit)
 {
-    DataType data_type;
+    DataType data_type = new_data_type();
     data_type.flags = DATA_TYPE_STRUCT;
-    data_type.pointer_count = 0;
     data_type.primitive = PRIMITIVE_NONE;
 
     match(TOKEN_TYPE_STRUCT, "struct");
@@ -121,7 +152,6 @@ static DataType parse_struct_type(Unit *unit)
     }
     else
     {
-        data_type.size = symbol_table_size(struct_->members);
         data_type.members = struct_->members;
     }
 
@@ -170,3 +200,4 @@ DataType parse_data_type(Unit *unit, SymbolTable *table)
     // Otherwise, parse normally
     return parse_primitive();
 }
+

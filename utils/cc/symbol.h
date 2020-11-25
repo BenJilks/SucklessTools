@@ -12,7 +12,6 @@ enum SymbolFlags
     SYMBOL_FUNCTION = 1 << 3,
     SYMBOL_ARGUMENT = 1 << 4,
     SYMBOL_MEMBER   = 1 << 5,
-    SYMBOL_ARRAY    = 1 << 6,
     SYMBOL_ENUM     = 1 << 7,
 };
 
@@ -22,7 +21,6 @@ typedef struct Symbol
     DataType data_type;
     int flags;
     int location;
-    int array_count;
 
     struct Symbol *params;
     int param_count;

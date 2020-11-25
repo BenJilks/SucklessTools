@@ -3,6 +3,8 @@
 
 #include "lexer.h"
 
+#define MAX_ARRAY_DEPTH 80
+
 struct SymbolTable;
 struct Unit;
 
@@ -28,12 +30,13 @@ enum Primitive
 typedef struct DataType
 {
     Token name;
-    int size;
+    int pointer_count;
+    int array_count;
 
     enum DataTypeFlags flags;
     enum Primitive primitive;
     struct SymbolTable *members;
-    int pointer_count;
+    int array_sizes[MAX_ARRAY_DEPTH];
 } DataType;
 
 DataType dt_void();
@@ -45,6 +48,9 @@ DataType dt_const_char_pointer();
 
 int data_type_equals(DataType *lhs, DataType *rhs);
 int data_type_size(DataType *data_type);
-DataType parse_data_type(struct Unit *unit, struct SymbolTable *table);
+
+DataType parse_data_type(
+    struct Unit *unit, struct SymbolTable *table);
 
 #endif // DATA_TYPE_H
+

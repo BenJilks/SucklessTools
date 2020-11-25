@@ -85,15 +85,17 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
         symbol.location = function->stack_size;
         symbol.params = NULL;
         symbol.param_count = 0;
-        symbol.array_count = 1;
 
         // Parse array size, if there is any
-        if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUARE)
+        DataType *symbol_type = &symbol.data_type;
+        while (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUARE)
         {
-            match(TOKEN_TYPE_OPEN_SQUARE, "[");
+            match(TOKEN_TYPE_OPEN_SQUARE, "["); 
             Token count_token = lexer_consume(TOKEN_TYPE_INTEGER);
-            symbol.array_count = atoi(lexer_printable_token_data(&count_token));
-            symbol.flags |= SYMBOL_ARRAY;
+
+            int array_size = atoi(lexer_printable_token_data(&count_token));
+            symbol_type->array_sizes[symbol_type->array_count++] = array_size;
+            
             match(TOKEN_TYPE_CLOSE_SQUARE, "]");
         }
 
@@ -334,7 +336,7 @@ static void parse_struct(Unit *unit)
         member.location = allocator;
         match(TOKEN_TYPE_SEMI, ";");
 
-        allocator += member.data_type.size;
+        allocator += data_type_size(&member.data_type);
         symbol_table_add(struct_.members, member);
     }
     match(TOKEN_TYPE_CLOSE_SQUIGGLY, "}");
@@ -360,7 +362,6 @@ static void parse_enum(Unit *unit)
     enum_type.flags = DATA_TYPE_ENUM | DATA_TYPE_PRIMITIVE;
     enum_type.pointer_count = 0;
     enum_type.primitive = PRIMITIVE_INT;
-    enum_type.size = 4;
 
     match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
     int auto_allocator = 0;
@@ -372,7 +373,6 @@ static void parse_enum(Unit *unit)
         member.flags = SYMBOL_ENUM;
         member.param_count = 0;
         member.is_variadic = 0;
-        member.array_count = 0;
         member.params = NULL;
 
         // If there's an '==', we have a value

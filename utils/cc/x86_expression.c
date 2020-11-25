@@ -154,10 +154,6 @@ static X86Value compile_variable(X86Code *code, Symbol *variable)
     int location = get_variable_location(variable);
     int type_size = data_type_size(&variable->data_type);
 
-    // NOTE: Arrays should return their pointer
-    if (variable->flags & SYMBOL_ARRAY)
-        return compile_variable_pointer(code, variable);
-
     switch (type_size)
     {
         case 1:

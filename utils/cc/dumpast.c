@@ -36,37 +36,46 @@ static void dump_value(Value *value, int indent)
 
 static void dump_expression(Expression *expression, int indent)
 {
+#define PRINT_DATA_TYPE \
+    fprintf(stderr, " -> %s\n", printable_data_type(&expression->data_type));
+
     print_indent(indent);
     switch (expression->type)
     {
         case EXPRESSION_TYPE_VALUE:
-            fprintf(stderr, "Value:\n");
+            fprintf(stderr, "Value:");
+            PRINT_DATA_TYPE; 
             dump_value(&expression->value, indent + 1);
             break;
         case EXPRESSION_TYPE_REF:
-            fprintf(stderr, "Ref:\n");
+            fprintf(stderr, "Ref:");
+            PRINT_DATA_TYPE; 
             dump_expression(expression->left, indent + 1);
             break;
         case EXPRESSION_TYPE_INVERT:
-            fprintf(stderr, "Invert:\n");
+            fprintf(stderr, "Invert:");
+            PRINT_DATA_TYPE; 
             dump_expression(expression->left, indent + 1);
             break;
         case EXPRESSION_TYPE_CAST:
-            fprintf(stderr, "Cast:\n");
+            fprintf(stderr, "Cast:");
+            PRINT_DATA_TYPE; 
             dump_expression(expression->left, indent + 1);
             print_indent(indent + 1);
             fprintf(stderr, "To '%s'\n", printable_data_type(&expression->data_type));
             break;
         case EXPRESSION_TYPE_FUNCTION_CALL:
-            fprintf(stderr, "Call:\n");
+            fprintf(stderr, "Call:");
+            PRINT_DATA_TYPE; 
             dump_expression(expression->left, indent + 1);
             print_indent(indent);
-            fprintf(stderr, "Arguments:\n");
+            fprintf(stderr, "Arguments:");
             for (int i = 0; i < expression->argument_length; i++)
                 dump_expression(expression->arguments[i], indent + 1);
             break;
         default:
-            fprintf(stderr, "%s:\n", expression_type_name(expression->type));
+            fprintf(stderr, "%s:", expression_type_name(expression->type));
+            PRINT_DATA_TYPE; 
             dump_expression(expression->left, indent + 1);
             dump_expression(expression->right, indent + 1);
             break;
@@ -94,6 +103,13 @@ char *printable_data_type(DataType *data_type)
     {
         sprintf(buffer + buffer_pointer, "*");
         buffer_pointer += 1;
+    }
+
+    sprintf(buffer + (buffer_pointer++), " ");
+    for (int i = 0; i < data_type->array_count; i++)
+    {
+        sprintf(buffer + buffer_pointer, "[%i]", data_type->array_sizes[i]);
+        buffer_pointer = strlen(buffer);
     }
     return buffer;
 }

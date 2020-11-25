@@ -10,6 +10,7 @@
 //#define DEBUG_PRE_PROCCESSOR
 
 #ifdef DEBUG_PRE_PROCCESSOR
+
 static int g_debug_indent = 0;
 #define DEBUG(...) \
     do { \
@@ -18,11 +19,18 @@ static int g_debug_indent = 0;
     } while (0)
 #define DEBUG_START_SCOPE g_debug_indent++
 #define DEBUG_END_SCOPE g_debug_indent--
+
 #else
+
 #define DEBUG(...)
 #define DEBUG_START_SCOPE
 #define DEBUG_END_SCOPE
+
 #endif
+
+/*
+ * State machine defintions
+ */
 
 enum CodeBlockState
 {
@@ -83,6 +91,10 @@ enum EndBlockMode
     END_BLOCK_MODE_ELIF,
 };
 
+/*
+ * Defined data
+ */
+
 typedef struct Define
 {
     char name[80];
@@ -120,6 +132,10 @@ static void definition_scope_add(
 
 static DefinitionScope definition_scope_copy(DefinitionScope *original)
 {
+    // TODO: To avoid doing so much copying, we could 
+    // have sub-scopes.
+    
+    // Clone as scope into another
     DefinitionScope scope;
     scope.count = original->count;
     scope.defines = malloc(sizeof(Define) * scope.count);
@@ -129,6 +145,7 @@ static DefinitionScope definition_scope_copy(DefinitionScope *original)
 
 static void skip_macro(Stream *input)
 {
+    // Read until the next line, unless it was escaped
     for (;;)
     {
         stream_read_next_char(input);
@@ -147,6 +164,7 @@ static void skip_macro(Stream *input)
 static void parse_define(
     Stream *input, enum BlockMode mode, DefinitionScope *scope)
 {
+    // Ignore if it was disabled
     if (mode == BLOCK_MODE_DISABLED)
     {
         skip_macro(input);
@@ -157,7 +175,6 @@ static void parse_define(
     define.param_count = 0;
 
     enum DefineState state = DEFINE_STATE_START;
-    enum DefineState return_state;
     int buffer_pointer = 0;
     for (;;)
     {
@@ -165,6 +182,10 @@ static void parse_define(
         switch (state)
         {
             case DEFINE_STATE_START:
+                // Skip tokens to the first non-whitespace char
+                //   <whitespace> => START
+                //   *            => NAME
+
                 if (input->peek == '\n')
                     assert (0);
                 if (isspace(input->peek))
@@ -174,6 +195,11 @@ static void parse_define(
                 break;
 
             case DEFINE_STATE_NAME:
+                // Read defintions name
+                //   <alphanumeric>,_ => NAME
+                //   (                => ARGUMENT_START
+                //   *                => VALUE
+
                 if (!isalnum(input->peek) && input->peek != '_')
                 {
                     define.name[buffer_pointer] = '\0';
@@ -192,6 +218,11 @@ static void parse_define(
                 break;
 
             case DEFINE_STATE_ARGUMENT_START:
+                // Skip until start of name
+                //   <newline>    => Error
+                //   <whitespace> => ARGUMENT_START
+                //   *            => ARGUMENT
+
                 if (input->peek == '\n')
                     assert (0);
                 if (isspace(input->peek))
@@ -201,6 +232,10 @@ static void parse_define(
                 break;
 
             case DEFINE_STATE_ARGUMENT:
+                // Read argument name
+                //   <alphanumeric>,_ => ARGUMENT
+                //   *                => ARGUMENT_NEXT
+
                 if (!isalnum(input->peek) && input->peek != '_')
                 {
                     define.params[define.param_count][buffer_pointer] = '\0';
@@ -214,37 +249,55 @@ static void parse_define(
                 break;
 
             case DEFINE_STATE_ARGUMENT_NEXT:
-                if (input->peek == '\n')
-                    assert (0);
+                // Skip whitespace, if the next char is ',', then read the next 
+                // argument. Otherwise, it's ')', so end the argument list.
+                //   <whitespace> => ARGUMENT_NEXT
+                //   ,            => ARGUMENT_START
+                //   )            => VALUE
+                //   *            => Error
+                
                 if (isspace(input->peek))
                     break;
-                if (input->peek == ',')
-                    state = DEFINE_STATE_ARGUMENT_START;
-                else if (input->peek == ')')
-                    state = DEFINE_STATE_VALUE;
-                else
-                    assert (0);
+                
+                switch (input->peek)
+                {
+                    case ',':
+                        state = DEFINE_STATE_ARGUMENT_START;
+                        break;
+                    case ')':
+                        state = DEFINE_STATE_VALUE;
+                        break;
+                    default:
+                        assert (0);
+                }
                 break;
 
             case DEFINE_STATE_VALUE:
-                if (input->peek == '\\')
+                // Read until the end of the line, unless escaped
+                //   \         => ESCAPE
+                //   <newline> => Done
+                //   *         => VALUE
+
+                switch (input->peek)
                 {
-                    state = DEFINE_STATE_ESCAPE;
-                    return_state = DEFINE_STATE_VALUE;
-                    break;
+                    case '\\':
+                        state = DEFINE_STATE_ESCAPE;
+                        break;
+                    case '\n':
+                        define.value[buffer_pointer] = '\0';
+                        definition_scope_add(scope, define);
+                        DEBUG("Define %s = %s\n", define.name, define.value);
+                        return;
+                    default:
+                        define.value[buffer_pointer++] = input->peek;
                 }
-                if (input->peek == '\n')
-                {
-                    define.value[buffer_pointer] = '\0';
-                    definition_scope_add(scope, define);
-                    DEBUG("Define %s = %s\n", define.name, define.value);
-                    return;
-                }
-                define.value[buffer_pointer++] = input->peek;
                 break;
 
             case DEFINE_STATE_ESCAPE:
-                state = return_state;
+                // Ignore newlines
+                //   * => VALUE
+                
+                state = DEFINE_STATE_VALUE;
                 if (input->peek == '\n')
                     break;
                 input->should_reconsume = 1;
@@ -255,6 +308,7 @@ static void parse_define(
 
 static int parse_if_condition(Stream *input, DefinitionScope *scope)
 {
+    // Read the condition into a memory stream
     Stream condition_value = stream_create_output_memory();
     for (;;)
     {
@@ -270,12 +324,14 @@ static int parse_if_condition(Stream *input, DefinitionScope *scope)
     }
     stream_memory_output_to_input(&condition_value);
 
+    // Substitute macros within the conditions
     Stream raw_condition = stream_create_output_memory();
     parse_block(&condition_value, &raw_condition, "If", BLOCK_MODE_CONDITION, scope, NULL);
     stream_memory_output_to_input(&raw_condition);
     raw_condition.memory[raw_condition.memory_length] = '\0';
     DEBUG("Condition: %s\n", raw_condition.memory);
 
+    // Evaluate it and get the result
     int condition_result = macro_condition_parse(&raw_condition);
     stream_close(&condition_value);
     stream_close(&raw_condition);
@@ -283,15 +339,22 @@ static int parse_if_condition(Stream *input, DefinitionScope *scope)
 }
 
 static void parse_if_block(
-    Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, int condition_result, SourceMap *map)
+    Stream *input, Stream *output, 
+    enum BlockMode mode, DefinitionScope *scope, 
+    int condition_result, SourceMap *map)
 {
     int is_disabled = (mode == BLOCK_MODE_DISABLED);
 
+    // Parse the main body
     enum EndBlockMode end_mode = parse_block(input, output, "Scope",
         condition_result && !is_disabled ? BLOCK_MODE_DEFUALT : BLOCK_MODE_DISABLED, scope, map);
 
     while (end_mode == END_BLOCK_MODE_ELIF)
     {
+        // While the last block ends with an elif
+        //   A previous condition was true => disable block 
+        //   This condition is true        => enable block
+
         int elif_result = parse_if_condition(input, scope);
         if (!condition_result && elif_result && !is_disabled)
             end_mode = parse_block(input, output, "Else Scope", BLOCK_MODE_DEFUALT, scope, map);
@@ -301,6 +364,7 @@ static void parse_if_block(
     }
     if (end_mode == END_BLOCK_MODE_ELSE)
     {
+        // If no other condition was true, enable this block
         parse_block(input, output, "Else Scope",
             condition_result || is_disabled ? BLOCK_MODE_DISABLED : BLOCK_MODE_DEFUALT, scope, map);
     }
@@ -309,6 +373,7 @@ static void parse_if_block(
 static void parse_if(
     Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
 {
+    // If this block is disabled, always evaluate condition to false
     int condition_result = 0;
     if (mode == BLOCK_MODE_DISABLED)
         skip_macro(input);
@@ -321,12 +386,14 @@ static void parse_if(
 
 static void parse_message(Stream *input, enum BlockMode mode, const char *name)
 {
+    // Skip if disabled
     if (mode == BLOCK_MODE_DISABLED)
     {
         skip_macro(input);
         return;
     }
 
+    // Read and print message
     fprintf(stderr, "%s: ", name);
     for (;;)
     {
@@ -340,6 +407,9 @@ static void parse_message(Stream *input, enum BlockMode mode, const char *name)
 
 static Define *find_definition(DefinitionScope *scope, char *name)
 {
+    // TODO: Make this a lot better.
+
+    // Slow search through definitions
     for (int i = 0; i < scope->count; i++)
     {
         if (!strcmp(scope->defines[i].name, name))
@@ -350,30 +420,30 @@ static Define *find_definition(DefinitionScope *scope, char *name)
 
 static void parse_name(Stream *input, char *buffer)
 {
-    int buffer_pointer = 0;
-    int is_start = 1;
+    // Skip white space
     for (;;)
     {
         stream_read_next_char(input);
-        if (is_start)
-        {
-            if (isspace(input->peek))
-                continue;
-            buffer[buffer_pointer++] = input->peek;
-            is_start = 0;
-        }
-        else
-        {
-            if (isspace(input->peek))
-                break;
-            buffer[buffer_pointer++] = input->peek;
-        }
+        if (!isspace(input->peek))
+            break;
+    }
+
+    // Read name into buffer
+    int buffer_pointer = 0;
+    for (;;)
+    {
+        if (isspace(input->peek))
+            break;
+        buffer[buffer_pointer++] = input->peek;
+        stream_read_next_char(input);
     }
     input->should_reconsume = 1;
     buffer[buffer_pointer] = '\0';
 }
 
-static void parse_ifdef(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
+static void parse_ifdef(
+    Stream *input, Stream *output, enum BlockMode mode, 
+    DefinitionScope *scope, SourceMap *map)
 {
     char buffer[80];
     parse_name(input, buffer);
@@ -383,7 +453,9 @@ static void parse_ifdef(Stream *input, Stream *output, enum BlockMode mode, Defi
     parse_if_block(input, output, mode, scope, def != NULL, map);
 }
 
-static void parse_ifndef(Stream *input, Stream *output, enum BlockMode mode, DefinitionScope *scope, SourceMap *map)
+static void parse_ifndef(
+    Stream *input, Stream *output, enum BlockMode mode, 
+    DefinitionScope *scope, SourceMap *map)
 {
     char buffer[80];
     parse_name(input, buffer);
@@ -395,6 +467,7 @@ static void parse_ifndef(Stream *input, Stream *output, enum BlockMode mode, Def
 
 static void absolute_include_file_path(char *local_file_path, char *out_buffer)
 {
+    // TODO: This should not be a static list
     static char *include_locations[] =
     {
         "/usr/local/include/",
@@ -402,10 +475,12 @@ static void absolute_include_file_path(char *local_file_path, char *out_buffer)
         "/usr/lib/clang/10.0.1/include/"
     };
 
+    // Check if it's a local file
     strcpy(out_buffer, local_file_path);
     if (access(out_buffer, F_OK) != -1)
         return;
 
+    // Check each include path
     int include_location_count = (int)sizeof(include_locations) / (int)sizeof(include_locations[0]);
     for (int i = 0; i < include_location_count; i++)
     {
@@ -422,6 +497,7 @@ static void absolute_include_file_path(char *local_file_path, char *out_buffer)
 static void parse_include(Stream *input, Stream *output, enum BlockMode mode,
     DefinitionScope *scope, SourceMap *map)
 {
+    // Ignore if disabled
     if (mode == BLOCK_MODE_DISABLED)
     {
         skip_macro(input);

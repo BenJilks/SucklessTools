@@ -74,7 +74,7 @@ int symbol_table_size(SymbolTable *table)
 {
     int total_size = 0;
     for (int i = 0; i < table->symbol_count; i++)
-        total_size += table->symbols[i]->data_type.size;
+        total_size += data_type_size(&table->symbols[i]->data_type);
 
     if (table->parent)
         total_size += symbol_table_size(table->parent);
@@ -84,11 +84,7 @@ int symbol_table_size(SymbolTable *table)
 
 int symbol_size(Symbol *symbol)
 {
-    int type_size = data_type_size(&symbol->data_type);
-    if (symbol->flags & SYMBOL_ARRAY)
-        return type_size * symbol->array_count;
-    else
-        return type_size;
+    return data_type_size(&symbol->data_type);
 }
 
 void free_symbol_table(SymbolTable *table)
@@ -106,3 +102,4 @@ void free_symbol_table(SymbolTable *table)
     if (table->type_defs)
         free(table->type_defs);
 }
+
