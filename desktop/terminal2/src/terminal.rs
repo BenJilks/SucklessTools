@@ -1,6 +1,7 @@
 use super::display;
 use super::decoder::*;
-use super::display::output::*;
+use super::display::cursor::*;
+use super::display::buffer::*;
 use std::{ptr, mem, ffi::CString};
 use libc;
 
@@ -17,6 +18,24 @@ struct Terminal<'a, Display>
     decoder: Decoder,
     display: &'a mut Display,
     master: i32,
+}
+
+fn flush<Display>(term: &mut Terminal<Display>)
+    where Display: display::Display
+{
+    let changes = term.buffer.get_changes();
+    for row in 0..term.buffer.get_height()
+    {
+        for column in 0..term.buffer.get_width()
+        {
+            let index = row * term.buffer.get_width() + column;
+            if changes[index as usize] {
+                term.display.draw_rune(&term.buffer, &CursorPos::new(row, column));
+            }
+        }
+    }
+    term.buffer.flush();
+    term.display.flush();
 }
 
 fn handle_output<Display>(term: &mut Terminal<Display>)
@@ -36,11 +55,10 @@ fn handle_output<Display>(term: &mut Terminal<Display>)
             libc::perror(c_str("read").as_ptr());
             return;
         }
-
     }
 
     term.decoder.decode(&buffer, count_read, &mut term.buffer);
-    term.display.redraw(&term.buffer);
+    flush(term);
 }
 
 fn handle_input<Display>(term: &mut Terminal<Display>)
@@ -137,7 +155,7 @@ pub fn run<Display>(display: &mut Display)
     let (master, slave_pid) = fd_or_error.unwrap();
     let mut term = Terminal
     {
-        buffer: Buffer::new(50, 20),
+        buffer: Buffer::new(100, 50),
         decoder: Decoder::new(),
         display: display,
         master: master,
@@ -157,6 +175,11 @@ pub fn run<Display>(display: &mut Display)
                 libc::perror(c_str("select").as_ptr());
                 return;
             }
+            
+            let mut status: i32 = 0;
+            if libc::waitpid(slave_pid, &mut status, libc::WNOHANG) != 0 {
+                break;
+            }
 
             if libc::FD_ISSET(master, &mut fds) {
                 handle_output(&mut term);
@@ -164,11 +187,6 @@ pub fn run<Display>(display: &mut Display)
 
             if libc::FD_ISSET(term.display.get_fd(), &mut fds) {
                 handle_input(&mut term);
-            }
-
-            let mut status: i32 = 0;
-            if libc::waitpid(slave_pid, &mut status, libc::WNOHANG) != 0 {
-                break;
             }
         }
     }

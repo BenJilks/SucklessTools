@@ -1,4 +1,4 @@
-use super::display::output::*;
+use super::display::buffer::*;
 
 enum State
 {
@@ -35,6 +35,8 @@ impl Decoder
                     {
                         '\n' => buffer.type_special(Special::NewLine),
                         '\r' => buffer.type_special(Special::Return),
+                        '\x07' => println!("Bell!!!"),
+                        '\x08' => buffer.do_command(Command::CursorLeft, 1),
                         '\x1b' => self.state = State::Escape,
                         _ => buffer.type_rune(c as u32),
                     }

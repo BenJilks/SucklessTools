@@ -1,5 +1,5 @@
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct CursorPos
 {
     row: i32,

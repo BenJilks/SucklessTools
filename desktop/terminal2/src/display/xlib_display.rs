@@ -1,11 +1,10 @@
 extern crate x11;
-use std::{ptr, mem, ffi::{CString, CStr}};
+use std::{ptr, mem, ffi::CString};
 use x11::{xlib, xft, keysym};
-use super::{output::*, cursor::*};
+use super::{buffer::*, cursor::*, rune};
 use std::os::raw::
 {
     c_ulong,
-    c_uint,
     c_char,
 };
 
@@ -36,6 +35,7 @@ impl XLibDisplay
     {
         unsafe
         {
+            // Open display
             self.display = xlib::XOpenDisplay(ptr::null());
             if self.display == ptr::null_mut()
             {
@@ -43,9 +43,11 @@ impl XLibDisplay
                 assert!(false);
             }
 
+            // Grab default info
             let screen = xlib::XDefaultScreen(self.display);
             let root_window = xlib::XDefaultRootWindow(self.display);
         
+            // Create window
             let black_pixel = xlib::XBlackPixel(self.display, screen);
             let white_pixel = xlib::XWhitePixel(self.display, screen);
             self.window = xlib::XCreateSimpleWindow(
@@ -57,9 +59,11 @@ impl XLibDisplay
                 assert!(false);
             }
             
+            // Select inputs
             xlib::XSelectInput(self.display, self.window, 
-                xlib::ExposureMask | xlib::KeyReleaseMask);
+                xlib::ExposureMask | xlib::KeyPressMask);
             
+            // Set title and open window
             let title_c_str = CString::new(title).expect("Failed to create C string");
             xlib::XStoreName(self.display, self.window, title_c_str.as_ptr() as *const i8);
             xlib::XMapWindow(self.display, self.window);
@@ -150,36 +154,44 @@ impl XLibDisplay
         }
     }
 
-    fn draw_rect(&mut self, x: i32, y: i32, width: i32, height: i32)
+    fn draw_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: u32)
     {
         unsafe
         {
             let screen = xlib::XDefaultScreen(self.display);
             let gc = xlib::XDefaultGC(self.display, screen);
+            xlib::XSetForeground(self.display, gc, ((color & 0xFFFFFF00) >> 8) as u64);
             xlib::XFillRectangle(self.display, self.window, gc, 
                 x, y, width as u32, height as u32);
         }
     }
     
-    fn draw_rune(&mut self, buffer: &Buffer, at: &CursorPos)
+    fn draw_rune_internal(&mut self, buffer: &Buffer, at: &CursorPos)
     {
-        let x = at.get_column() * self.font_width;
-        let y = (at.get_row() + 1) * self.font_height;
-        self.draw_rect(x, y - self.font_height, self.font_width, self.font_height);
-
+        // Fetch rune at position
         let rune_or_none = buffer.rune_at(&at);
         if rune_or_none.is_none() {
             return;
         }
 
+        // Draw background
         let rune = rune_or_none.unwrap();
-        if rune == 0 {
+        let x = at.get_column() * self.font_width;
+        let y = (at.get_row() + 1) * self.font_height;
+        self.draw_rect(
+            x, y - self.font_height, 
+            self.font_width, self.font_height,
+            rune::int_from_color(rune.attribute.background));
+
+        // If it's a 0, don't draw it
+        if rune.code_point == 0 {
             return;
         }
 
         unsafe
         {
-            let glyph = xft::XftCharIndex(self.display, self.font, rune);
+            // Fetch char data
+            let glyph = xft::XftCharIndex(self.display, self.font, rune.code_point);
             let mut spec = xft::XftGlyphSpec 
             { 
                 glyph: glyph, 
@@ -187,6 +199,7 @@ impl XLibDisplay
                 y: (y - self.font_descent) as i16, 
             };
 
+            // Draw to screen
             xft::XftDrawGlyphSpec(self.draw, &mut self.color, self.font, &mut spec, 1);
         }
     }
@@ -198,33 +211,34 @@ impl XLibDisplay
             for column in 0..buffer.get_width()
             {
                 let pos = CursorPos::new(row, column);
-                self.draw_rune(buffer, &pos);
+                self.draw_rune_internal(buffer, &pos);
             }
         }
     }
 
     fn on_key_pressed(&self, event: &mut xlib::XEvent) -> Option<String>
     {
-        let key_str: String;
+        let mut buffer: [u8; 80];
         unsafe
         {
-            let keycode = event.key.keycode;
-            let keysym = xlib::XkbKeycodeToKeysym(self.display, keycode as u8, 0, 0);
-            match keysym as c_uint
+            match event.key.keycode
             {
-                keysym::XK_space => key_str = " ".to_owned(),
-                keysym::XK_Return => key_str = "\n".to_owned(),
-                keysym::XK_BackSpace => key_str = "\x08".to_owned(),
-                _ => 
-                {
-                    let c_str = CStr::from_ptr(xlib::XKeysymToString(keysym));
-                    key_str = c_str.to_str().expect("Unable to read c string").to_owned();
-                },
+                keysym::XK_Left => println!("Left"),
+                _ => {}
             }
 
+            buffer = mem::zeroed();
+            xlib::XLookupString(&mut event.key, 
+                buffer.as_mut_ptr() as *mut i8, buffer.len() as i32, 
+                ptr::null_mut(), ptr::null_mut());
+        }
+         
+        let str_or_error = std::str::from_utf8(&buffer);
+        if str_or_error.is_err() {
+            return None;
         }
 
-        return Some( key_str );
+        return Some( str_or_error.unwrap().to_owned() );
     }
 
 }
@@ -259,7 +273,7 @@ impl super::Display for XLibDisplay
             match event.get_type()
             {
                 xlib::Expose => self.paint(buffer),
-                xlib::KeyRelease => return self.on_key_pressed(&mut event),
+                xlib::KeyPress => return self.on_key_pressed(&mut event),
                 _ => {},
             }
         }
@@ -270,6 +284,20 @@ impl super::Display for XLibDisplay
     fn redraw(&mut self, buffer: &Buffer)
     {
         self.paint(buffer);
+        self.flush();
+    }
+
+    fn flush(&mut self)
+    {
+        unsafe
+        {
+            xlib::XFlush(self.display);
+        }
+    }
+    
+    fn draw_rune(&mut self, buffer: &Buffer, at: &CursorPos)
+    {
+        self.draw_rune_internal(buffer, at);
     }
 
     fn should_close(&self) -> bool
