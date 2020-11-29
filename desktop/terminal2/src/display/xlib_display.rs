@@ -1,7 +1,7 @@
 extern crate x11;
 use std::{ptr, mem, collections::HashMap, ffi::CString};
 use x11::{xlib, xft, keysym};
-use super::{buffer::*, cursor::*, rune};
+use super::{buffer::*, cursor::*, rune, UpdateResult};
 use std::os::raw::
 {
     c_ulong,
@@ -238,15 +238,21 @@ impl XLibDisplay
         }
     }
 
-    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> Option<super::UpdateResult>
+    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> Option<UpdateResult>
     {
         let keysym = unsafe { xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0) };
         match keysym as c_uint
         {
-            keysym::XK_Up => return super::UpdateResult::input("\x1b[A"),
-            keysym::XK_Down => return super::UpdateResult::input("\x1b[B"),
-            keysym::XK_Left => return super::UpdateResult::input("\x1b[C"),
-            keysym::XK_Right => return super::UpdateResult::input("\x1b[D"),
+            keysym::XK_Up => return UpdateResult::input("\x1b[A"),
+            keysym::XK_Down => return UpdateResult::input("\x1b[B"),
+            keysym::XK_Right => return UpdateResult::input("\x1b[C"),
+            keysym::XK_Left => return UpdateResult::input("\x1b[D"),
+
+            keysym::XK_Home => return UpdateResult::input("\x1b[H"),
+            keysym::XK_End => return UpdateResult::input("\x1b[F"),
+            
+            keysym::XK_Page_Up => return UpdateResult::input("\x1b[5~"),
+            keysym::XK_Page_Down => return UpdateResult::input("\x1b[6~"),
             _ => {}
         }
 
@@ -264,10 +270,10 @@ impl XLibDisplay
             return None;
         }
 
-        return super::UpdateResult::input(str_or_error.unwrap());
+        return UpdateResult::input(str_or_error.unwrap());
     }
 
-    fn on_resize(&mut self, event: &mut xlib::XEvent) -> Option<super::UpdateResult>
+    fn on_resize(&mut self, event: &mut xlib::XEvent) -> Option<UpdateResult>
     {
         let width: i32;
         let height: i32;
@@ -279,7 +285,7 @@ impl XLibDisplay
         
         let rows = height / self.font_height;
         let columns = width / self.font_width;
-        return super::UpdateResult::resize(rows, columns);
+        return UpdateResult::resize(rows, columns);
     }
 
 }
@@ -308,7 +314,7 @@ impl Drop for XLibDisplay
 impl super::Display for XLibDisplay
 {
 
-    fn update(&mut self, buffer: &Buffer) -> Option<super::UpdateResult>
+    fn update(&mut self, buffer: &Buffer) -> Option<UpdateResult>
     {
         unsafe
         {

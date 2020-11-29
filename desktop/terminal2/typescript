@@ -1,36 +1,0 @@
-Script started on 2020-11-29 18:53:10+00:00 [TERM="xterm-256color" TTY="/dev/pts/5" COLUMNS="-1" LINES="-1"]
-^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@]0;benjilks@artixlinux:~/src/suckless/desktop/terminal2[01;36m[benjilks@artixlinux[01;37m terminal2[01;36m]$[00m 
-]0;benjilks@artixlinux:~/src/suckless/desktop/terminal2[01;36m[benjilks@artixlinux[01;37m terminal2[01;36m]$[00m clear
-[H[2J[3J]0;benjilks@artixlinux:~/src/suckless/desktop/terminal2[01;36m[benjilks@artixlinux[01;37m terminal2[01;36m]$[00m python
-Python 3.8.6 (default, Sep 30 2020, 20:59:51) 
-[GCC 10.2.0] on linux
-Type "help", "copyright", "credits" or "license" for more information.
->>> exit()
-]0;benjilks@artixlinux:~/src/suckless/desktop/terminal2[01;36m[benjilks@artixlinux[01;37m terminal2[01;36m]$[00m js  node
-bash: node: command not found
-]0;benjilks@artixlinux:~/src/suckless/desktop/terminal2[01;36m[benjilks@artixlinux[01;37m terminal2[01;36m]$[00m ls
-Cargo.lock  Cargo.toml  build.rs  [0m[01;34msrc[0m  [01;34mtarget[0m  typescript
-]0;benjilks@artixlinux:~/src/suckless/desktop/terminal2[01;36m[benjilks@artixlinux[01;37m terminal2[01;36m]$[00m sudo    sudo pac man      man _s  -Syu
-:: Synchronizing package databases...
- system                  0.0   B  0.00   B/s 00:00 [----------------------]   0% system                112.0 KiB   174 KiB/s 00:00 [###########-----------]  50% system                223.4 KiB   828 KiB/s 00:00 [######################] 100%
- world                   0.0   B  0.00   B/s 00:00 [----------------------]   0% world                 288.0 KiB   389 KiB/s 00:02 [####------------------]  20% world                1418.0 KiB  3.27 MiB/s 00:00 [######################] 100%
- galaxy is up to date
- extra                   0.0   B  0.00   B/s 00:00 [----------------------]   0% extra                 543.8 KiB   906 KiB/s 00:01 [#######---------------]  33% extra                1636.9 KiB  4.95 MiB/s 00:00 [######################] 100%
- community               0.0   B  0.00   B/s 00:00 [----------------------]   0% community             719.8 KiB   923 KiB/s 00:05 [##--------------------]  13% community               3.0 MiB  4.43 MiB/s 00:00 [############----------]  56% community               3.8 MiB  4.21 MiB/s 00:00 [###############-------]  72% community               5.3 MiB  7.02 MiB/s 00:01 [######################] 100%
- multilib is up to date
-:: Starting full system upgrade...
-resolving dependencies...
-looking for conflicting packages...
-
-Packages (2) bash-5.0.018-2  imagemagick-7.0.10.44-1
-
-Total Download Size:    4.15 MiB
-Total Installed Size:  17.89 MiB
-Net Upgrade Size:       0.01 MiB
-
-:: Proceed with installation? [Y/n] y^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@
-^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@^@:: Retrieving packages...
- bash-5.0.018-2-x...     0.0   B  0.00   B/s 00:00 [----------------------]   0% bash-5.0.018-2-x...    16.0 KiB  21.0 KiB/s 01:18 [----------------------]   0% bash-5.0.018-2-x...  1655.3 KiB  4.00 MiB/s 00:00 [######################] 100%
- imagemagick-7.0....     0.0   B  0.00   B/s 00:00 [----------------------]   0% imagemagick-7.0....  1616.0 KiB  2.63 MiB/s 00:00 [#############---------]  62% imagemagick-7.0....     2.5 MiB  8.54 MiB/s 00:00 [######################] 100%
-(0/2) checking keys in keyring                     [----------------------]   0%(1/2) checking keys in keyring                     [###########-----------]  50%(2/2) checking keys in keyring                     [######################] 100%
-(0/2) checking package integrity                   [----------------------]   0%(1/2) checking package integrity                   [
