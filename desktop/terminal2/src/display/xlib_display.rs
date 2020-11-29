@@ -5,6 +5,7 @@ use super::{buffer::*, cursor::*, rune};
 use std::os::raw::
 {
     c_ulong,
+    c_uint,
     c_char,
 };
 
@@ -221,9 +222,13 @@ impl XLibDisplay
         let mut buffer: [u8; 80];
         unsafe
         {
-            match event.key.keycode
+            let keysym = xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0);
+            match keysym as c_uint
             {
-                keysym::XK_Left => println!("Left"),
+                keysym::XK_Up => return Some( "\x1b[A".to_owned() ),
+                keysym::XK_Down => return Some( "\x1b[B".to_owned() ),
+                keysym::XK_Left => return Some( "\x1b[D".to_owned() ),
+                keysym::XK_Right => return Some( "\x1b[C".to_owned() ),
                 _ => {}
             }
 
