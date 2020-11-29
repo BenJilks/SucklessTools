@@ -53,7 +53,7 @@ impl XLibDisplay
             let white_pixel = xlib::XWhitePixel(self.display, screen);
             self.window = xlib::XCreateSimpleWindow(
                 self.display, root_window, 0, 0, 1600, 800, 0, 
-                black_pixel, white_pixel);
+                white_pixel, black_pixel);
             if self.window == 0
             {
                 println!("Unable to open x11 window");
@@ -62,7 +62,7 @@ impl XLibDisplay
             
             // Select inputs
             xlib::XSelectInput(self.display, self.window, 
-                xlib::ExposureMask | xlib::KeyPressMask);
+                xlib::ExposureMask | xlib::KeyPressMask | xlib::StructureNotifyMask);
             
             // Set title and open window
             let title_c_str = CString::new(title).expect("Failed to create C string");
@@ -228,9 +228,9 @@ impl XLibDisplay
 
     fn paint(&mut self, buffer: &Buffer)
     {
-        for row in 0..buffer.get_height()
+        for row in 0..buffer.get_rows()
         {
-            for column in 0..buffer.get_width()
+            for column in 0..buffer.get_columns()
             {
                 let pos = CursorPos::new(row, column);
                 self.draw_rune_internal(buffer, &pos);
@@ -238,21 +238,21 @@ impl XLibDisplay
         }
     }
 
-    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> Option<String>
+    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> Option<super::UpdateResult>
     {
+        let keysym = unsafe { xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0) };
+        match keysym as c_uint
+        {
+            keysym::XK_Up => return super::UpdateResult::input("\x1b[A"),
+            keysym::XK_Down => return super::UpdateResult::input("\x1b[B"),
+            keysym::XK_Left => return super::UpdateResult::input("\x1b[C"),
+            keysym::XK_Right => return super::UpdateResult::input("\x1b[D"),
+            _ => {}
+        }
+
         let mut buffer: [u8; 80];
         unsafe
         {
-            let keysym = xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0);
-            match keysym as c_uint
-            {
-                keysym::XK_Up => return Some( "\x1b[A".to_owned() ),
-                keysym::XK_Down => return Some( "\x1b[B".to_owned() ),
-                keysym::XK_Left => return Some( "\x1b[D".to_owned() ),
-                keysym::XK_Right => return Some( "\x1b[C".to_owned() ),
-                _ => {}
-            }
-
             buffer = mem::zeroed();
             xlib::XLookupString(&mut event.key, 
                 buffer.as_mut_ptr() as *mut i8, buffer.len() as i32, 
@@ -264,7 +264,22 @@ impl XLibDisplay
             return None;
         }
 
-        return Some( str_or_error.unwrap().to_owned() );
+        return super::UpdateResult::input(str_or_error.unwrap());
+    }
+
+    fn on_resize(&mut self, event: &mut xlib::XEvent) -> Option<super::UpdateResult>
+    {
+        let width: i32;
+        let height: i32;
+        unsafe
+        {
+            width = event.configure.width;
+            height = event.configure.height;
+        }
+        
+        let rows = height / self.font_height;
+        let columns = width / self.font_width;
+        return super::UpdateResult::resize(rows, columns);
     }
 
 }
@@ -293,7 +308,7 @@ impl Drop for XLibDisplay
 impl super::Display for XLibDisplay
 {
 
-    fn update(&mut self, buffer: &Buffer) -> Option<String>
+    fn update(&mut self, buffer: &Buffer) -> Option<super::UpdateResult>
     {
         unsafe
         {
@@ -303,6 +318,7 @@ impl super::Display for XLibDisplay
             {
                 xlib::Expose => self.paint(buffer),
                 xlib::KeyPress => return self.on_key_pressed(&mut event),
+                xlib::ConfigureNotify => return self.on_resize(&mut event),
                 _ => {},
             }
         }

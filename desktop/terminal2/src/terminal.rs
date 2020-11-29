@@ -24,11 +24,11 @@ fn flush<Display>(term: &mut Terminal<Display>)
     where Display: display::Display
 {
     let changes = term.buffer.get_changes();
-    for row in 0..term.buffer.get_height()
+    for row in 0..term.buffer.get_rows()
     {
-        for column in 0..term.buffer.get_width()
+        for column in 0..term.buffer.get_columns()
         {
-            let index = row * term.buffer.get_width() + column;
+            let index = row * term.buffer.get_columns() + column;
             if changes[index as usize] {
                 term.display.draw_rune(&term.buffer, &CursorPos::new(row, column));
             }
@@ -61,22 +61,52 @@ fn handle_output<Display>(term: &mut Terminal<Display>)
     flush(term);
 }
 
-fn handle_input<Display>(term: &mut Terminal<Display>)
+fn handle_input<Display>(term: &mut Terminal<Display>, input: &String)
     where Display: display::Display
 {
-    let input_or_none = term.display.update(&term.buffer);
-    if !input_or_none.is_none()
+    unsafe
     {
-        let input = input_or_none.unwrap();
-        unsafe
+        if libc::write(
+            term.master, 
+            input.as_ptr() as *const libc::c_void, 
+            input.len()) < 0 
         {
-            if libc::write(
-                term.master, 
-                input.as_ptr() as *const libc::c_void, 
-                input.len()) < 0 
-            {
-                libc::perror(c_str("write").as_ptr());
-            }
+            libc::perror(c_str("write").as_ptr());
+        }
+    }
+}
+
+fn handle_resize<Display>(term: &mut Terminal<Display>, rows: i32, columns: i32)
+    where Display: display::Display
+{
+    term.buffer.resize(rows, columns);
+    unsafe
+    {
+        let mut size = libc::winsize
+        {
+            ws_row: rows as u16,
+            ws_col: columns as u16,
+            ws_xpixel: rows as u16,
+            ws_ypixel: columns as u16,
+        };
+
+        if libc::ioctl(term.master, libc::TIOCSWINSZ, &mut size) < 0 {
+            libc::perror(c_str("ioctl(TIOCSWINSZ)").as_ptr());
+        }
+    }
+}
+
+fn handle_update<Display>(term: &mut Terminal<Display>)
+    where Display: display::Display
+{
+    let result_or_none = term.display.update(&term.buffer);
+    if !result_or_none.is_none()
+    {
+        let result = result_or_none.unwrap();
+        match result.result_type
+        {
+            display::UpdateResultType::Input => handle_input(term, &result.input),
+            display::UpdateResultType::Resize => handle_resize(term, result.rows, result.columns),
         }
     }
 }
@@ -186,7 +216,7 @@ pub fn run<Display>(display: &mut Display)
             }
 
             if libc::FD_ISSET(term.display.get_fd(), &mut fds) {
-                handle_input(&mut term);
+                handle_update(&mut term);
             }
         }
     }
