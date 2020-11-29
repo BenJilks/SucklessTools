@@ -101,7 +101,7 @@ fn execute_child_process(master: i32, slave: i32)
         libc::close(master);
         
         // Execute shell
-        let shell = c_str("/usr/bin/python");
+        let shell = c_str("/usr/bin/bash");
         if libc::execl(shell.as_ptr(), shell.as_ptr(), 0) < 0 {
             libc::perror(c_str("execl").as_ptr());
         }

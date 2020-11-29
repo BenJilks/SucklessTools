@@ -1,5 +1,5 @@
 extern crate x11;
-use std::{ptr, mem, ffi::CString};
+use std::{ptr, mem, collections::HashMap, ffi::CString};
 use x11::{xlib, xft, keysym};
 use super::{buffer::*, cursor::*, rune};
 use std::os::raw::
@@ -20,7 +20,7 @@ pub struct XLibDisplay
 
     // xft
     font: *mut xft::XftFont,
-    color: xft::XftColor,
+    colors: HashMap<rune::Color, xft::XftColor>,
     draw: *mut xft::XftDraw,
 
     // Terminal
@@ -52,7 +52,7 @@ impl XLibDisplay
             let black_pixel = xlib::XBlackPixel(self.display, screen);
             let white_pixel = xlib::XWhitePixel(self.display, screen);
             self.window = xlib::XCreateSimpleWindow(
-                self.display, root_window, 0, 0, 100, 100, 0, 
+                self.display, root_window, 0, 0, 1600, 800, 0, 
                 black_pixel, white_pixel);
             if self.window == 0
             {
@@ -104,15 +104,37 @@ impl XLibDisplay
                 root_window, self.visual, xlib::AllocNone);
 
             // Allocate font color
-            self.color = mem::zeroed();
-            let color = "#FFFFFF";
-            let color_c_str = CString::new(color).expect("Failed to create C string");
-            if xft::XftColorAllocName(self.display, self.visual, self.cmap, 
-                color_c_str.as_ptr() as *const c_char, &mut self.color) == 0
+            let mut allocate_color = |color_name|
             {
-                println!("Could not allocate Xft color");
-                assert!(false);
-            }
+                // Create color name string
+                let mut color: xft::XftColor = mem::zeroed();
+                let color_string = format!("#{}", 
+                    rune::string_from_color(&color_name)
+                        .chars()
+                        .into_iter()
+                        .take(6)
+                        .collect::<String>());
+
+                // Allocate the color
+                let color_c_str = CString::new(color_string).expect("Failed to create C string");
+                if xft::XftColorAllocName(self.display, self.visual, self.cmap, 
+                    color_c_str.as_ptr() as *const c_char, &mut color) == 0
+                {
+                    println!("Could not allocate Xft color");
+                    assert!(false);
+                }
+                self.colors.insert(color_name, color);
+            };
+            allocate_color(rune::Color::Black);
+            allocate_color(rune::Color::Red);
+            allocate_color(rune::Color::Green);
+            allocate_color(rune::Color::Yellow);
+            allocate_color(rune::Color::Blue);
+            allocate_color(rune::Color::Magenta);
+            allocate_color(rune::Color::Cyan);
+            allocate_color(rune::Color::White);
+            allocate_color(rune::Color::DefaultBackground);
+            allocate_color(rune::Color::DefaultForeground);
 
             // Create draw
             self.draw = xft::XftDrawCreate(self.display, self.window, self.visual, self.cmap);
@@ -130,29 +152,26 @@ impl XLibDisplay
 
     pub fn new(title: &str) -> Self
     {
-        unsafe
+        let mut display = Self
         {
-            let mut display = Self
-            {
-                display: ptr::null_mut(),
-                window: 0,
-                visual: ptr::null_mut(),
-                cmap: 0,
-                fd: 0,
+            display: ptr::null_mut(),
+            window: 0,
+            visual: ptr::null_mut(),
+            cmap: 0,
+            fd: 0,
 
-                font: ptr::null_mut(),
-                color: mem::zeroed(),
-                draw: ptr::null_mut(),
+            font: ptr::null_mut(),
+            colors: HashMap::new(),
+            draw: ptr::null_mut(),
 
-                font_width: 0,
-                font_height: 0,
-                font_descent: 0,
-            };
+            font_width: 0,
+            font_height: 0,
+            font_descent: 0,
+        };
 
-            display.create_window(title);
-            display.load_font();
-            return display;
-        }
+        display.create_window(title);
+        display.load_font();
+        return display;
     }
 
     fn draw_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: u32)
@@ -182,7 +201,7 @@ impl XLibDisplay
         self.draw_rect(
             x, y - self.font_height, 
             self.font_width, self.font_height,
-            rune::int_from_color(rune.attribute.background));
+            rune::int_from_color(&rune.attribute.background));
 
         // If it's a 0, don't draw it
         if rune.code_point == 0 {
@@ -201,7 +220,9 @@ impl XLibDisplay
             };
 
             // Draw to screen
-            xft::XftDrawGlyphSpec(self.draw, &mut self.color, self.font, &mut spec, 1);
+            let color = self.colors.get(&rune.attribute.foreground).unwrap();
+            xft::XftDrawGlyphSpec(self.draw, 
+                color, self.font, &mut spec, 1);
         }
     }
 
@@ -255,8 +276,11 @@ impl Drop for XLibDisplay
     {
         unsafe
         {
-            xft::XftColorFree(self.display, 
-                self.visual, self.cmap, &mut self.color);
+            for color in &mut self.colors
+            {
+                xft::XftColorFree(self.display, 
+                    self.visual, self.cmap, color.1);
+            }
             xft::XftDrawDestroy(self.draw);
 
             xlib::XDestroyWindow(self.display, self.window);

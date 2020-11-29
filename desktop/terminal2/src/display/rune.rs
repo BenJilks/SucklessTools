@@ -1,5 +1,5 @@
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Color
 {
     Black,
@@ -21,7 +21,19 @@ pub struct Attribute
     pub foreground: Color,
 }
 
-#[derive(Clone, PartialEq)]
+impl Default for Attribute
+{
+    fn default() -> Self
+    {
+        return Self
+        {
+            background: Color::DefaultBackground,
+            foreground: Color::DefaultForeground,
+        };
+    }
+}
+
+#[derive(Clone, PartialEq, Default)]
 pub struct Rune
 {
     pub code_point: u32,
@@ -42,20 +54,26 @@ impl Attribute
 
 }
 
-pub fn int_from_color(color: Color) -> u32
+pub fn string_from_color(color: &Color) -> &'static str
 {
     match color
     {
-        Color::Black => return 0x000000FF,
-        Color::Red => return 0xFF0000FF,
-        Color::Green => return 0x00FF00FF,
-        Color::Yellow => return 0xFFFF00FF,
-        Color::Blue => return 0x0000FFFF,
-        Color::Magenta => return 0x00FFFFFF,
-        Color::Cyan => return 0xFF00FFFF,
-        Color::White => return 0xFFFFFFFF,
-        Color::DefaultBackground => return 0x000000FF,
-        Color::DefaultForeground => return 0xFFFFFFFF,
+        Color::Black => return "000000FF",
+        Color::Red => return "FF0000FF",
+        Color::Green => return "00FF00FF",
+        Color::Yellow => return "FFFF00FF",
+        Color::Blue => return "0000FFFF",
+        Color::Magenta => return "00FFFFFF",
+        Color::Cyan => return "FF00FFFF",
+        Color::White => return "FFFFFFFF",
+        Color::DefaultBackground => return "000000FF",
+        Color::DefaultForeground => return "FFFFFFFF",
     }
+}
+
+pub fn int_from_color(color: &Color) -> u32
+{
+    return u32::from_str_radix(string_from_color(color), 16)
+        .expect("Invalid color");
 }
 

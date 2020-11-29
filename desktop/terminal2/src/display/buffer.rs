@@ -7,11 +7,6 @@ pub enum Special
     Return,
 }
 
-pub enum Command
-{
-    CursorLeft,
-}
-
 pub struct Buffer
 {
     cursor: CursorPos,
@@ -28,30 +23,21 @@ impl Buffer
     
     pub fn new(width: i32, height: i32) -> Self
     {
-        let default_rune = Rune
-        {
-            code_point: 0,
-            attribute: Attribute
-            {
-                background: Color::DefaultBackground,
-                foreground: Color::DefaultForeground,
-            },
-        };
-
         return Self
         {
             cursor: CursorPos::new(0, 0),
-            attribute: default_rune.attribute.clone(),
+            attribute: Attribute::default(),
 
             width: width,
             height: height,
-            content: vec![default_rune.clone(); (width * height) as usize].into_boxed_slice(),
+            content: vec![Rune::default(); (width * height) as usize].into_boxed_slice(),
             changes: vec![false; (width * height) as usize].into_boxed_slice(),
         };
     }
 
     pub fn get_width(&self) -> i32 { self.width }
     pub fn get_height(&self) -> i32 { self.height }
+    pub fn get_attribute(&mut self) -> &mut Attribute { &mut self.attribute }
     pub fn get_changes(&self) -> Box<[bool]> { self.changes.clone() }
 
     pub fn flush(&mut self)
@@ -87,6 +73,10 @@ impl Buffer
 
     fn on_cursor_change(&mut self)
     {
+        if self.out_of_bounds(&self.cursor) {
+            return;
+        }
+
         let index = self.index_from_cursor(&self.cursor);
         self.changes[index] = true;
     }
@@ -131,14 +121,66 @@ impl Buffer
         self.on_cursor_change();
     }
 
-    pub fn do_command(&mut self, command: Command, arg: i32)
+    fn cursor_move(&mut self, row: i32, column: i32)
     {
         self.on_cursor_change();
-        match command
-        {
-            Command::CursorLeft => self.cursor.move_by(0, -arg),
-        }
+        self.cursor.move_by(row, column);
+        self.cursor.clamp(self.width, self.height);
         self.on_cursor_change();
+    }
+    
+    pub fn cursor_set(&mut self, row: i32, column: i32) 
+    { 
+        self.on_cursor_change();
+        self.cursor.move_to(row, column); 
+        self.cursor.clamp(self.width, self.height);
+        self.on_cursor_change();
+    }
+
+    pub fn cursor_left(&mut self, amount: i32) { self.cursor_move(0, -amount) }
+    pub fn cursor_right(&mut self, amount: i32) { self.cursor_move(0, amount) }
+    pub fn cursor_up(&mut self, amount: i32) { self.cursor_move(-amount, 0) }
+    pub fn cursor_down(&mut self, amount: i32) { self.cursor_move(amount, 0) }
+
+    pub fn clear_line_range(&mut self, start: i32, end: i32)
+    {
+        for column in start..end
+        {
+            let pos = CursorPos::new(self.cursor.get_row(), column);
+            self.set_rune_at(&pos, Rune::default());
+        }
+    }
+
+    pub fn clear_block_range(&mut self, start: i32, end: i32)
+    {
+        for row in start..end
+        {
+            for column in 0..self.width
+            {
+                let pos = CursorPos::new(row, column);
+                self.set_rune_at(&pos, Rune::default());
+            }
+        }
+    }
+
+    pub fn clear_from_cursor_right(&mut self) {
+        self.clear_line_range(self.cursor.get_column(), self.width) 
+    }
+    pub fn clear_from_cursor_left(&mut self) { 
+        self.clear_line_range(0, self.cursor.get_column()) 
+    }
+    pub fn clear_whole_line(&mut self) { 
+        self.clear_line_range(0, self.width) 
+    }
+    
+    pub fn clear_from_cursor_down(&mut self) {
+        self.clear_block_range(self.cursor.get_row(), self.height)
+    }
+    pub fn clear_from_cursor_up(&mut self) {
+        self.clear_block_range(0, self.cursor.get_row()) 
+    }
+    pub fn clear_whole_screen(&mut self) {
+        self.clear_block_range(0, self.height) 
     }
 
 }
