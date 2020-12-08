@@ -48,12 +48,6 @@ impl CursorPos
         self.column = 0;
     }
 
-    pub fn next_line(&mut self)
-    {
-        self.row += 1;
-        self.column = 0;
-    }
-
     pub fn get_row(&self) -> i32 { self.row }
     pub fn get_column(&self) -> i32 { self.column }
 

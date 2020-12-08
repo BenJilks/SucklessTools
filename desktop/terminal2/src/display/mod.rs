@@ -12,7 +12,7 @@ pub enum UpdateResultType
 pub struct UpdateResult
 {
     pub result_type: UpdateResultType,
-    pub input: String,
+    pub input: Vec<u8>,
     pub rows: i32,
     pub columns: i32,
 }
@@ -20,33 +20,38 @@ pub struct UpdateResult
 impl UpdateResult
 {
 
-    pub fn input(input: &str) -> Option<Self>
+    pub fn input(input: &[u8]) -> Self
     {
-        return Some(Self
+        return Self
         {
             result_type: UpdateResultType::Input,
-            input: input.to_owned(),
+            input: input.to_vec(),
             rows: 0,
             columns: 0,
-        });
+        };
     }
 
-    pub fn resize(rows: i32, columns: i32) -> Option<Self>
+    pub fn input_str(input: &str) -> Self
     {
-        return Some(Self
+        return Self::input(input.as_bytes());
+    }
+
+    pub fn resize(rows: i32, columns: i32) -> Self
+    {
+        return Self
         {
             result_type: UpdateResultType::Resize,
-            input: String::new(),
+            input: Vec::new(),
             rows: rows,
             columns: columns,
-        });
+        };
     }
 
 }
 
 pub trait Display
 {
-    fn update(&mut self, buffer: &buffer::Buffer) -> Option<UpdateResult>;
+    fn update(&mut self, buffer: &buffer::Buffer) -> Vec<UpdateResult>;
     fn should_close(&self) -> bool;
 
     fn draw_rune(&mut self, buffer: &buffer::Buffer, at: &cursor::CursorPos);

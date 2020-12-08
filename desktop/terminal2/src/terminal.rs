@@ -61,7 +61,7 @@ fn handle_output<Display>(term: &mut Terminal<Display>)
     flush(term);
 }
 
-fn handle_input<Display>(term: &mut Terminal<Display>, input: &String)
+fn handle_input<Display>(term: &mut Terminal<Display>, input: &Vec<u8>)
     where Display: display::Display
 {
     unsafe
@@ -99,10 +99,9 @@ fn handle_resize<Display>(term: &mut Terminal<Display>, rows: i32, columns: i32)
 fn handle_update<Display>(term: &mut Terminal<Display>)
     where Display: display::Display
 {
-    let result_or_none = term.display.update(&term.buffer);
-    if !result_or_none.is_none()
+    let results = term.display.update(&term.buffer);
+    for result in &results
     {
-        let result = result_or_none.unwrap();
         match result.result_type
         {
             display::UpdateResultType::Input => handle_input(term, &result.input),

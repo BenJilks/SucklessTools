@@ -238,42 +238,40 @@ impl XLibDisplay
         }
     }
 
-    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> Option<UpdateResult>
+    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> UpdateResult
     {
         let keysym = unsafe { xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0) };
         match keysym as c_uint
         {
-            keysym::XK_Up => return UpdateResult::input("\x1b[A"),
-            keysym::XK_Down => return UpdateResult::input("\x1b[B"),
-            keysym::XK_Right => return UpdateResult::input("\x1b[C"),
-            keysym::XK_Left => return UpdateResult::input("\x1b[D"),
+            keysym::XK_Up => return UpdateResult::input_str("\x1b[A"),
+            keysym::XK_Down => return UpdateResult::input_str("\x1b[B"),
+            keysym::XK_Right => return UpdateResult::input_str("\x1b[C"),
+            keysym::XK_Left => return UpdateResult::input_str("\x1b[D"),
 
-            keysym::XK_Home => return UpdateResult::input("\x1b[H"),
-            keysym::XK_End => return UpdateResult::input("\x1b[F"),
+            keysym::XK_Home => return UpdateResult::input_str("\x1b[H"),
+            keysym::XK_End => return UpdateResult::input_str("\x1b[F"),
             
-            keysym::XK_Page_Up => return UpdateResult::input("\x1b[5~"),
-            keysym::XK_Page_Down => return UpdateResult::input("\x1b[6~"),
+            keysym::XK_Page_Up => return UpdateResult::input_str("\x1b[5~"),
+            keysym::XK_Page_Down => return UpdateResult::input_str("\x1b[6~"),
+            keysym::XK_Tab => return UpdateResult::input_str("\t"),
+            keysym::XK_Escape => return UpdateResult::input_str("\x1b"),
             _ => {}
         }
 
         let mut buffer: [u8; 80];
+        let len: i32;
         unsafe
         {
             buffer = mem::zeroed();
-            xlib::XLookupString(&mut event.key, 
+            len = xlib::XLookupString(&mut event.key, 
                 buffer.as_mut_ptr() as *mut i8, buffer.len() as i32, 
                 ptr::null_mut(), ptr::null_mut());
         }
          
-        let str_or_error = std::str::from_utf8(&buffer);
-        if str_or_error.is_err() {
-            return None;
-        }
-
-        return UpdateResult::input(str_or_error.unwrap());
+        return UpdateResult::input(&buffer[..len as usize]);
     }
 
-    fn on_resize(&mut self, event: &mut xlib::XEvent) -> Option<UpdateResult>
+    fn on_resize(&mut self, event: &mut xlib::XEvent) -> UpdateResult
     {
         let width: i32;
         let height: i32;
@@ -314,22 +312,26 @@ impl Drop for XLibDisplay
 impl super::Display for XLibDisplay
 {
 
-    fn update(&mut self, buffer: &Buffer) -> Option<UpdateResult>
+    fn update(&mut self, buffer: &Buffer) -> Vec<UpdateResult>
     {
+        let mut results = Vec::<UpdateResult>::new();
         unsafe
         {
             let mut event: xlib::XEvent = mem::zeroed();
-            xlib::XNextEvent(self.display, &mut event);
-            match event.get_type()
+            while xlib::XPending(self.display) != 0
             {
-                xlib::Expose => self.paint(buffer),
-                xlib::KeyPress => return self.on_key_pressed(&mut event),
-                xlib::ConfigureNotify => return self.on_resize(&mut event),
-                _ => {},
+                xlib::XNextEvent(self.display, &mut event);
+                match event.get_type()
+                {
+                    xlib::Expose => self.paint(buffer),
+                    xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
+                    xlib::ConfigureNotify => results.push(self.on_resize(&mut event)),
+                    _ => {},
+                }
             }
         }
 
-        return None;
+        return results;
     }
 
     fn redraw(&mut self, buffer: &Buffer)
