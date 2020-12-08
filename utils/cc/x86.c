@@ -1,6 +1,7 @@
 #include "x86.h"
 #include "x86_expression.h"
 #include "dumpast.h"
+#include "unit.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,11 +121,12 @@ static void compile_function(X86Code *code, Function *function)
     x86_code_add_blank(code);
 }
 
-X86Code x86_compile_unit(Unit *unit)
+X86Code x86_compile()
 {
     X86Code code = x86_code_new();
-    for (int i = 0; i < unit->function_count; i++)
-        compile_function(&code, &unit->functions[i]);
+    for (int i = 0; i < function_count; i++)
+        compile_function(&code, &functions[i]);
 
     return code;
 }
+

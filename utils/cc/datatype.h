@@ -6,7 +6,6 @@
 #define MAX_ARRAY_DEPTH 80
 
 struct SymbolTable;
-struct Unit;
 
 enum DataTypeFlags
 {
@@ -49,8 +48,7 @@ DataType dt_const_char_pointer();
 int data_type_equals(DataType *lhs, DataType *rhs);
 int data_type_size(DataType *data_type);
 
-DataType parse_data_type(
-    struct Unit *unit, struct SymbolTable *table);
+DataType parse_data_type(struct SymbolTable *table);
 
 #endif // DATA_TYPE_H
 

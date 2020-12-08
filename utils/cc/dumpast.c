@@ -1,4 +1,5 @@
 #include "dumpast.h"
+#include "unit.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
@@ -189,11 +190,11 @@ static void dump_struct(Struct *struct_)
     }
 }
 
-void dump_unit(Unit *unit)
+void dump_unit()
 {
     fprintf(stderr, "Unit:\n");
-    for (int i = 0; i < unit->struct_count; i++)
-        dump_struct(&unit->structs[i]);
-    for (int i = 0; i < unit->function_count; i++)
-        dump_function(&unit->functions[i]);
+    for (int i = 0; i < struct_count; i++)
+        dump_struct(&structs[i]);
+    for (int i = 0; i < function_count; i++)
+        dump_function(&functions[i]);
 }

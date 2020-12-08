@@ -4,6 +4,6 @@
 #include "parser.h"
 #include "x86_asm.h"
 
-X86Code x86_compile_unit(Unit *unit);
+X86Code x86_compile();
 
 #endif // X86_H

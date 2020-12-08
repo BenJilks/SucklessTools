@@ -480,7 +480,7 @@ int lexer_compair_token_token(Token *lhs, Token *rhs)
     return 1;
 }
 
-void lexer_close()
+void lexer_destroy()
 {
     assert (g_source);
     free(g_source);

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "lexer.h"
 #include "parser.h"
+#include "unit.h"
 #include "preproccessor.h"
 #include "dumpast.h"
 #include "x86.h"
@@ -17,19 +18,18 @@ int main()
     lexer_open_memory(output_stream.memory, output_stream.memory_length, &source_map);
 
     // Parse
-    Unit *unit = parse();
-    dump_unit(unit);
+    unit_create();
+    parse();
+    dump_unit();
 
     // Compile
-    X86Code code = x86_compile_unit(unit);
+    X86Code code = x86_compile();
     x86_dump(&code);
 
     // Clean up
+    unit_destroy();
+    lexer_destroy();
     free_x86_code(&code);
-    free_unit(unit);
-    free(unit);
-
-    lexer_close();
     free_source_map(&source_map);
     return 0;
 }

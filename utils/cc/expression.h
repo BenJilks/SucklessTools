@@ -70,6 +70,6 @@ typedef struct Expression
 
 enum Primitive primitive_from_name(Token *name);
 int is_data_type_next(SymbolTable *table);
-Expression *parse_expression(SymbolTable *table, struct Unit *unit);
+Expression *parse_expression(SymbolTable *table);
 
 #endif // EXPRESSION_H

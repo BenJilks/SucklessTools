@@ -54,7 +54,7 @@ typedef struct Token
 
 void lexer_open_file(const char *file_path, SourceMap *source_map);
 void lexer_open_memory(const char *data, int data_len, SourceMap *source_map);
-void lexer_close();
+void lexer_destroy();
 
 #define ERROR(token, ...) \
 { \
@@ -74,3 +74,4 @@ Token lexer_peek(int count);
 const char *lexer_token_type_to_string(enum TokenType);
 
 #endif // LEXER_H
+

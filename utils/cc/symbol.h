@@ -57,3 +57,4 @@ int symbol_size(Symbol *symbol);
 void free_symbol_table(SymbolTable *table);
 
 #endif // SYMBOL_H
+

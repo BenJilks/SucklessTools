@@ -1,5 +1,6 @@
 #include "datatype.h"
 #include "parser.h"
+#include "unit.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -123,18 +124,7 @@ static DataType parse_primitive()
     return data_type;
 }
 
-static Struct *find_struct(Unit *unit, Token *name)
-{
-    for (int i = 0; i < unit->struct_count; i++)
-    {
-        if (lexer_compair_token_token(&unit->structs[i].name, name))
-            return &unit->structs[i];
-    }
-
-    return NULL;
-}
-
-static DataType parse_struct_type(Unit *unit)
+static DataType parse_struct_type()
 {
     DataType data_type = new_data_type();
     data_type.flags = DATA_TYPE_STRUCT;
@@ -142,7 +132,7 @@ static DataType parse_struct_type(Unit *unit)
 
     match(TOKEN_TYPE_STRUCT, "struct");
     Token name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    Struct *struct_ = find_struct(unit, &name);
+    Struct *struct_ = unit_find_struct(&name);
     data_type.name = name;
 
     if (struct_ == NULL)
@@ -180,7 +170,7 @@ static DataType parse_unsigned_type()
     return data_type;
 }
 
-DataType parse_data_type(Unit *unit, SymbolTable *table)
+DataType parse_data_type(SymbolTable *table)
 {
     // Check for typedefs
     Token name = lexer_peek(0);
@@ -193,7 +183,7 @@ DataType parse_data_type(Unit *unit, SymbolTable *table)
     }
 
     if (name.type == TOKEN_TYPE_STRUCT)
-        return parse_struct_type(unit);
+        return parse_struct_type();
     else if (name.type == TOKEN_TYPE_UNSIGNED)
         return parse_unsigned_type();
 

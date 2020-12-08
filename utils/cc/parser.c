@@ -1,12 +1,14 @@
 #include "parser.h"
 #include "lexer.h"
+#include "unit.h"
+#include "buffer.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <memory.h>
 
-static void parse_statement(Function*, Unit*, Scope*);
-static Scope *parse_scope(Function*, Unit*, SymbolTable *parent);
+static void parse_statement(Function*, Scope*);
+static Scope *parse_scope(Function*, SymbolTable *parent);
 
 Token match(enum TokenType type, const char *name)
 {
@@ -20,31 +22,6 @@ Token match(enum TokenType type, const char *name)
     return token;
 }
 
-Buffer make_buffer(void **memory, int *count, int unit_size)
-{
-    Buffer buffer;
-    buffer.memory = malloc(80 * unit_size);
-    buffer.unit_size = unit_size;
-    buffer.count = count;
-    buffer.buffer = 80;
-
-    *count = 0;
-    *memory = buffer.memory;
-    return buffer;
-}
-
-void append_buffer(Buffer *buffer, void *item)
-{
-    if (*buffer->count >= buffer->buffer)
-    {
-        buffer->buffer += 80;
-        buffer->memory = realloc(buffer->memory, buffer->buffer * buffer->unit_size);
-    }
-
-    memcpy(buffer->memory + (*buffer->count * buffer->unit_size), item, buffer->unit_size);
-    *buffer->count += 1;
-}
-
 static void add_statement_to_scope(Scope *scope, Statement statement)
 {
     if (!scope->statements)
@@ -56,9 +33,9 @@ static void add_statement_to_scope(Scope *scope, Statement statement)
     scope->statement_count += 1;
 }
 
-static void parse_declaration(Function *function, Unit *unit, Scope *scope)
+static void parse_declaration(Function *function, Scope *scope)
 {
-    DataType data_type = parse_data_type(unit, scope->table);
+    DataType data_type = parse_data_type(scope->table);
     Statement statement;
 
     Statement *curr_statement = NULL;
@@ -111,7 +88,7 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
         if (lexer_peek(0).type == TOKEN_TYPE_EQUALS)
         {
             match(TOKEN_TYPE_EQUALS, "=");
-            curr_statement->expression = parse_expression(scope->table, unit);
+            curr_statement->expression = parse_expression(scope->table);
         }
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
@@ -123,109 +100,109 @@ static void parse_declaration(Function *function, Unit *unit, Scope *scope)
     add_statement_to_scope(scope, statement);
 }
 
-static void parse_expression_statement(Scope *scope, Unit *unit)
+static void parse_expression_statement(Scope *scope)
 {
     Statement statement;
     statement.type = STATEMENT_TYPE_EXPRESSION;
-    statement.expression = parse_expression(scope->table, unit);
+    statement.expression = parse_expression(scope->table);
     statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
 }
 
-static void parse_return(Scope *scope, Unit *unit)
+static void parse_return(Scope *scope)
 {
     match(TOKEN_TYPE_RETURN, "return");
 
     Statement statement;
     statement.type = STATEMENT_TYPE_RETURN;
-    statement.expression = parse_expression(scope->table, unit);
+    statement.expression = parse_expression(scope->table);
     statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
 }
 
-static Scope *parse_block_or_statement(Function *function, Unit *unit, SymbolTable *parent)
+static Scope *parse_block_or_statement(Function *function, SymbolTable *parent)
 {
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
-        return parse_scope(function, unit, parent);
+        return parse_scope(function, parent);
 
     Scope *scope = malloc(sizeof(Scope));
     scope->statements = NULL;
     scope->statement_count = 0;
     scope->table = symbol_table_new(parent);
-    parse_statement(function, unit, scope);
+    parse_statement(function, scope);
     return scope;
 }
 
-static void parse_if(Function *function, Unit *unit, Scope *scope)
+static void parse_if(Function *function, Scope *scope)
 {
     match(TOKEN_TYPE_IF, "if");
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
 
     Statement statement;
     statement.type = STATEMENT_TYPE_IF;
-    statement.expression = parse_expression(scope->table, unit);
+    statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
 
-    statement.sub_scope = parse_block_or_statement(function, unit, scope->table);
+    statement.sub_scope = parse_block_or_statement(function, scope->table);
     add_statement_to_scope(scope, statement);
 }
 
-static void parse_while(Function *function, Unit *unit, Scope *scope)
+static void parse_while(Function *function, Scope *scope)
 {
     match(TOKEN_TYPE_WHILE, "while");
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
 
     Statement statement;
     statement.type = STATEMENT_TYPE_WHILE;
-    statement.expression = parse_expression(scope->table, unit);
+    statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
 
-    statement.sub_scope = parse_scope(function, unit, scope->table);
+    statement.sub_scope = parse_scope(function, scope->table);
     add_statement_to_scope(scope, statement);
 }
 
-static void parse_typedef(Unit *unit, SymbolTable *table)
+static void parse_typedef(SymbolTable *table)
 {
     match(TOKEN_TYPE_TYPEDEF, "typedef");
-    DataType data_type = parse_data_type(unit, table);
+    DataType data_type = parse_data_type(table);
     Token name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
     match(TOKEN_TYPE_SEMI, ";");
     symbol_table_define_type(table, name, data_type);
 }
 
-static void parse_statement(Function *function, Unit *unit, Scope *scope)
+static void parse_statement(Function *function, Scope *scope)
 {
     if (is_data_type_next(scope->table))
     {
-        parse_declaration(function, unit, scope);
+        parse_declaration(function, scope);
         return;
     }
 
     switch (lexer_peek(0).type)
     {
         case TOKEN_TYPE_RETURN:
-            parse_return(scope, unit);
+            parse_return(scope);
             break;
         case TOKEN_TYPE_IF:
-            parse_if(function, unit, scope);
+            parse_if(function, scope);
             break;
         case TOKEN_TYPE_WHILE:
-            parse_while(function, unit, scope);
+            parse_while(function, scope);
             break;
         case TOKEN_TYPE_TYPEDEF:
-            parse_typedef(unit, scope->table);
+            parse_typedef(scope->table);
             break;
         default:
-            parse_expression_statement(scope, unit);
+            parse_expression_statement(scope);
             break;
     }
 }
 
-static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent)
+static Scope *parse_scope(Function *function, SymbolTable *parent)
 {
     Scope *scope = malloc(sizeof(Scope));
     scope->statements = NULL;
@@ -234,15 +211,16 @@ static Scope *parse_scope(Function *function, Unit *unit, SymbolTable *parent)
 
     match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
-        parse_statement(function, unit, scope);
+        parse_statement(function, scope);
     match(TOKEN_TYPE_CLOSE_SQUIGGLY, "}");
 
     return scope;
 }
 
-static void parse_params(Function *function, Unit *unit, Symbol *symbol)
+static void parse_params(Function *function, Symbol *symbol)
 {
-    Buffer params_buffer = make_buffer((void**)&symbol->params, &symbol->param_count, sizeof(Symbol));
+    BUFFER_DECLARE(param, Symbol);
+    BUFFER_INIT(param, Symbol);
     symbol->is_variadic = 0;
 
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
@@ -257,7 +235,7 @@ static void parse_params(Function *function, Unit *unit, Symbol *symbol)
 
         Symbol param;
         param.flags = SYMBOL_ARGUMENT;
-        param.data_type = parse_data_type(unit, function->table);
+        param.data_type = parse_data_type(function->table);
         param.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
         param.params = NULL;
         param.param_count = 0;
@@ -265,7 +243,7 @@ static void parse_params(Function *function, Unit *unit, Symbol *symbol)
         param.location = function->argument_size;
         function->argument_size += symbol_size(&param);
 
-        append_buffer(&params_buffer, &param);
+        BUFFER_ADD(param, Symbol, &param);
         symbol_table_add(function->table, param);
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
@@ -273,11 +251,13 @@ static void parse_params(Function *function, Unit *unit, Symbol *symbol)
         match(TOKEN_TYPE_COMMA, ",");
     }
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
+    symbol->params = params;
+    symbol->param_count = param_count;
 }
 
-static void parse_function(Unit *unit)
+static void parse_function()
 {
-    if (!is_data_type_next(unit->global_table))
+    if (!is_data_type_next(global_table))
     {
         Token token = lexer_consume(TOKEN_TYPE_NONE);
         ERROR(&token, "Expected datatype, got '%s' instead",
@@ -286,35 +266,31 @@ static void parse_function(Unit *unit)
     }
 
     Function function;
-    function.table = symbol_table_new(unit->global_table);
+    function.table = symbol_table_new(global_table);
     function.stack_size = 0;
     function.argument_size = 0;
 
     // Function definition
     Symbol func_symbol;
-    func_symbol.data_type = parse_data_type(unit, function.table);
+    func_symbol.data_type = parse_data_type(function.table);
     func_symbol.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
-    parse_params(&function, unit, &func_symbol);
+    parse_params(&function, &func_symbol);
 
     // Register symbol
-    symbol_table_add(unit->global_table, func_symbol);
+    symbol_table_add(global_table, func_symbol);
 
     // Optional function body
     function.func_symbol = func_symbol;
     function.body = NULL;
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
-        function.body = parse_scope(&function, unit, function.table);
+        function.body = parse_scope(&function, function.table);
     else
         match(TOKEN_TYPE_SEMI, ";");
 
-    if (!unit->functions)
-        unit->functions = malloc(sizeof(Function));
-    else
-        unit->functions = realloc(unit->functions, (unit->function_count + 1) * sizeof(Function));
-    unit->functions[unit->function_count++] = function;
+    unit_add_function(&function);
 }
 
-static void parse_struct(Unit *unit)
+static void parse_struct()
 {
     match(TOKEN_TYPE_STRUCT, "struct");
 
@@ -327,7 +303,7 @@ static void parse_struct(Unit *unit)
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
     {
         Symbol member;
-        member.data_type = parse_data_type(unit, unit->global_table);
+        member.data_type = parse_data_type(global_table);
         member.name = lexer_consume(TOKEN_TYPE_IDENTIFIER);
         member.flags = SYMBOL_MEMBER;
         member.params = NULL;
@@ -342,14 +318,10 @@ static void parse_struct(Unit *unit)
     match(TOKEN_TYPE_CLOSE_SQUIGGLY, "}");
     match(TOKEN_TYPE_SEMI, ";");
 
-    if (!unit->structs)
-        unit->structs = malloc(sizeof(Struct));
-    else
-        unit->structs = realloc(unit->structs, (unit->struct_count + 1) * sizeof(Struct));
-    unit->structs[unit->struct_count++] = struct_;
+    unit_add_struct(&struct_);
 }
 
-static void parse_enum(Unit *unit)
+static void parse_enum()
 {
     match(TOKEN_TYPE_ENUM, "enum");
 
@@ -386,7 +358,7 @@ static void parse_enum(Unit *unit)
 
         member.location = auto_allocator++;
         symbol_table_add(enum_.members, member);
-        symbol_table_add(unit->global_table, member);
+        symbol_table_add(global_table, member);
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
             break;
@@ -396,15 +368,8 @@ static void parse_enum(Unit *unit)
     match(TOKEN_TYPE_SEMI, ";");
 }
 
-Unit *parse()
+void parse()
 {
-    Unit *unit = malloc(sizeof (Unit));
-    unit->functions = NULL;
-    unit->function_count = 0;
-    unit->structs = NULL;
-    unit->struct_count = 0;
-    unit->global_table = symbol_table_new(NULL);
-
     for (;;)
     {
         Token token = lexer_peek(0);
@@ -414,110 +379,20 @@ Unit *parse()
         switch (token.type)
         {
             case TOKEN_TYPE_IDENTIFIER:
-                parse_function(unit);
+                parse_function();
                 break;
             case TOKEN_TYPE_TYPEDEF:
-                parse_typedef(unit, unit->global_table);
+                parse_typedef(global_table);
                 break;
             case TOKEN_TYPE_STRUCT:
-                parse_struct(unit);
+                parse_struct();
                 break;
             case TOKEN_TYPE_ENUM:
-                parse_enum(unit);
+                parse_enum();
                 break;
             default:
                 assert (0);
         }
     }
-
-    return unit;
 }
 
-void free_expression(Expression *expression)
-{
-    switch (expression->type)
-    {
-        case EXPRESSION_TYPE_ADD:
-            free_expression(expression->left);
-            free_expression(expression->right);
-            free(expression->left);
-            free(expression->right);
-            break;
-        case EXPRESSION_TYPE_FUNCTION_CALL:
-            free_expression(expression->left);
-            for (int i = 0; i < expression->argument_length; i++)
-            {
-                free_expression(expression->arguments[i]);
-                free(expression->arguments[i]);
-            }
-            free(expression->left);
-            free(expression->arguments);
-            break;
-        case EXPRESSION_TYPE_REF:
-            free_expression(expression->left);
-            free(expression->left);
-            break;
-        default:
-            break;
-    }
-}
-
-void free_scope(Scope *scope)
-{
-    free_symbol_table(scope->table);
-    free(scope->table);
-    if (scope->statements)
-    {
-        for (int i = 0; i < scope->statement_count; i++)
-        {
-            Statement *statement = &scope->statements[i];
-            if (statement->expression)
-            {
-                free_expression(statement->expression);
-                free(statement->expression);
-            }
-            if (statement->sub_scope)
-            {
-                free_scope(statement->sub_scope);
-                free(statement->sub_scope);
-            }
-        }
-        free(scope->statements);
-    }
-}
-
-void free_function(Function *function)
-{
-    free_symbol_table(function->table);
-    free(function->table);
-    if (function->body)
-    {
-        free_symbol_table(function->body->table);
-        free(function->body);
-    }
-}
-
-void free_struct(Struct *struct_)
-{
-    free_symbol_table(struct_->members);
-    free(struct_->members);
-}
-
-void free_unit(Unit *unit)
-{
-    if (unit->functions)
-    {
-        for (int i = 0; i < unit->function_count; i++)
-            free_function(&unit->functions[i]);
-        free(unit->functions);
-    }
-    if (unit->structs)
-    {
-        for (int i = 0; i < unit->struct_count; i++)
-            free_struct(&unit->structs[i]);
-        free(unit->structs);
-    }
-
-    free_symbol_table(unit->global_table);
-    free(unit->global_table);
-}

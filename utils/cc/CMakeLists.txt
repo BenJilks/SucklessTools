@@ -13,6 +13,7 @@ set(SOURCES
         stream.c
         macro_condition.c
         source_map.c
+        unit.c
         x86.c
         x86_expression.c
         x86_asm.c
