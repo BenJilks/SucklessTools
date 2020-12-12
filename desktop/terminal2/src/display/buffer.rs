@@ -76,7 +76,6 @@ impl Buffer
 
     fn move_row(&mut self, to: i32, from: i32)
     {
-        println!("move {} -> {}", from, to);
         for column in 0..self.columns 
         {
             let to_index = (to * self.columns + column) as usize;
@@ -96,7 +95,7 @@ impl Buffer
         }
     }
 
-    fn scroll(&mut self, amount: i32)
+    pub fn scroll(&mut self, amount: i32)
     {
         if amount < 0
         {
@@ -132,7 +131,8 @@ impl Buffer
 
     fn out_of_bounds(&self, pos: &CursorPos) -> bool
     {
-        return pos.get_row() >= self.rows || pos.get_column() >= self.columns;
+        return pos.get_row() < 0 || pos.get_row() >= self.rows || 
+            pos.get_column() < 0 || pos.get_column() >= self.columns;
     }
 
     pub fn rune_at(&self, at: &CursorPos) -> Option<Rune>
@@ -190,6 +190,21 @@ impl Buffer
         let rune = self.rune_from_code_point(code_point);
         self.set_rune_at(&cursor, rune);
         self.cursor_move(0, 1);
+    }
+
+    pub fn fill(&mut self, code_point: u32)
+    {
+        let mut rune = Rune::default();
+        rune.code_point = code_point;
+
+        for row in 0..self.rows
+        {
+            for column in 0..self.columns
+            {
+                let pos = CursorPos::new(row, column);
+                self.set_rune_at(&pos, rune.clone());
+            }
+        }
     }
 
     pub fn insert(&mut self, count: usize)
@@ -320,9 +335,11 @@ impl Buffer
     }
     
     pub fn clear_from_cursor_down(&mut self) {
-        self.clear_block_range(self.cursor.get_row(), self.rows);
+        self.clear_from_cursor_right();
+        self.clear_block_range(self.cursor.get_row() + 1, self.rows);
     }
     pub fn clear_from_cursor_up(&mut self) {
+        self.clear_from_cursor_left();
         self.clear_block_range(0, self.cursor.get_row());
     }
     pub fn clear_whole_screen(&mut self) {

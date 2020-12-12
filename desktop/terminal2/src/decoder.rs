@@ -11,6 +11,7 @@ enum State
     Command,
     CommandBody,
     Bracket,
+    Hash,
 }
 
 pub struct Decoder
@@ -238,6 +239,24 @@ impl Decoder
         self.command = '\0';
     }
 
+    fn finish_hash(&mut self, buffer: &mut Buffer)
+    {
+        match self.command
+        {
+            '8' =>
+            {
+                buffer.fill('E' as u32);
+            },
+
+            _ =>
+            {
+                println!("Unkown bracket escape {}", 
+                    self.command);
+            }
+        }
+        self.command = '\0';
+    }
+
     fn finish_command(&mut self)
     {
         println!("Command {:?} {}", self.args, self.buffer);
@@ -248,34 +267,23 @@ impl Decoder
     pub fn decode(&mut self, output: &[u8], count_read: i32, buffer: &mut Buffer)
     {
         let mut i = 0;
-        while i < count_read
+        loop
         {
             if !self.reconsume
             {
+                if i >= count_read {
+                    break;
+                }
+                
                 self.c = output[i as usize] as char;
                 i += 1;
             }
             self.reconsume = false;
-            
-            // Enable raw stream debugging
-            if false
-            {
-                match self.c
-                { 
-                    '\x1b' => print!("\\033"),
-                    '\x06' => print!("\\0x06"),
-                    '\x07' => print!("\\0x07"),
-                    '\x08' => print!("\\b"),
-                    '\r' => print!("\\r"),
-                    _ => print!("{}", self.c),
-                }
-                use std::io::Write;
-                std::io::stdout().flush().unwrap();
-            }
-
+           
+            println!("{} - {} {:?}", self.c, self.c as u32, self.state);
             match self.state
             {
-
+                
                 State::Initial =>
                 {
                     match self.c
@@ -296,10 +304,17 @@ impl Decoder
                         '[' => self.state = State::Private,
                         ']' => self.state = State::Command,
                         '(' => self.state = State::Bracket,
+                        '#' => self.state = State::Hash,
+                        'D' => 
+                        {
+                            self.state = State::Initial;
+                            buffer.scroll(1);
+                            println!("Escape D");
+                        },
                         _ =>
                         {
                             self.state = State::Initial;
-                            self.reconsume = true;
+                            println!("Unkown escape '{}'", self.c);
                         },
                     }
                 },
@@ -316,7 +331,6 @@ impl Decoder
                         },
                     }
                     self.state = State::Argument;
-                
                 },
 
                 State::Argument =>
@@ -383,6 +397,13 @@ impl Decoder
                     self.state = State::Initial;
                     self.command = self.c;
                     self.finish_bracket();
+                },
+
+                State::Hash =>
+                {
+                    self.state = State::Initial;
+                    self.command = self.c;
+                    self.finish_hash(buffer);
                 },
                 
             }
