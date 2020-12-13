@@ -70,7 +70,7 @@ static void dump_expression(Expression *expression, int indent)
             PRINT_DATA_TYPE; 
             dump_expression(expression->left, indent + 1);
             print_indent(indent);
-            fprintf(stderr, "Arguments:");
+            fprintf(stderr, "Arguments:\n");
             for (int i = 0; i < expression->argument_length; i++)
                 dump_expression(expression->arguments[i], indent + 1);
             break;

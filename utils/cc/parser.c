@@ -89,6 +89,7 @@ static void parse_declaration(Function *function, Scope *scope)
         {
             match(TOKEN_TYPE_EQUALS, "=");
             curr_statement->expression = parse_expression(scope->table);
+            check_assign_types(symbol_type, &curr_statement->expression->data_type);
         }
 
         if (lexer_peek(0).type != TOKEN_TYPE_COMMA)
@@ -394,5 +395,46 @@ void parse()
                 assert (0);
         }
     }
+}
+
+void free_scope(Scope *scope)
+{
+    free_symbol_table(scope->table);
+    free(scope->table);
+    if (scope->statements)
+    {
+        for (int i = 0; i < scope->statement_count; i++)
+        {
+            Statement *statement = &scope->statements[i];
+            if (statement->expression)
+            {
+                free_expression(statement->expression);
+                free(statement->expression);
+            }
+            if (statement->sub_scope)
+            {
+                free_scope(statement->sub_scope);
+                free(statement->sub_scope);
+            }
+        }
+        free(scope->statements);
+    }
+}
+
+void free_function(Function *function)
+{
+    free_symbol_table(function->table);
+    free(function->table);
+    if (function->body)
+    {
+        free_symbol_table(function->body->table);
+        free(function->body);
+    }
+}
+
+void free_struct(Struct *struct_)
+{
+    free_symbol_table(struct_->members);
+    free(struct_->members);
 }
 

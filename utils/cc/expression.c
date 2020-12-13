@@ -2,6 +2,7 @@
 #include "parser.h"
 #include "unit.h"
 #include "buffer.h"
+#include "dumpast.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -178,7 +179,8 @@ static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
     return expression;
 }
 
-static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType type, DataType *lhs_data_type)
+static Expression *make_unary_expression(
+        SymbolTable *table, enum ExpressionType type, DataType *lhs_data_type)
 {
     Expression *expression = malloc(sizeof(Expression));
     expression->left = parse_unary_operator(table, lhs_data_type);
@@ -190,7 +192,8 @@ static Expression *make_unary_expression(SymbolTable *table, enum ExpressionType
     return expression;
 }
 
-static Expression *parse_sub_expression_or_cast(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_sub_expression_or_cast(
+        SymbolTable *table, DataType *lhs_data_type)
 {
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
     if (is_data_type_next(table))
@@ -209,7 +212,8 @@ static Expression *parse_sub_expression_or_cast(SymbolTable *table, DataType *lh
     return sub_expression;
 }
 
-static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type)
+static Expression *parse_unary_operator(
+        SymbolTable *table, DataType *lhs_data_type)
 {
     switch (lexer_peek(0).type)
     {
@@ -436,6 +440,18 @@ static Expression *parse_logical(SymbolTable *table, DataType *lhs_data_type)
     return left;
 }
 
+void check_assign_types(
+    DataType *left, DataType *right)
+{
+    if (!data_type_equals(left, right))
+    {
+        char msg[80];
+        sprintf(msg, "Cannot assign type '%s' to", printable_data_type(right));
+        sprintf(msg, "type '%s'\n", printable_data_type(left));
+        ERROR(NULL, msg);
+    }
+}
+
 Expression *parse_expression(SymbolTable *table)
 {
     Expression *left = parse_logical(table, NULL);
@@ -444,6 +460,8 @@ Expression *parse_expression(SymbolTable *table)
     {
         match(TOKEN_TYPE_EQUALS, "=");
         Expression *right = parse_logical(table, &left->data_type);
+
+        check_assign_types(&left->data_type, &right->data_type);
         left = create_operation_expression(left, EXPRESSION_TYPE_ASSIGN, right);
     }
 

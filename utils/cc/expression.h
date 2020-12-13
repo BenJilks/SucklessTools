@@ -72,4 +72,7 @@ enum Primitive primitive_from_name(Token *name);
 int is_data_type_next(SymbolTable *table);
 Expression *parse_expression(SymbolTable *table);
 
+void check_assign_types(DataType *left, DataType *right);
+
 #endif // EXPRESSION_H
+
