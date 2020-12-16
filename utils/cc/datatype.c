@@ -9,7 +9,7 @@
     DataType dt_##_name() \
     { \
         DataType type = new_data_type(); \
-        type.name = (Token) { #_name, sizeof(#_name), \
+        type.name = (Token) { #_name, sizeof(#_name) - 1, \
             TOKEN_TYPE_IDENTIFIER, { "null", 0, 0, 0 } }; \
          \
         type.flags = DATA_TYPE_PRIMITIVE; \

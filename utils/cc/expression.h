@@ -7,6 +7,7 @@
     __TYPE(INT) \
     __TYPE(FLOAT) \
     __TYPE(STRING) \
+    __TYPE(CHAR) \
     __TYPE(VARIABLE)
 
 enum ValueType

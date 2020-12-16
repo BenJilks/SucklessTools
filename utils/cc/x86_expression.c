@@ -202,6 +202,11 @@ static X86Value compile_value(X86Code *code, Value *value, enum ExpressionMode m
         case VALUE_TYPE_STRING:
             compile_string(code, value);
             return (X86Value) { dt_const_char_pointer() };
+        case VALUE_TYPE_CHAR:
+            INST(X86_OP_CODE_MOV_REG_IMM8, X86_REG_AL, value->s.data[0]);
+            INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 1);
+            INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
+            return (X86Value) { dt_char() };
         case VALUE_TYPE_VARIABLE:
             if (!value->v)
                 break;

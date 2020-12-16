@@ -25,6 +25,34 @@ static SourceMap *g_source_map;
 // Current token state
 static char g_c = '\0';
 static int g_should_reconsume = 0;
+static int g_has_error = 0;
+
+// Single char token table
+struct CharTokenPair
+{
+    char c;
+    enum TokenType t;
+};
+static struct CharTokenPair single_char_token_table[] =
+{
+    { '+', TOKEN_TYPE_ADD },
+    { '(', TOKEN_TYPE_OPEN_BRACKET },
+    { ')', TOKEN_TYPE_CLOSE_BRACKET },
+    { '{', TOKEN_TYPE_OPEN_SQUIGGLY },
+    { '}', TOKEN_TYPE_CLOSE_SQUIGGLY },
+    { ',', TOKEN_TYPE_COMMA },
+    { ';', TOKEN_TYPE_SEMI },
+    { '+', TOKEN_TYPE_ADD },
+    { '=', TOKEN_TYPE_EQUALS },
+    { '*', TOKEN_TYPE_STAR },
+    { '&', TOKEN_TYPE_AND },
+    { '<', TOKEN_TYPE_LESS_THAN },
+    { '>', TOKEN_TYPE_GREATER_THAN },
+    { '-', TOKEN_TYPE_SUBTRACT },
+    { '[', TOKEN_TYPE_OPEN_SQUARE },
+    { ']', TOKEN_TYPE_CLOSE_SQUARE },
+    { '/', TOKEN_TYPE_FORWARD_SLASH },
+};
 
 static int find_start_of_line(SourceLine *line)
 {
@@ -43,6 +71,8 @@ static int find_start_of_line(SourceLine *line)
 
 void lexer_error(Token *token, const char *message)
 {
+    g_has_error = 1;
+
     // If a token was specified, use its line data, 
     // otherwise use the current position.
     SourceLine line;
@@ -71,6 +101,11 @@ void lexer_error(Token *token, const char *message)
     for (int i = 0; i < 8 + g_source_column - 4; i++)
         fprintf(stderr, " ");
     fprintf(stderr, "^^^^\n\n");
+}
+
+int lexer_has_error()
+{
+    return g_has_error;
 }
 
 static void reset_lexer_state()
@@ -128,6 +163,7 @@ enum State
     STATE_INTEGER,
     STATE_FLOAT,
     STATE_STRING,
+    STATE_CHAR,
     STATE_DOT,
     STATE_DOT_DOT,
     STATE_EXCLAMATION,
@@ -240,6 +276,14 @@ static Token lexer_next()
                     token.data = g_source + g_source_pointer;
                     break;
                 }
+                
+                // Char
+                if (g_c == '\'')
+                {
+                    state = STATE_CHAR;
+                    token.data = g_source + g_source_pointer;
+                    break;
+                }
 
                 // ... Or .
                 if (g_c == '.')
@@ -260,40 +304,11 @@ static Token lexer_next()
                 }
 
                 // Any other single char tokens
-                switch (g_c)
+                for (int i = 0; i < sizeof(single_char_token_table) / sizeof(struct CharTokenPair); i++)
                 {
-                    case '(':
-                        return make_single_char_token(TOKEN_TYPE_OPEN_BRACKET);
-                    case ')':
-                        return make_single_char_token(TOKEN_TYPE_CLOSE_BRACKET);
-                    case '{':
-                        return make_single_char_token(TOKEN_TYPE_OPEN_SQUIGGLY);
-                    case '}':
-                        return make_single_char_token(TOKEN_TYPE_CLOSE_SQUIGGLY);
-                    case ',':
-                        return make_single_char_token(TOKEN_TYPE_COMMA);
-                    case ';':
-                        return make_single_char_token(TOKEN_TYPE_SEMI);
-                    case '+':
-                        return make_single_char_token(TOKEN_TYPE_ADD);
-                    case '=':
-                        return make_single_char_token(TOKEN_TYPE_EQUALS);
-                    case '*':
-                        return make_single_char_token(TOKEN_TYPE_STAR);
-                    case '&':
-                        return make_single_char_token(TOKEN_TYPE_AND);
-                    case '<':
-                        return make_single_char_token(TOKEN_TYPE_LESS_THAN);
-                    case '>':
-                        return make_single_char_token(TOKEN_TYPE_GREATER_THAN);
-                    case '-':
-                        return make_single_char_token(TOKEN_TYPE_SUBTRACT);
-                    case '[':
-                        return make_single_char_token(TOKEN_TYPE_OPEN_SQUARE);
-                    case ']':
-                        return make_single_char_token(TOKEN_TYPE_CLOSE_SQUARE);
-                    case '/':
-                        return make_single_char_token(TOKEN_TYPE_FORWARD_SLASH);
+                    struct CharTokenPair *pair = &single_char_token_table[i];
+                    if (g_c == pair->c)
+                        return make_single_char_token(pair->t);
                 }
 
                 assert (0);
@@ -347,6 +362,18 @@ static Token lexer_next()
                 if (g_c == '"')
                 {
                     token.type = TOKEN_TYPE_STRING;
+                    state = STATE_INITIAL;
+                    return token;
+                }
+
+                token.length += 1;
+                break;
+
+            case STATE_CHAR:
+                if (token.length > 0)
+                {
+                    assert (g_c == '\'');
+                    token.type = TOKEN_TYPE_CHAR;
                     state = STATE_INITIAL;
                     return token;
                 }

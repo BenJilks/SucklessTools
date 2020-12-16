@@ -9,6 +9,7 @@
     __TOKEN_TYPE(INTEGER) \
     __TOKEN_TYPE(FLOAT) \
     __TOKEN_TYPE(STRING) \
+    __TOKEN_TYPE(CHAR) \
 	__TOKEN_TYPE(OPEN_BRACKET) \
 	__TOKEN_TYPE(CLOSE_BRACKET) \
 	__TOKEN_TYPE(OPEN_SQUIGGLY) \
@@ -64,6 +65,7 @@ void lexer_destroy();
 }
 
 void lexer_error(Token *token, const char *message);
+int lexer_has_error();
 
 char *lexer_printable_token_data(Token*);
 int lexer_compair_token_name(Token*, const char *name);

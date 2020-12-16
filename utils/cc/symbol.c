@@ -98,8 +98,12 @@ void free_symbol_table(SymbolTable *table)
             free(table->symbols[i]);
         }
         free(table->symbols);
+        table->symbols = NULL;
     }
     if (table->type_defs)
+    {
         free(table->type_defs);
+        table->type_defs = NULL;
+    }
 }
 

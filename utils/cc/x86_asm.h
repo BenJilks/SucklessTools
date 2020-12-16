@@ -55,6 +55,7 @@ typedef struct X86Argument
 #define ENUMERATE_X86_OP_CODES                                               \
     __OP_CODE(MOV_REG_REG,                    REG,    REG,    NONE,   mov)   \
     __OP_CODE(MOV_REG_IMM32,                  REG,    IMM32,  NONE,   mov)   \
+    __OP_CODE(MOV_REG_IMM8,                   REG,    IMM8,   NONE,   mov)   \
     __OP_CODE(MOV_REG_MEM32_REG_OFF,          REG,    REG,    OFF32,  mov)   \
     __OP_CODE(MOV_REG_MEM8_REG_OFF,           REG,    REG,    OFF8,   mov)   \
     __OP_CODE(MOV_MEM32_REG_OFF_REG,          REG,    OFF32,  REG,    mov)   \

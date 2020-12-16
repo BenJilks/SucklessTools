@@ -5,6 +5,7 @@
 #include "expression.h"
 
 #define ENUMERATE_STATEMENT_TYPE \
+    __TYPE(NULL) \
     __TYPE(DECLARATION) \
     __TYPE(EXPRESSION) \
     __TYPE(IF) \
@@ -61,12 +62,21 @@ typedef struct Enum
     SymbolTable *members;
 } Enum;
 
+// Global variables
 extern Function *functions;
 extern Struct *structs;
 extern int function_count;
 extern int struct_count;
 extern SymbolTable *global_table;
 
+// Scope
+Scope *scope_create(SymbolTable *parent);
+void add_statement_to_scope(Scope *scope, Statement statement);
+
+// Statement
+Statement statement_create();
+
+// Unit
 void unit_create();
 void unit_destroy();
 

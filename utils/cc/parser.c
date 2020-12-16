@@ -22,23 +22,11 @@ Token match(enum TokenType type, const char *name)
     return token;
 }
 
-static void add_statement_to_scope(Scope *scope, Statement statement)
-{
-    if (!scope->statements)
-        scope->statements = malloc(sizeof(Statement));
-    else
-        scope->statements = realloc(scope->statements, (scope->statement_count + 1) * sizeof(Statement));
-
-    scope->statements[scope->statement_count] = statement;
-    scope->statement_count += 1;
-}
-
 static void parse_declaration(Function *function, Scope *scope)
 {
     DataType data_type = parse_data_type(scope->table);
-    Statement statement;
-
-    Statement *curr_statement = NULL;
+    Statement statement, *curr_statement = NULL;
+    
     for (;;)
     {
         if (curr_statement == NULL)
@@ -80,6 +68,7 @@ static void parse_declaration(Function *function, Scope *scope)
         function->stack_size += symbol_size(&symbol);
 
         // Create statement
+        *curr_statement = statement_create();
         curr_statement->type = STATEMENT_TYPE_DECLARATION;
         curr_statement->symbol = symbol;
         curr_statement->expression = NULL;
@@ -103,10 +92,9 @@ static void parse_declaration(Function *function, Scope *scope)
 
 static void parse_expression_statement(Scope *scope)
 {
-    Statement statement;
+    Statement statement = statement_create();
     statement.type = STATEMENT_TYPE_EXPRESSION;
     statement.expression = parse_expression(scope->table);
-    statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
@@ -116,10 +104,9 @@ static void parse_return(Scope *scope)
 {
     match(TOKEN_TYPE_RETURN, "return");
 
-    Statement statement;
+    Statement statement = statement_create();
     statement.type = STATEMENT_TYPE_RETURN;
     statement.expression = parse_expression(scope->table);
-    statement.sub_scope = NULL;
     match(TOKEN_TYPE_SEMI, ";");
 
     add_statement_to_scope(scope, statement);
@@ -130,10 +117,7 @@ static Scope *parse_block_or_statement(Function *function, SymbolTable *parent)
     if (lexer_peek(0).type == TOKEN_TYPE_OPEN_SQUIGGLY)
         return parse_scope(function, parent);
 
-    Scope *scope = malloc(sizeof(Scope));
-    scope->statements = NULL;
-    scope->statement_count = 0;
-    scope->table = symbol_table_new(parent);
+    Scope *scope = scope_create(parent);
     parse_statement(function, scope);
     return scope;
 }
@@ -143,7 +127,7 @@ static void parse_if(Function *function, Scope *scope)
     match(TOKEN_TYPE_IF, "if");
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
 
-    Statement statement;
+    Statement statement = statement_create();
     statement.type = STATEMENT_TYPE_IF;
     statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
@@ -157,7 +141,7 @@ static void parse_while(Function *function, Scope *scope)
     match(TOKEN_TYPE_WHILE, "while");
     match(TOKEN_TYPE_OPEN_BRACKET, "(");
 
-    Statement statement;
+    Statement statement = statement_create();
     statement.type = STATEMENT_TYPE_WHILE;
     statement.expression = parse_expression(scope->table);
     match(TOKEN_TYPE_CLOSE_BRACKET, ")");
@@ -205,10 +189,7 @@ static void parse_statement(Function *function, Scope *scope)
 
 static Scope *parse_scope(Function *function, SymbolTable *parent)
 {
-    Scope *scope = malloc(sizeof(Scope));
-    scope->statements = NULL;
-    scope->statement_count = 0;
-    scope->table = symbol_table_new(parent);
+    Scope *scope = scope_create(parent);
 
     match(TOKEN_TYPE_OPEN_SQUIGGLY, "{");
     while (lexer_peek(0).type != TOKEN_TYPE_CLOSE_SQUIGGLY)
@@ -408,7 +389,7 @@ void free_scope(Scope *scope)
             Statement *statement = &scope->statements[i];
             if (statement->expression)
             {
-                free_expression(statement->expression);
+                //TODO: free_expression(statement->expression);
                 free(statement->expression);
             }
             if (statement->sub_scope)

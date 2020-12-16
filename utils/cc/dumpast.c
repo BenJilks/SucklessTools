@@ -24,6 +24,9 @@ static void dump_value(Value *value, int indent)
         case VALUE_TYPE_STRING:
             fprintf(stderr, "string \"%s\"\n", lexer_printable_token_data(&value->s));
             break;
+        case VALUE_TYPE_CHAR:
+            fprintf(stderr, "char '%s'\n", lexer_printable_token_data(&value->s));
+            break;
         case VALUE_TYPE_VARIABLE:
             if (value->v == NULL)
                 fprintf(stderr, "variable %s\n", "!! Unkown !!");

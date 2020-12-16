@@ -38,6 +38,36 @@ void unit_destroy()
     free_symbol_table(global_table);
 }
 
+Scope *scope_create(SymbolTable *parent)
+{
+    Scope *scope = malloc(sizeof(Scope));
+    scope->statements = NULL;
+    scope->statement_count = 0;
+    scope->table = symbol_table_new(parent);
+    return scope;
+}
+
+void add_statement_to_scope(Scope *scope, Statement statement)
+{
+    if (!scope->statements)
+        scope->statements = malloc(sizeof(Statement));
+    else
+        scope->statements = realloc(scope->statements, (scope->statement_count + 1) * sizeof(Statement));
+
+    scope->statements[scope->statement_count] = statement;
+    scope->statement_count += 1;
+}
+
+Statement statement_create()
+{
+    Statement statement;
+    statement.type = STATEMENT_TYPE_NULL;
+    statement.expression = NULL;
+    statement.next = NULL;
+    statement.sub_scope = NULL;
+    return statement;
+}
+
 void unit_add_function(Function *func)
 {
     BUFFER_ADD(function, Function, func);
@@ -124,7 +154,6 @@ static void free_function(Function *function)
     if (function->body)
     {
         free_scope(function->body);
-        free_symbol_table(function->body->table);
         free(function->body);
     }
 }

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 static Expression *parse_unary_operator(SymbolTable *table, DataType *lhs_data_type);
 
@@ -145,6 +146,13 @@ static Expression *parse_term(SymbolTable *table, DataType *lhs_data_type)
             expression->data_type = dt_const_char_pointer();
             break;
         
+        case TOKEN_TYPE_CHAR:
+            value->type = VALUE_TYPE_CHAR;
+            value->s = token;
+            lexer_consume(TOKEN_TYPE_CHAR);
+            expression->data_type = dt_char();
+            break;
+
         case TOKEN_TYPE_IDENTIFIER:
             value->type = VALUE_TYPE_VARIABLE;
             value->v = symbol_table_lookup(table, &token);
@@ -446,8 +454,8 @@ void check_assign_types(
     if (!data_type_equals(left, right))
     {
         char msg[80];
-        sprintf(msg, "Cannot assign type '%s' to", printable_data_type(right));
-        sprintf(msg, "type '%s'\n", printable_data_type(left));
+        sprintf(msg, "Cannot assign type '%s' to ", printable_data_type(right));
+        sprintf(msg + strlen(msg), "type '%s'\n", printable_data_type(left));
         ERROR(NULL, msg);
     }
 }
