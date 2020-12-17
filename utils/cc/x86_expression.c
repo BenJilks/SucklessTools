@@ -2,76 +2,109 @@
 #include "dumpast.h"
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
-X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
+static void unimplemented_cast(DataType *from, DataType *to)
 {
-    if (!(value->data_type.flags & DATA_TYPE_PRIMITIVE) || !(data_type->flags & DATA_TYPE_PRIMITIVE))
+    fprintf(stderr, "Internal Error (x86): Unimplemented cast from '%s'", printable_data_type(from));
+    fprintf(stderr, " to '%s'\n", printable_data_type(to));
+    assert (0);
+}
+
+static void comment_cast(X86Code *code, DataType *from, DataType *to)
+{
+    char comment[80];
+    sprintf(comment, "Cast %s", printable_data_type(from));
+    sprintf(comment + strlen(comment), " to %s", printable_data_type(to));
+    COMMENT_CODE(code, comment);
+}
+
+X86Value compile_cast(X86Code *code, X86Value *value, DataType *to_type)
+{
+    if (!(value->data_type.flags & DATA_TYPE_PRIMITIVE) || !(to_type->flags & DATA_TYPE_PRIMITIVE))
     {
-        if (data_type_equals(&value->data_type, data_type))
+        if (data_type_equals(&value->data_type, to_type))
             return *value;
 
-        fprintf(stderr, "Error: Connot cast type '%s'", printable_data_type(&value->data_type));
-        fprintf(stderr, " to '%s'\n", printable_data_type(data_type));
-        return *value;
+        // NOTE: This is invalid and we should have 
+        //       not allowed this in parsing.
+        assert (0);
     }
-
+    
+    comment_cast(code, &value->data_type, to_type);
     switch (value->data_type.primitive)
     {
         case PRIMITIVE_INT:
-            switch (data_type->primitive)
+            switch (to_type->primitive)
             {
                 case PRIMITIVE_INT:
                     return *value;
+
                 case PRIMITIVE_CHAR:
-                    COMMENT_CODE(code, "Cast int to char");
                     INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
                     INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
                     return (X86Value) { dt_char() };
+
                 case PRIMITIVE_FLOAT:
                     INST(X86_OP_CODE_FLOAD_INT_MEM32_REG_OFF, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
                     return (X86Value) { dt_float() };
+
                 default:
                     break;
             }
             break;
         case PRIMITIVE_FLOAT:
-            switch (data_type->primitive)
+            switch (to_type->primitive)
             {
+                case PRIMITIVE_INT:
+                    INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_FSTORE_INT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_int() };
+
                 case PRIMITIVE_FLOAT:
                     return *value;
+
                 case PRIMITIVE_DOUBLE:
                     INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM64_REG_OFF, X86_REG_ESP, -4);
                     INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
                     return (X86Value) { dt_double() };
+
                 default:
-                    assert (0);
                     break;
             }
             break;
         case PRIMITIVE_DOUBLE:
-            switch (data_type->primitive)
+            switch (to_type->primitive)
             {
+                case PRIMITIVE_INT:
+                    INST(X86_OP_CODE_FLOAD_FLOAT_MEM64_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 4);
+                    INST(X86_OP_CODE_FSTORE_INT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_int() };
+
                 case PRIMITIVE_DOUBLE:
                     return *value;
+
                 default:
                     break;
             }
             break;
         case PRIMITIVE_CHAR:
-            switch (data_type->primitive)
+            switch (to_type->primitive)
             {
                 case PRIMITIVE_CHAR:
                     return *value;
+
                 case PRIMITIVE_INT:
-                    COMMENT_CODE(code, "Cast char to int");
                     INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
                     INST(X86_OP_CODE_MOV_MEM32_REG_OFF_IMM32, X86_REG_ESP, 0, 0);
                     INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
                     return (X86Value) { dt_int() };
+
                 default:
                     break;
             }
@@ -80,9 +113,7 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *data_type)
             break;
     }
 
-    fprintf(stderr, "Error: Connot cast type '%s'", printable_data_type(&value->data_type));
-    fprintf(stderr, " to '%s'\n", printable_data_type(data_type));
-    return *value;
+    unimplemented_cast(&value->data_type, to_type);
 }
 
 static int get_variable_location(Symbol *variable)

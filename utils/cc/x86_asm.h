@@ -89,9 +89,11 @@ typedef struct X86Argument
     __OP_CODE(JUMP_LABEL_IF_ZERO,             LABEL,  NONE,   NONE,   jz)    \
     __OP_CODE(JUMP_LABEL_IF_NOT_ZERO,         LABEL,  NONE,   NONE,   jnz)   \
     __OP_CODE(FLOAD_FLOAT_MEM32_REG_OFF,      REG,    OFF32,  NONE,   fld)   \
+    __OP_CODE(FLOAD_FLOAT_MEM64_REG_OFF,      REG,    OFF64,  NONE,   fld)   \
     __OP_CODE(FLOAD_INT_MEM32_REG_OFF,        REG,    OFF32,  NONE,   fild)  \
     __OP_CODE(FSTORE_FLOAT_POP_MEM32_REG_OFF, REG,    OFF32,  NONE,   fstp)  \
     __OP_CODE(FSTORE_FLOAT_POP_MEM64_REG_OFF, REG,    OFF64,  NONE,   fstp)  \
+    __OP_CODE(FSTORE_INT_POP_MEM32_REG_OFF,   REG,    OFF32,  NONE,   fistp) \
     __OP_CODE(FADD_POP_REG_REG,               REG,    REG,    NONE,   faddp) \
     __OP_CODE(DOUBLE_TO_QUADWORD,             NONE,   NONE,   NONE,   cdq)
 

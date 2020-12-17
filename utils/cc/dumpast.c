@@ -109,11 +109,14 @@ char *printable_data_type(DataType *data_type)
         buffer_pointer += 1;
     }
 
-    sprintf(buffer + (buffer_pointer++), " ");
-    for (int i = 0; i < data_type->array_count; i++)
+    if (data_type->array_count > 0)
     {
-        sprintf(buffer + buffer_pointer, "[%i]", data_type->array_sizes[i]);
-        buffer_pointer = strlen(buffer);
+        sprintf(buffer + (buffer_pointer++), " ");
+        for (int i = 0; i < data_type->array_count; i++)
+        {
+            sprintf(buffer + buffer_pointer, "[%i]", data_type->array_sizes[i]);
+            buffer_pointer = strlen(buffer);
+        }
     }
     return buffer;
 }
