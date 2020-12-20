@@ -36,6 +36,8 @@ enum CodeBlockState
 {
     CODE_BLOCK_STATE_DEFAULT,
     CODE_BLOCK_STATE_IDENTIFIER,
+    CODE_BLOCK_STATE_STRING,
+    CODE_BLOCK_STATE_STRING_ESCAPE,
     CODE_BLOCK_STATE_SLASH,
     CODE_BLOCK_STATE_COMMENT_LINE,
     CODE_BLOCK_STATE_COMMENT_MULTI,
@@ -772,6 +774,12 @@ static enum EndBlockMode parse_block(Stream *input, Stream *output, const char *
                     input->should_reconsume = 1;
                     break;
                 }
+                if (input->peek == '"')
+                {
+                    stream_write_char(output, input->peek);
+                    state = CODE_BLOCK_STATE_STRING;
+                    break;
+                }
                 if (input->peek == '/')
                 {
                     state = CODE_BLOCK_STATE_SLASH;
@@ -803,6 +811,23 @@ static enum EndBlockMode parse_block(Stream *input, Stream *output, const char *
                     break;
                 }
                 buffer[buffer_pointer++] = input->peek;
+                break;
+
+            case CODE_BLOCK_STATE_STRING:
+                if (mode != BLOCK_MODE_DISABLED)
+                    stream_write_char(output, input->peek);
+                if (input->peek == '\\')
+                {
+                    state = CODE_BLOCK_STATE_STRING_ESCAPE;
+                    break;
+                }
+                if (input->peek == '"')
+                    state = CODE_BLOCK_STATE_DEFAULT;
+                break;
+
+            case CODE_BLOCK_STATE_STRING_ESCAPE:
+                if (mode != BLOCK_MODE_DISABLED)
+                    stream_write_char(output, input->peek);
                 break;
 
             case CODE_BLOCK_STATE_SLASH:

@@ -1,19 +1,47 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include "lexer.h"
 #include "parser.h"
 #include "unit.h"
 #include "preproccessor.h"
 #include "dumpast.h"
 #include "x86.h"
-#include <ctype.h>
+
+static struct option cmd_options[] =
+{
+	{ "dumpast", no_argument, 0, 'a' },
+};
 
 int main(int argc, char *argv[])
 {
-    // TODO: Actuall parse command line arguments
-    const char *file_path = "test.c";
-    if (argc >= 2)
-        file_path = argv[1];
+    int dump_ast = 0;
+	for (;;)
+	{
+		int option_index;
+		int c = getopt_long(argc, argv, "a",
+			cmd_options, &option_index);
+
+		if (c == -1)
+			break;
+
+		switch (c)
+		{
+			case 'a':
+                dump_ast = 1;
+                break;
+        }
+    }
+
+    if (optind >= argc)
+    {
+        fprintf(stderr, "No input files\n");
+        return 1;
+    }
+    
+    // TODO: Allow multiple source files
+    const char *file_path = argv[optind];
 
     Stream input_stream = stream_create_input_file(file_path);
     Stream output_stream = stream_create_output_memory();
@@ -25,7 +53,8 @@ int main(int argc, char *argv[])
     // Parse
     unit_create();
     parse();
-    dump_unit();
+    if (dump_ast)
+        dump_unit();
 
     // Compile
     X86Code code = x86_compile();

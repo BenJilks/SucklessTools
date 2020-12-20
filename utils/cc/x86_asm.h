@@ -53,49 +53,50 @@ typedef struct X86Argument
 } X86Argument;
 
 #define ENUMERATE_X86_OP_CODES                                               \
-    __OP_CODE(MOV_REG_REG,                    REG,    REG,    NONE,   mov)   \
-    __OP_CODE(MOV_REG_IMM32,                  REG,    IMM32,  NONE,   mov)   \
-    __OP_CODE(MOV_REG_IMM8,                   REG,    IMM8,   NONE,   mov)   \
-    __OP_CODE(MOV_REG_MEM32_REG_OFF,          REG,    REG,    OFF32,  mov)   \
-    __OP_CODE(MOV_REG_MEM8_REG_OFF,           REG,    REG,    OFF8,   mov)   \
-    __OP_CODE(MOV_MEM32_REG_OFF_REG,          REG,    OFF32,  REG,    mov)   \
-    __OP_CODE(MOV_MEM32_REG_OFF_IMM32,        REG,    OFF32,  IMM32,  mov)   \
-    __OP_CODE(MOV_MEM8_REG_OFF_REG,           REG,    OFF8,   REG,    mov)   \
-    __OP_CODE(LOAD_AH_F,                      NONE,   NONE,   NONE,   lahf)  \
-    __OP_CODE(SET_REG_IF_ZERO,                REG,    NONE,   NONE,   sete)  \
-    __OP_CODE(SET_REG_IF_NOT_ZERO,            REG,    NONE,   NONE,   setne) \
-    __OP_CODE(SET_REG_IF_LESS,                REG,    NONE,   NONE,   setl)  \
-    __OP_CODE(SET_REG_IF_LESS_UNSIGNED,       REG,    NONE,   NONE,   setb)  \
-    __OP_CODE(SET_REG_IF_GREATER,             REG,    NONE,   NONE,   setg)  \
-    __OP_CODE(SET_REG_IF_GREATER_UNSIGNED,    REG,    NONE,   NONE,   seta)  \
-    __OP_CODE(SUB_REG_IMM8,                   REG,    IMM8,   NONE,   sub)   \
-    __OP_CODE(SUB_REG_REG,                    REG,    REG,    NONE,   sub)   \
-    __OP_CODE(ADD_REG_REG,                    REG,    REG,    NONE,   add)   \
-    __OP_CODE(ADD_REG_IMM8,                   REG,    IMM8,   NONE,   add)   \
-    __OP_CODE(MUL_REG_REG,                    REG,    REG,    NONE,   imul)  \
-    __OP_CODE(MUL_REG_IMM8,                   REG,    IMM8,   NONE,   imul)  \
-    __OP_CODE(DIV_REG,                        REG,    NONE,   NONE,   idiv)  \
-    __OP_CODE(CMP_REG_IMM32,                  REG,    IMM32,  NONE,   cmp)   \
-    __OP_CODE(CMP_REG_REG,                    REG,    REG,    NONE,   cmp)   \
-    __OP_CODE(AND_REG_IMM32,                  REG,    IMM32,  NONE,   and)   \
-    __OP_CODE(PUSH_REG,                       REG,    NONE,   NONE,   push)  \
-    __OP_CODE(PUSH_IMM32,                     IMM32,  NONE,   NONE,   push)  \
-    __OP_CODE(PUSH_MEM32_REG_OFF,             REG,    OFF32,  NONE,   push)  \
-    __OP_CODE(PUSH_LABEL,                     LABEL,  NONE,   NONE,   push)  \
-    __OP_CODE(POP_REG,                        REG,    NONE,   NONE,   pop)   \
-    __OP_CODE(CALL_LABEL,                     LABEL,  NONE,   NONE,   call)  \
-    __OP_CODE(RET,                            NONE,   NONE,   NONE,   ret)   \
-    __OP_CODE(JUMP_LABEL,                     LABEL,  NONE,   NONE,   jmp)   \
-    __OP_CODE(JUMP_LABEL_IF_ZERO,             LABEL,  NONE,   NONE,   jz)    \
-    __OP_CODE(JUMP_LABEL_IF_NOT_ZERO,         LABEL,  NONE,   NONE,   jnz)   \
-    __OP_CODE(FLOAD_FLOAT_MEM32_REG_OFF,      REG,    OFF32,  NONE,   fld)   \
-    __OP_CODE(FLOAD_FLOAT_MEM64_REG_OFF,      REG,    OFF64,  NONE,   fld)   \
-    __OP_CODE(FLOAD_INT_MEM32_REG_OFF,        REG,    OFF32,  NONE,   fild)  \
-    __OP_CODE(FSTORE_FLOAT_POP_MEM32_REG_OFF, REG,    OFF32,  NONE,   fstp)  \
-    __OP_CODE(FSTORE_FLOAT_POP_MEM64_REG_OFF, REG,    OFF64,  NONE,   fstp)  \
-    __OP_CODE(FSTORE_INT_POP_MEM32_REG_OFF,   REG,    OFF32,  NONE,   fistp) \
-    __OP_CODE(FADD_POP_REG_REG,               REG,    REG,    NONE,   faddp) \
-    __OP_CODE(DOUBLE_TO_QUADWORD,             NONE,   NONE,   NONE,   cdq)
+    __OP_CODE(MOV_REG_REG,                          REG,    REG,    NONE,   mov)   \
+    __OP_CODE(MOV_REG_IMM32,                        REG,    IMM32,  NONE,   mov)   \
+    __OP_CODE(MOV_REG_IMM8,                         REG,    IMM8,   NONE,   mov)   \
+    __OP_CODE(MOV_REG_MEM32_REG_OFF,                REG,    REG,    OFF32,  mov)   \
+    __OP_CODE(MOV_REG_MEM8_REG_OFF,                 REG,    REG,    OFF8,   mov)   \
+    __OP_CODE(MOV_MEM32_REG_OFF_REG,                REG,    OFF32,  REG,    mov)   \
+    __OP_CODE(MOV_MEM32_REG_OFF_IMM32,              REG,    OFF32,  IMM32,  mov)   \
+    __OP_CODE(MOV_MEM8_REG_OFF_REG,                 REG,    OFF8,   REG,    mov)   \
+    __OP_CODE(MOVSX_REG_MEM8_REG_OFF,               REG,    REG,    OFF8,   movsx) \
+    __OP_CODE(LOAD_AH_F,                            NONE,   NONE,   NONE,   lahf)  \
+    __OP_CODE(SET_REG_IF_ZERO,                      REG,    NONE,   NONE,   sete)  \
+    __OP_CODE(SET_REG_IF_NOT_ZERO,                  REG,    NONE,   NONE,   setne) \
+    __OP_CODE(SET_REG_IF_LESS,                      REG,    NONE,   NONE,   setl)  \
+    __OP_CODE(SET_REG_IF_LESS_UNSIGNED,             REG,    NONE,   NONE,   setb)  \
+    __OP_CODE(SET_REG_IF_GREATER,                   REG,    NONE,   NONE,   setg)  \
+    __OP_CODE(SET_REG_IF_GREATER_UNSIGNED,          REG,    NONE,   NONE,   seta)  \
+    __OP_CODE(SUB_REG_IMM8,                         REG,    IMM8,   NONE,   sub)   \
+    __OP_CODE(SUB_REG_REG,                          REG,    REG,    NONE,   sub)   \
+    __OP_CODE(ADD_REG_REG,                          REG,    REG,    NONE,   add)   \
+    __OP_CODE(ADD_REG_IMM8,                         REG,    IMM8,   NONE,   add)   \
+    __OP_CODE(MUL_REG_REG,                          REG,    REG,    NONE,   imul)  \
+    __OP_CODE(MUL_REG_IMM8,                         REG,    IMM8,   NONE,   imul)  \
+    __OP_CODE(DIV_REG,                              REG,    NONE,   NONE,   idiv)  \
+    __OP_CODE(CMP_REG_IMM32,                        REG,    IMM32,  NONE,   cmp)   \
+    __OP_CODE(CMP_REG_REG,                          REG,    REG,    NONE,   cmp)   \
+    __OP_CODE(AND_REG_IMM32,                        REG,    IMM32,  NONE,   and)   \
+    __OP_CODE(PUSH_REG,                             REG,    NONE,   NONE,   push)  \
+    __OP_CODE(PUSH_IMM32,                           IMM32,  NONE,   NONE,   push)  \
+    __OP_CODE(PUSH_MEM32_REG_OFF,                   REG,    OFF32,  NONE,   push)  \
+    __OP_CODE(PUSH_LABEL,                           LABEL,  NONE,   NONE,   push)  \
+    __OP_CODE(POP_REG,                              REG,    NONE,   NONE,   pop)   \
+    __OP_CODE(CALL_LABEL,                           LABEL,  NONE,   NONE,   call)  \
+    __OP_CODE(RET,                                  NONE,   NONE,   NONE,   ret)   \
+    __OP_CODE(JUMP_LABEL,                           LABEL,  NONE,   NONE,   jmp)   \
+    __OP_CODE(JUMP_LABEL_IF_ZERO,                   LABEL,  NONE,   NONE,   jz)    \
+    __OP_CODE(JUMP_LABEL_IF_NOT_ZERO,               LABEL,  NONE,   NONE,   jnz)   \
+    __OP_CODE(FLOAD_FLOAT_MEM32_REG_OFF,            REG,    OFF32,  NONE,   fld)   \
+    __OP_CODE(FLOAD_FLOAT_MEM64_REG_OFF,            REG,    OFF64,  NONE,   fld)   \
+    __OP_CODE(FLOAD_INT_MEM32_REG_OFF,              REG,    OFF32,  NONE,   fild)  \
+    __OP_CODE(FSTORE_FLOAT_POP_MEM32_REG_OFF,       REG,    OFF32,  NONE,   fstp)  \
+    __OP_CODE(FSTORE_FLOAT_POP_MEM64_REG_OFF,       REG,    OFF64,  NONE,   fstp)  \
+    __OP_CODE(FSTORE_INT_POP_MEM32_REG_OFF,         REG,    OFF32,  NONE,   fistp) \
+    __OP_CODE(FADD_POP_REG_REG,                     REG,    REG,    NONE,   faddp) \
+    __OP_CODE(DOUBLE_TO_QUADWORD,                   NONE,   NONE,   NONE,   cdq)
 
 enum X86OpCode
 {
@@ -169,3 +170,4 @@ X86Instruction x86(X86Code *code, enum X86OpCode op_code, ...);
 void x86_dump(X86Code *code);
 
 #endif // X86_ASM_H
+

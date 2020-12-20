@@ -93,6 +93,10 @@ class cc:
         f.close()
 
         if result.stdout != expected:
+            print("Expected:")
+            print(str(expected, encoding='UTF-8'))
+            print("Got:")
+            print(str(result.stdout, encoding='UTF-8'))
             exit_env(1)
 
 class ExitException(Exception):

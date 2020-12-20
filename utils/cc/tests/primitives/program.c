@@ -7,8 +7,11 @@ int main()
     int i = 42;
     float f = 4.2;
     const char *str = "Hello, World!";
+    const char *multi_string = 
+        "This " "is " "made "
+        "from " "multiple " "strings";
 
-    printf("%c %i %f %s",
-        (int)c, i, f, str);
+    printf("%c %i %f %s %s",
+        (int)c, i, f, str, multi_string);
 }
 

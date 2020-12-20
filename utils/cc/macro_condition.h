@@ -6,3 +6,4 @@
 int macro_condition_parse(Stream *input);
 
 #endif // MACRO_CONDITION_H
+

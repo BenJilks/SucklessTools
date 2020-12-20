@@ -41,7 +41,7 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *to_type)
                     return *value;
 
                 case PRIMITIVE_CHAR:
-                    INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_MOV_REG_MEM32_REG_OFF, X86_REG_EAX, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
                     INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
                     return (X86Value) { dt_char() };
@@ -50,6 +50,12 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *to_type)
                     INST(X86_OP_CODE_FLOAD_INT_MEM32_REG_OFF, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
                     return (X86Value) { dt_float() };
+                
+                case PRIMITIVE_DOUBLE:
+                    INST(X86_OP_CODE_FLOAD_INT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
+                    INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM64_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_double() };
 
                 default:
                     break;
@@ -62,6 +68,15 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *to_type)
                     INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
                     INST(X86_OP_CODE_FSTORE_INT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
                     return (X86Value) { dt_int() };
+                
+                case PRIMITIVE_CHAR:
+                    INST(X86_OP_CODE_FLOAD_FLOAT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_FSTORE_INT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+
+                    INST(X86_OP_CODE_MOV_REG_MEM32_REG_OFF, X86_REG_EAX, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
+                    INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
+                    return (X86Value) { dt_char() };
 
                 case PRIMITIVE_FLOAT:
                     return *value;
@@ -85,6 +100,22 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *to_type)
                     INST(X86_OP_CODE_FSTORE_INT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
                     return (X86Value) { dt_int() };
 
+                case PRIMITIVE_CHAR:
+                    INST(X86_OP_CODE_FLOAD_FLOAT_MEM64_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 4);
+                    INST(X86_OP_CODE_FSTORE_INT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    
+                    INST(X86_OP_CODE_MOV_REG_MEM32_REG_OFF, X86_REG_EAX, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 3);
+                    INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
+                    return (X86Value) { dt_char() };
+
+                case PRIMITIVE_FLOAT:
+                    INST(X86_OP_CODE_FLOAD_FLOAT_MEM64_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 4);
+                    INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_float() };
+
                 case PRIMITIVE_DOUBLE:
                     return *value;
 
@@ -99,11 +130,38 @@ X86Value compile_cast(X86Code *code, X86Value *value, DataType *to_type)
                     return *value;
 
                 case PRIMITIVE_INT:
-                    INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
-                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 3);
-                    INST(X86_OP_CODE_MOV_MEM32_REG_OFF_IMM32, X86_REG_ESP, 0, 0);
-                    INST(X86_OP_CODE_MOV_MEM8_REG_OFF_REG, X86_REG_ESP, 0, X86_REG_AL);
+                    if (value->data_type.flags & DATA_TYPE_UNSIGNED)
+                        INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
+                    else
+                        INST(X86_OP_CODE_MOVSX_REG_MEM8_REG_OFF, X86_REG_EAX, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 1);
+                    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
                     return (X86Value) { dt_int() };
+                
+                case PRIMITIVE_FLOAT:
+                    if (value->data_type.flags & DATA_TYPE_UNSIGNED)
+                        INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
+                    else
+                        INST(X86_OP_CODE_MOVSX_REG_MEM8_REG_OFF, X86_REG_EAX, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 1);
+                    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+
+                    INST(X86_OP_CODE_FLOAD_INT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_char() };
+                
+                case PRIMITIVE_DOUBLE:
+                    if (value->data_type.flags & DATA_TYPE_UNSIGNED)
+                        INST(X86_OP_CODE_MOV_REG_MEM8_REG_OFF, X86_REG_AL, X86_REG_ESP, 0);
+                    else
+                        INST(X86_OP_CODE_MOVSX_REG_MEM8_REG_OFF, X86_REG_EAX, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_ADD_REG_IMM8, X86_REG_ESP, 1);
+                    INST(X86_OP_CODE_PUSH_REG, X86_REG_EAX);
+
+                    INST(X86_OP_CODE_FLOAD_INT_MEM32_REG_OFF, X86_REG_ESP, 0);
+                    INST(X86_OP_CODE_SUB_REG_IMM8, X86_REG_ESP, 4);
+                    INST(X86_OP_CODE_FSTORE_FLOAT_POP_MEM64_REG_OFF, X86_REG_ESP, 0);
+                    return (X86Value) { dt_char() };
 
                 default:
                     break;
