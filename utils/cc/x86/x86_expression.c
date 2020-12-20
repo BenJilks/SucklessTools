@@ -1,5 +1,5 @@
+#include "../dumpast.h"
 #include "x86_expression.h"
-#include "dumpast.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

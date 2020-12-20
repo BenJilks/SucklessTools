@@ -1,7 +1,7 @@
+#include "../preprocessor/buffer.h"
+#include "../lexer/lexer.h"
 #include "parser.h"
-#include "lexer.h"
 #include "unit.h"
-#include "buffer.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>

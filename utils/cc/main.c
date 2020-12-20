@@ -2,12 +2,12 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <getopt.h>
-#include "lexer.h"
-#include "parser.h"
-#include "unit.h"
-#include "preproccessor.h"
+#include "lexer/lexer.h"
+#include "parser/parser.h"
+#include "parser/unit.h"
+#include "preprocessor/preprocessor.h"
+#include "x86/x86.h"
 #include "dumpast.h"
-#include "x86.h"
 
 static struct option cmd_options[] =
 {

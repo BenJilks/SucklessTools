@@ -1,7 +1,7 @@
 #ifndef LEXER_H
 #define LEXER_H
 
-#include "source_map.h"
+#include "../preprocessor/source_map.h"
 
 #define ENUMERATE_TOKEN_TYPES \
     __TOKEN_TYPE(NONE) \

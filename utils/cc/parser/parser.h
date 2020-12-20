@@ -1,7 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include "lexer.h"
+#include "../lexer/lexer.h"
 #include "symbol.h"
 #include "expression.h"
 

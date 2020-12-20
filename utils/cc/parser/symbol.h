@@ -1,7 +1,7 @@
 #ifndef SYMBOL_H
 #define SYMBOL_H
 
-#include "lexer.h"
+#include "../lexer/lexer.h"
 #include "datatype.h"
 
 enum SymbolFlags

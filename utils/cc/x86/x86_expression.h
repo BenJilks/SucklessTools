@@ -1,8 +1,8 @@
 #ifndef X86_EXPRESSION_H
 #define X86_EXPRESSION_H
 
+#include "../parser/parser.h"
 #include "x86_asm.h"
-#include "parser.h"
 
 #define INST(...) x86_code_add_instruction(code, x86(code, __VA_ARGS__))
 

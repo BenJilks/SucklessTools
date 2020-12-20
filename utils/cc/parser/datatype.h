@@ -1,7 +1,7 @@
 #ifndef DATA_TYPE_H
 #define DATA_TYPE_H
 
-#include "lexer.h"
+#include "../lexer/lexer.h"
 
 #define MAX_ARRAY_DEPTH 80
 

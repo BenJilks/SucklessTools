@@ -1,5 +1,5 @@
+#include "../preprocessor/buffer.h"
 #include "unit.h"
-#include "buffer.h"
 #include <stdlib.h>
 
 // Global state

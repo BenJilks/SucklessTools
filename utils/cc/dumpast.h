@@ -1,7 +1,7 @@
 #ifndef DUMPAST_H
 #define DUMPAST_H
 
-#include "parser.h"
+#include "parser/datatype.h"
 
 char *printable_data_type(DataType *data_type);
 void dump_unit();
