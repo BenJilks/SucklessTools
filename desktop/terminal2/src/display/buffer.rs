@@ -249,12 +249,18 @@ impl Buffer
         }
     }
 
+    fn new_line(&mut self)
+    {
+        self.cursor_move(1, 0);
+        self.cursor.carriage_return();
+    }
+
     pub fn type_special(&mut self, special: Special)
     {
         self.on_cursor_change();
         match special
         {
-            Special::NewLine => self.cursor_move(1, 0),
+            Special::NewLine => self.new_line(),
             Special::Return => self.cursor.carriage_return(),
         }
         self.on_cursor_change();

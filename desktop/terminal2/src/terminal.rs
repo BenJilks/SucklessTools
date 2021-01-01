@@ -57,8 +57,13 @@ fn handle_output<Display>(term: &mut Terminal<Display>)
         }
     }
 
-    term.decoder.decode(&buffer, count_read, &mut term.buffer);
+    let response = term.decoder.decode(
+        &buffer, count_read, &mut term.buffer);
     flush(term);
+    
+    if response.len() > 0 {
+        handle_input(term, &response);
+    }
 }
 
 fn handle_input<Display>(term: &mut Terminal<Display>, input: &Vec<u8>)
@@ -112,6 +117,9 @@ fn handle_update<Display>(term: &mut Terminal<Display>)
 
 fn execute_child_process(master: i32, slave: i32)
 {
+    let term = c_str("TERM=xterm-256color");
+    let shell = c_str("/usr/bin/bash");
+    
     unsafe
     {
         // Set up standard streams
@@ -128,9 +136,11 @@ fn execute_child_process(master: i32, slave: i32)
         // Close the old streams
         libc::close(slave);
         libc::close(master);
+
+        // Setup envirement
+        libc::putenv(term.as_ptr() as *mut i8);
         
         // Execute shell
-        let shell = c_str("/usr/bin/bash");
         if libc::execl(shell.as_ptr(), shell.as_ptr(), 0) < 0 {
             libc::perror(c_str("execl").as_ptr());
         }

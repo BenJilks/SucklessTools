@@ -1,10 +1,15 @@
 use super::display::buffer::*;
 use super::display::rune::*;
 
+const SHOW_ALL_ESCAPES: bool = false;
+
 #[derive(Debug)]
 enum State
 {
-    Initial,
+    Ascii,
+    Utf8OneByteLeft,
+    Utf8TwoBytesLeft,
+    Utf8ThreeBytesLeft,
     Escape,
     Private,
     Argument,
@@ -21,6 +26,7 @@ pub struct Decoder
     c: char,
     reconsume: bool,
 
+    curr_rune: u32,
     is_private: bool,
     args: Vec<i32>,
     command: char,
@@ -118,11 +124,12 @@ impl Decoder
     {
         return Self
         {
-            state: State::Initial,
+            state: State::Ascii,
             buffer: String::new(),
             c: '\0',
             reconsume: false,
 
+            curr_rune: 0,
             is_private: false,
             args: Vec::new(),
             command: '\0',
@@ -139,10 +146,11 @@ impl Decoder
         self.buffer.clear();
     }
 
-    fn finish_escape(&mut self, buffer: &mut Buffer)
+    fn finish_escape(&mut self, buffer: &mut Buffer, response: &mut Vec<u8>)
     {
         let args = &self.args;
         let def = |val| { if args.len() >= 1 {args[0]} else {val} };
+        let def_or_zero = |val| { if def(val) == 0 {val} else {def(val)} };
 
         match self.command
         {
@@ -164,10 +172,10 @@ impl Decoder
                 buffer.cursor_set(row, column);
             },
 
-            'A' => buffer.cursor_up(def(1)),
-            'B' => buffer.cursor_down(def(1)),
-            'C' => buffer.cursor_right(def(1)),
-            'D' => buffer.cursor_left(def(1)),
+            'A' => buffer.cursor_up(def_or_zero(1)),
+            'B' => buffer.cursor_down(def_or_zero(1)),
+            'C' => buffer.cursor_right(def_or_zero(1)),
+            'D' => buffer.cursor_left(def_or_zero(1)),
             
             'K' =>
             {
@@ -207,9 +215,25 @@ impl Decoder
             'r' =>
             {
                 let top = if args.len() == 2 {args[0] - 1} else {0};
-                let bottom = if args.len() == 2 {args[1] - 1} else {buffer.get_rows()};
+                let bottom = if args.len() == 2 {args[1]} else {buffer.get_rows()};
                 buffer.set_scroll_region(top, bottom);
             },
+
+            'c' =>
+            {
+                assert!(def(0) == 0);
+                response.append(&mut "\x1b[1;2c"
+                    .as_bytes()
+                    .to_vec());
+            },
+
+            'X' =>
+            {
+                let count = def(1);
+                for _ in 0..count {
+                    buffer.type_rune(' ' as u32);
+                }
+            }
 
             _ => 
             {
@@ -218,11 +242,31 @@ impl Decoder
             },
         }
 
-        println!("Escape {}{:?}{}", 
-            if self.is_private {"?"} else {""}, args, self.command);
+        if SHOW_ALL_ESCAPES 
+        {
+            println!("Escape {}{:?}{}", 
+                if self.is_private {"?"} else {""}, args, self.command);
+        }
 
         self.is_private = false;
         self.args.clear();
+        self.command = '\0';
+    }
+
+    fn finish_single_char_code(&mut self, buffer: &mut Buffer)
+    {
+        match self.command
+        {
+            'D' => buffer.cursor_down(1),
+            'M' => buffer.cursor_up(1),
+            'E' => buffer.type_special(Special::NewLine),
+
+            _ =>
+            {
+                println!("Unkown escape '{}'", self.command);
+            }
+        }
+
         self.command = '\0';
     }
 
@@ -235,6 +279,10 @@ impl Decoder
                 println!("Unkown bracket escape {}", 
                     self.command);
             }
+        }
+        
+        if SHOW_ALL_ESCAPES {
+            println!("Escape {}", self.command);
         }
         self.command = '\0';
     }
@@ -264,15 +312,17 @@ impl Decoder
         self.args.clear();
     }
 
-    pub fn decode(&mut self, output: &[u8], count_read: i32, buffer: &mut Buffer)
+    pub fn decode(&mut self, output: &[u8], count_read: i32, buffer: &mut Buffer) -> Vec<u8>
     {
+        let mut response = Vec::<u8>::new();
         let mut i = 0;
+
         loop
         {
             if !self.reconsume
             {
                 if i >= count_read {
-                    break;
+                    return response;
                 }
                 
                 self.c = output[i as usize] as char;
@@ -280,20 +330,83 @@ impl Decoder
             }
             self.reconsume = false;
            
-            println!("{} - {} {:?}", self.c, self.c as u32, self.state);
             match self.state
             {
                 
-                State::Initial =>
+                State::Ascii =>
                 {
-                    match self.c
+                    if (self.c as u32 & 0b11100000) == 0b11000000
                     {
-                        '\n' => buffer.type_special(Special::NewLine),
-                        '\r' => buffer.type_special(Special::Return),
-                        '\x07' => println!("Bell!!!"),
-                        '\x08' => buffer.cursor_left(1),
-                        '\x1b' => self.state = State::Escape,
-                        _ => buffer.type_rune(self.c as u32),
+                        self.curr_rune = (self.c as u32 & 0b00011111) << 6;
+                        self.state = State::Utf8OneByteLeft;
+                    }
+                    else if (self.c as u32 & 0b11110000) == 0b11100000
+                    {
+                        self.curr_rune = (self.c as u32 & 0b00001111) << 12;
+                        self.state = State::Utf8TwoBytesLeft;
+                    }
+                    else if (self.c as u32 & 0b11111000) == 0b11110000
+                    {
+                        self.curr_rune = (self.c as u32 & 0b00000111) << 18;
+                        self.state = State::Utf8ThreeBytesLeft;
+                    }
+                    else
+                    {
+                        match self.c
+                        {
+                            '\n' => buffer.type_special(Special::NewLine),
+                            '\r' => buffer.type_special(Special::Return),
+                            '\x07' => println!("Bell!!!"),
+                            '\x08' => buffer.cursor_left(1),
+                            '\x1b' => self.state = State::Escape,
+                            _ => buffer.type_rune(self.c as u32),
+                        }
+                    }
+                },
+
+                State::Utf8OneByteLeft =>
+                {
+                    if (self.c as u32 & 0b11000000) != 0b10000000
+                    {
+                        println!("Invalid UTF-8");
+                        self.state = State::Ascii;
+                        self.reconsume = true;
+                    }
+                    else
+                    {
+                        self.curr_rune |= self.c as u32 & 0b00111111;
+                        self.state = State::Ascii;
+                        buffer.type_rune(self.curr_rune);
+                    }
+                },
+                
+                State::Utf8TwoBytesLeft =>
+                {
+                    if (self.c as u32 & 0b11000000) != 0b10000000
+                    {
+                        println!("Invalid UTF-8");
+                        self.state = State::Ascii;
+                        self.reconsume = true;
+                    }
+                    else
+                    {
+                        self.curr_rune |= (self.c as u32 & 0b00111111) << 6;
+                        self.state = State::Utf8OneByteLeft;
+                    }
+                },
+
+                State::Utf8ThreeBytesLeft =>
+                {
+                    if (self.c as u32 & 0b11000000) != 0b10000000
+                    {
+                        println!("Invalid UTF-8");
+                        self.state = State::Ascii;
+                        self.reconsume = true;
+                    }
+                    else
+                    {
+                        self.curr_rune |= (self.c as u32 & 0b00111111) << 12;
+                        self.state = State::Utf8TwoBytesLeft;
                     }
                 },
 
@@ -305,16 +418,11 @@ impl Decoder
                         ']' => self.state = State::Command,
                         '(' => self.state = State::Bracket,
                         '#' => self.state = State::Hash,
-                        'D' => 
-                        {
-                            self.state = State::Initial;
-                            buffer.scroll(1);
-                            println!("Escape D");
-                        },
                         _ =>
                         {
-                            self.state = State::Initial;
-                            println!("Unkown escape '{}'", self.c);
+                            self.state = State::Ascii;
+                            self.command = self.c;
+                            self.finish_single_char_code(buffer);
                         },
                     }
                 },
@@ -342,15 +450,15 @@ impl Decoder
                         ' ' => {},
                         '\x1b' => 
                         {
-                            self.state = State::Initial;
+                            self.state = State::Ascii;
                             self.reconsume = true;
                         },
                         _ =>
                         {
-                            self.state = State::Initial;
+                            self.state = State::Ascii;
                             self.command = self.c;
                             self.finish_argument();
-                            self.finish_escape(buffer);
+                            self.finish_escape(buffer, &mut response);
                         },
                     }
                 },
@@ -364,7 +472,7 @@ impl Decoder
                         {
                             self.finish_argument();
                             self.finish_command();
-                            self.state = State::Initial;
+                            self.state = State::Ascii;
                         },
                         ';' =>
                         {
@@ -386,7 +494,7 @@ impl Decoder
                         '\x07' =>
                         {
                             self.finish_command();
-                            self.state = State::Initial;
+                            self.state = State::Ascii;
                         },
                         _ => self.buffer.push(self.c),
                     }
@@ -394,14 +502,14 @@ impl Decoder
 
                 State::Bracket =>
                 {
-                    self.state = State::Initial;
+                    self.state = State::Ascii;
                     self.command = self.c;
                     self.finish_bracket();
                 },
 
                 State::Hash =>
                 {
-                    self.state = State::Initial;
+                    self.state = State::Ascii;
                     self.command = self.c;
                     self.finish_hash(buffer);
                 },
