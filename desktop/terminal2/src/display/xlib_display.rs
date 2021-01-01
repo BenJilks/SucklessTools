@@ -1,7 +1,7 @@
 extern crate x11;
 use std::{ptr, mem, collections::HashMap, ffi::CString};
 use x11::{xlib, xft, keysym};
-use super::{buffer::*, cursor::*, rune, UpdateResult};
+use super::{buffer::*, cursor::*, UpdateResult};
 use std::os::raw::
 {
     c_ulong,
@@ -20,7 +20,7 @@ pub struct XLibDisplay
 
     // xft
     font: *mut xft::XftFont,
-    colors: HashMap<rune::Color, xft::XftColor>,
+    colors: HashMap<u32, xft::XftColor>,
     draw: *mut xft::XftDraw,
 
     // Terminal
@@ -103,39 +103,6 @@ impl XLibDisplay
             self.cmap = xlib::XCreateColormap(self.display, 
                 root_window, self.visual, xlib::AllocNone);
 
-            // Allocate font color
-            let mut allocate_color = |color_name|
-            {
-                // Create color name string
-                let mut color: xft::XftColor = mem::zeroed();
-                let color_string = format!("#{}", 
-                    rune::string_from_color(&color_name)
-                        .chars()
-                        .into_iter()
-                        .take(6)
-                        .collect::<String>());
-
-                // Allocate the color
-                let color_c_str = CString::new(color_string).expect("Failed to create C string");
-                if xft::XftColorAllocName(self.display, self.visual, self.cmap, 
-                    color_c_str.as_ptr() as *const c_char, &mut color) == 0
-                {
-                    println!("Could not allocate Xft color");
-                    assert!(false);
-                }
-                self.colors.insert(color_name, color);
-            };
-            allocate_color(rune::Color::Black);
-            allocate_color(rune::Color::Red);
-            allocate_color(rune::Color::Green);
-            allocate_color(rune::Color::Yellow);
-            allocate_color(rune::Color::Blue);
-            allocate_color(rune::Color::Magenta);
-            allocate_color(rune::Color::Cyan);
-            allocate_color(rune::Color::White);
-            allocate_color(rune::Color::DefaultBackground);
-            allocate_color(rune::Color::DefaultForeground);
-
             // Create draw
             self.draw = xft::XftDrawCreate(self.display, self.window, self.visual, self.cmap);
             if self.draw == ptr::null_mut()
@@ -148,6 +115,31 @@ impl XLibDisplay
             self.font_height = (*self.font).height;
             self.font_descent = (*self.font).descent;
         }
+    }
+
+    fn font_color(&mut self, color: &u32) -> xft::XftColor
+    {
+        if !self.colors.contains_key(&color)
+        {
+            unsafe
+            {
+                // Create color name string
+                let mut font_color: xft::XftColor = mem::zeroed();
+                let color_string = format!("#{:06x}", (color >> 8) & 0xFFFFFF);
+
+                // Allocate the color
+                let color_c_str = CString::new(color_string).expect("Failed to create C string");
+                if xft::XftColorAllocName(self.display, self.visual, self.cmap, 
+                    color_c_str.as_ptr() as *const c_char, &mut font_color) == 0
+                {
+                    println!("Could not allocate Xft color");
+                    assert!(false);
+                }
+                self.colors.insert(*color, font_color);
+            }
+        }
+
+        return *self.colors.get(&color).unwrap();
     }
 
     pub fn new(title: &str) -> Self
@@ -201,7 +193,7 @@ impl XLibDisplay
         self.draw_rect(
             x, y - self.font_height, 
             self.font_width, self.font_height,
-            rune::int_from_color(&rune.attribute.background));
+            rune.attribute.background);
 
         // If it's a 0, don't draw it
         if rune.code_point == 0 {
@@ -220,9 +212,9 @@ impl XLibDisplay
             };
 
             // Draw to screen
-            let color = self.colors.get(&rune.attribute.foreground).unwrap();
+            let color = self.font_color(&rune.attribute.foreground);
             xft::XftDrawGlyphSpec(self.draw, 
-                color, self.font, &mut spec, 1);
+                &color, self.font, &mut spec, 1);
         }
     }
 

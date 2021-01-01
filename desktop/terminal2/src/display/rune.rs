@@ -1,6 +1,5 @@
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum Color
+pub enum StandardColor
 {
     Black,
     Red,
@@ -14,11 +13,33 @@ pub enum Color
     DefaultForeground,
 }
 
+impl StandardColor
+{
+    
+    pub fn color(&self) -> u32
+    {
+        match self
+        {
+            StandardColor::Black => 0x000000FF,
+            StandardColor::Red => 0xFF0000FF,
+            StandardColor::Green => 0x00FF00FF,
+            StandardColor::Yellow => 0xFFFF00FF,
+            StandardColor::Blue => 0x0000FFFF,
+            StandardColor::Magenta => 0x00FFFFFF,
+            StandardColor::Cyan => 0xFF00FFFF,
+            StandardColor::White => 0xFFFFFFFF,
+            StandardColor::DefaultBackground => 0x000000FF,
+            StandardColor::DefaultForeground => 0xFFFFFFFF,
+        }
+    }
+
+}
+
 #[derive(Clone, PartialEq)]
 pub struct Attribute
 {
-    pub background: Color,
-    pub foreground: Color,
+    pub background: u32,
+    pub foreground: u32,
 }
 
 impl Default for Attribute
@@ -27,8 +48,8 @@ impl Default for Attribute
     {
         return Self
         {
-            background: Color::DefaultBackground,
-            foreground: Color::DefaultForeground,
+            background: StandardColor::DefaultBackground.color(),
+            foreground: StandardColor::DefaultForeground.color(),
         };
     }
 }
@@ -52,28 +73,5 @@ impl Attribute
         };
     }
 
-}
-
-pub fn string_from_color(color: &Color) -> &'static str
-{
-    match color
-    {
-        Color::Black => return "000000FF",
-        Color::Red => return "FF0000FF",
-        Color::Green => return "00FF00FF",
-        Color::Yellow => return "FFFF00FF",
-        Color::Blue => return "0000FFFF",
-        Color::Magenta => return "00FFFFFF",
-        Color::Cyan => return "FF00FFFF",
-        Color::White => return "FFFFFFFF",
-        Color::DefaultBackground => return "000000FF",
-        Color::DefaultForeground => return "FFFFFFFF",
-    }
-}
-
-pub fn int_from_color(color: &Color) -> u32
-{
-    return u32::from_str_radix(string_from_color(color), 16)
-        .expect("Invalid color");
 }
 

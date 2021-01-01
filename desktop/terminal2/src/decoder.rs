@@ -32,6 +32,96 @@ pub struct Decoder
     command: char,
 }
 
+#[derive(PartialEq)]
+enum ColorType
+{
+    Foreground,
+    Background,
+}
+
+fn decode_standard_color(code: &i32, color_type: &ColorType) -> Option<StandardColor>
+{
+    match code
+    {
+        0 => return Some( StandardColor::Black ),
+        1 => return Some( StandardColor::Red ),
+        2 => return Some( StandardColor::Green ),
+        3 => return Some( StandardColor::Yellow ),
+        4 => return Some( StandardColor::Blue ),
+        5 => return Some( StandardColor::Magenta ),
+        6 => return Some( StandardColor::Cyan ),
+        7 => return Some( StandardColor::White ),
+        9 =>
+        {
+            if *color_type == ColorType::Background {
+                return Some( StandardColor::DefaultBackground );
+            } else {
+                return Some( StandardColor::DefaultForeground );
+            }
+        },
+        _ => return None,
+    }
+}
+
+fn set_color_from_type(attribute: &mut Attribute, 
+    color_type: &ColorType, color: u32)
+{
+    match color_type
+    {
+        ColorType::Background => attribute.background = color,
+        ColorType::Foreground => attribute.foreground = color,
+    }
+}
+
+fn decode_non_16bit_color(args: &Vec<i32>, buffer: &mut Buffer)
+{
+    assert!(args.len() == 3);
+    assert!(args[1] == 5);
+
+    let color_type = 
+        if args[0] == 38 
+            { ColorType::Foreground } 
+        else 
+            { ColorType::Background };
+    let code = args[2];
+    let attribute = buffer.get_attribute();
+
+    let color = 
+        if code <= 7
+        {
+            // Standard colors
+            let standard_color = decode_standard_color(&code, &color_type);
+            standard_color.unwrap().color()
+        }
+        else if code >= 16 && code <= 231 
+        {
+            // Cube colors
+            let cube = code - 16;
+            let rf = (cube / 36) as f32 / 6.0;
+            let gf = (cube / 6) as f32 / 6.0;
+            let bf = (cube % 6) as f32 / 6.0;
+            
+            let r = (rf * 255.0) as u32;
+            let g = (gf * 255.0) as u32;
+            let b = (bf * 255.0) as u32;
+            (r << 24) | (g << 16) | (b << 8)
+        }
+        else if code >= 232 && code <= 255
+        {
+            // Grayscale colors
+            let factor = (code - 232) as f32 / 24.0;
+            let shade = (factor * 255.0) as u32;
+            (shade << 24) | (shade << 16) | (shade << 8)
+        }
+        else 
+        {
+            panic!()
+        };
+
+    set_color_from_type(attribute, 
+        &color_type, color);
+}
+
 fn decode_color(mut code: i32, buffer: &mut Buffer)
 {
     let original_code = code;
@@ -42,8 +132,8 @@ fn decode_color(mut code: i32, buffer: &mut Buffer)
         // Reset all attributes
         0 =>
         {
-            attribute.background = Color::DefaultBackground;
-            attribute.foreground = Color::DefaultForeground;
+            attribute.background = StandardColor::DefaultBackground.color();
+            attribute.foreground = StandardColor::DefaultForeground.color();
             //m_flags = 0;
             return;
         },
@@ -63,13 +153,6 @@ fn decode_color(mut code: i32, buffer: &mut Buffer)
         _ => {}
     }
 
-    #[derive(PartialEq)]
-    enum ColorType
-    {
-        Foreground,
-        Background,
-    };
-
     let mut color_type = ColorType::Foreground;
     if code >= 90
     {
@@ -84,37 +167,15 @@ fn decode_color(mut code: i32, buffer: &mut Buffer)
         code -= 10;
     }
 
-    let color: Color;
-    match code
+    let color = decode_standard_color(&code, &color_type);
+    if color.is_none() 
     {
-        0 => color = Color::Black,
-        1 => color = Color::Red,
-        2 => color = Color::Green,
-        3 => color = Color::Yellow,
-        4 => color = Color::Blue,
-        5 => color = Color::Magenta,
-        6 => color = Color::Cyan,
-        7 => color = Color::White,
-        8 | 9 =>
-        {
-            if color_type == ColorType::Background {
-                color = Color::DefaultBackground;
-            } else {
-                color = Color::DefaultForeground;
-            }
-        },
-        _ =>
-        {
-            println!("Invalid attribute: {}", original_code);
-            return;
-        }
+        println!("Invalid attribute: {}", original_code);
+        return;
     }
 
-    match color_type
-    {
-        ColorType::Background => attribute.background = color,
-        ColorType::Foreground => attribute.foreground = color,
-    }
+    set_color_from_type(attribute, 
+        &color_type, color.unwrap().color());
 }
 
 impl Decoder
@@ -156,11 +217,19 @@ impl Decoder
         {
             'm' =>
             {
-                if args.len() == 0 {
+                if args.len() == 0 
+                {
                     decode_color(0, buffer);
-                }
-                for color_code in args {
-                    decode_color(*color_code, buffer);
+                } 
+                else if args[0] == 38 || args[0] == 48 
+                {
+                    decode_non_16bit_color(args, buffer);
+                } 
+                else 
+                {
+                    for color_code in args {
+                        decode_color(*color_code, buffer);
+                    }
                 }
             },
 
