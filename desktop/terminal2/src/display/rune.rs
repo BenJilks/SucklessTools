@@ -42,6 +42,13 @@ pub struct Attribute
     pub foreground: u32,
 }
 
+#[derive(PartialEq)]
+pub enum ColorType
+{
+    Foreground,
+    Background,
+}
+
 impl Default for Attribute
 {
     fn default() -> Self
@@ -71,6 +78,15 @@ impl Attribute
             background: self.foreground.clone(),
             foreground: self.background.clone(),
         };
+    }
+
+    pub fn from_type(&mut self, color_type: &ColorType) -> &mut u32
+    {
+        match color_type
+        {
+            ColorType::Background => &mut self.background,
+            ColorType::Foreground => &mut self.foreground,
+        }
     }
 
 }

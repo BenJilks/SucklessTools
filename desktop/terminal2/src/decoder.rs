@@ -1,6 +1,9 @@
 use super::display::buffer::*;
 use super::display::rune::*;
+use std::io::Write;
 
+const SHOW_STREAM_LOG: bool = false;
+const SHOW_UNKOWN_ESCAPES: bool = true;
 const SHOW_ALL_ESCAPES: bool = false;
 
 #[derive(Debug)]
@@ -32,48 +35,31 @@ pub struct Decoder
     command: char,
 }
 
-#[derive(PartialEq)]
-enum ColorType
-{
-    Foreground,
-    Background,
-}
-
 fn decode_standard_color(code: &i32, color_type: &ColorType) -> Option<StandardColor>
 {
     match code
     {
-        0 => return Some( StandardColor::Black ),
-        1 => return Some( StandardColor::Red ),
-        2 => return Some( StandardColor::Green ),
-        3 => return Some( StandardColor::Yellow ),
-        4 => return Some( StandardColor::Blue ),
-        5 => return Some( StandardColor::Magenta ),
-        6 => return Some( StandardColor::Cyan ),
-        7 => return Some( StandardColor::White ),
+        0 => Some( StandardColor::Black ),
+        1 => Some( StandardColor::Red ),
+        2 => Some( StandardColor::Green ),
+        3 => Some( StandardColor::Yellow ),
+        4 => Some( StandardColor::Blue ),
+        5 => Some( StandardColor::Magenta ),
+        6 => Some( StandardColor::Cyan ),
+        7 => Some( StandardColor::White ),
         9 =>
         {
             if *color_type == ColorType::Background {
-                return Some( StandardColor::DefaultBackground );
+                Some( StandardColor::DefaultBackground )
             } else {
-                return Some( StandardColor::DefaultForeground );
+                Some( StandardColor::DefaultForeground )
             }
         },
-        _ => return None,
+        _ => None,
     }
 }
 
-fn set_color_from_type(attribute: &mut Attribute, 
-    color_type: &ColorType, color: u32)
-{
-    match color_type
-    {
-        ColorType::Background => attribute.background = color,
-        ColorType::Foreground => attribute.foreground = color,
-    }
-}
-
-fn decode_non_16bit_color(args: &Vec<i32>, buffer: &mut Buffer)
+fn decode_non_16color(args: &Vec<i32>, buffer: &mut Buffer)
 {
     assert!(args.len() == 3);
     assert!(args[1] == 5);
@@ -86,19 +72,19 @@ fn decode_non_16bit_color(args: &Vec<i32>, buffer: &mut Buffer)
     let code = args[2];
     let attribute = buffer.get_attribute();
 
-    let color = 
+    *attribute.from_type(&color_type) =
         if code <= 7
         {
-            // Standard colors
+            // Standard 
             let standard_color = decode_standard_color(&code, &color_type);
             standard_color.unwrap().color()
         }
         else if code >= 16 && code <= 231 
         {
-            // Cube colors
+            // Cube 
             let cube = code - 16;
             let rf = (cube / 36) as f32 / 6.0;
-            let gf = (cube / 6) as f32 / 6.0;
+            let gf = ((cube % 36) / 6) as f32 / 6.0;
             let bf = (cube % 6) as f32 / 6.0;
             
             let r = (rf * 255.0) as u32;
@@ -108,7 +94,7 @@ fn decode_non_16bit_color(args: &Vec<i32>, buffer: &mut Buffer)
         }
         else if code >= 232 && code <= 255
         {
-            // Grayscale colors
+            // Grayscale 
             let factor = (code - 232) as f32 / 24.0;
             let shade = (factor * 255.0) as u32;
             (shade << 24) | (shade << 16) | (shade << 8)
@@ -117,9 +103,6 @@ fn decode_non_16bit_color(args: &Vec<i32>, buffer: &mut Buffer)
         {
             panic!()
         };
-
-    set_color_from_type(attribute, 
-        &color_type, color);
 }
 
 fn decode_color(mut code: i32, buffer: &mut Buffer)
@@ -170,12 +153,13 @@ fn decode_color(mut code: i32, buffer: &mut Buffer)
     let color = decode_standard_color(&code, &color_type);
     if color.is_none() 
     {
-        println!("Invalid attribute: {}", original_code);
+        if SHOW_UNKOWN_ESCAPES {
+            println!("Invalid attribute: {}", original_code);
+        }
         return;
     }
 
-    set_color_from_type(attribute, 
-        &color_type, color.unwrap().color());
+    *attribute.from_type(&color_type) = color.unwrap().color();
 }
 
 impl Decoder
@@ -223,7 +207,7 @@ impl Decoder
                 } 
                 else if args[0] == 38 || args[0] == 48 
                 {
-                    decode_non_16bit_color(args, buffer);
+                    decode_non_16color(args, buffer);
                 } 
                 else 
                 {
@@ -280,6 +264,7 @@ impl Decoder
             'P' => buffer.delete(def(1) as usize),
 
             'L' => buffer.insert_lines(def(1)),
+            'M' => buffer.delete_lines(def(1)),
 
             'r' =>
             {
@@ -306,8 +291,11 @@ impl Decoder
 
             _ => 
             {
-                println!("Unkown escape {}{:?}{}", 
-                    if self.is_private {"?"} else {""}, args, self.command);
+                if SHOW_UNKOWN_ESCAPES
+                {
+                    println!("Unkown escape {}{:?}{}", 
+                        if self.is_private {"?"} else {""}, args, self.command);
+                }
             },
         }
 
@@ -332,7 +320,9 @@ impl Decoder
 
             _ =>
             {
-                println!("Unkown escape '{}'", self.command);
+                if SHOW_UNKOWN_ESCAPES {
+                    println!("Unkown escape '{}'", self.command);
+                }
             }
         }
 
@@ -345,8 +335,11 @@ impl Decoder
         {
             _ =>
             {
-                println!("Unkown bracket escape {}", 
-                    self.command);
+                if SHOW_UNKOWN_ESCAPES
+                {
+                    println!("Unkown bracket escape {}", 
+                        self.command);
+                }
             }
         }
         
@@ -367,8 +360,11 @@ impl Decoder
 
             _ =>
             {
-                println!("Unkown bracket escape {}", 
-                    self.command);
+                if SHOW_UNKOWN_ESCAPES
+                {
+                    println!("Unkown bracket escape {}", 
+                        self.command);
+                }
             }
         }
         self.command = '\0';
@@ -376,12 +372,15 @@ impl Decoder
 
     fn finish_command(&mut self)
     {
-        println!("Command {:?} {}", self.args, self.buffer);
+        if SHOW_UNKOWN_ESCAPES {
+            println!("Command {:?} {}", self.args, self.buffer);
+        }
+
         self.buffer.clear();
         self.args.clear();
     }
 
-    pub fn decode(&mut self, output: &[u8], count_read: i32, buffer: &mut Buffer) -> Vec<u8>
+    pub fn decode(&mut self, output: Vec<u8>, buffer: &mut Buffer) -> Vec<u8>
     {
         let mut response = Vec::<u8>::new();
         let mut i = 0;
@@ -390,15 +389,28 @@ impl Decoder
         {
             if !self.reconsume
             {
-                if i >= count_read {
+                if i >= output.len() {
                     return response;
                 }
                 
                 self.c = output[i as usize] as char;
                 i += 1;
+            
+                if SHOW_STREAM_LOG 
+                {
+                    match self.c
+                    {
+                        '\x1b' => print!("\\033"),
+                        '\r' => print!("\\r"),
+                        '\n' => print!("\\n"),
+                        '\t' => print!("\\t"),
+                        _ => print!("{}", self.c),
+                    }
+                    std::io::stdout().flush().unwrap();
+                }
             }
             self.reconsume = false;
-           
+
             match self.state
             {
                 

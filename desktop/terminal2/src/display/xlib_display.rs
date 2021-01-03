@@ -265,17 +265,11 @@ impl XLibDisplay
 
     fn on_resize(&mut self, event: &mut xlib::XEvent) -> UpdateResult
     {
-        let width: i32;
-        let height: i32;
-        unsafe
-        {
-            width = event.configure.width;
-            height = event.configure.height;
-        }
-        
+        let width = unsafe { event.configure.width };
+        let height = unsafe { event.configure.height };
         let rows = height / self.font_height;
         let columns = width / self.font_width;
-        return UpdateResult::resize(rows, columns);
+        return UpdateResult::resize(rows, columns, width, height);
     }
 
 }

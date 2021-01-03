@@ -15,6 +15,8 @@ pub struct UpdateResult
     pub input: Vec<u8>,
     pub rows: i32,
     pub columns: i32,
+    pub width: i32,
+    pub height: i32,
 }
 
 impl UpdateResult
@@ -28,6 +30,8 @@ impl UpdateResult
             input: input.to_vec(),
             rows: 0,
             columns: 0,
+            width: 0,
+            height: 0,
         };
     }
 
@@ -36,7 +40,7 @@ impl UpdateResult
         return Self::input(input.as_bytes());
     }
 
-    pub fn resize(rows: i32, columns: i32) -> Self
+    pub fn resize(rows: i32, columns: i32, width: i32, height: i32) -> Self
     {
         return Self
         {
@@ -44,6 +48,8 @@ impl UpdateResult
             input: Vec::new(),
             rows: rows,
             columns: columns,
+            width: width,
+            height: height,
         };
     }
 

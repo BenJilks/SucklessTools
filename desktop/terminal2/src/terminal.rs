@@ -38,27 +38,34 @@ fn flush<Display>(term: &mut Terminal<Display>)
     term.display.flush();
 }
 
-fn handle_output<Display>(term: &mut Terminal<Display>)
+fn read_from_terminal<Display>(term: &mut Terminal<Display>) -> Vec<u8>
     where Display: display::Display
 {
-    let mut buffer: [u8; 80];
-    let count_read: i32;
+    let mut bytes = Vec::<u8>::new();
     unsafe
     {
-        buffer = mem::zeroed();
-        count_read = libc::read(
+        let mut buffer: [u8; 1024] = mem::zeroed();
+        let count_read = libc::read(
             term.master, 
             buffer.as_mut_ptr() as *mut libc::c_void, 
             buffer.len()) as i32;
-        if count_read < 0 
-        {
+
+        if count_read < 0 {
             libc::perror(c_str("read").as_ptr());
-            return;
+        } else {
+            bytes.extend_from_slice(&buffer[..count_read as usize]);
         }
     }
+    
+    return bytes;
+}
 
+fn handle_output<Display>(term: &mut Terminal<Display>)
+    where Display: display::Display
+{
+    let bytes = read_from_terminal(term);
     let response = term.decoder.decode(
-        &buffer, count_read, &mut term.buffer);
+        bytes, &mut term.buffer);
     flush(term);
     
     if response.len() > 0 {
@@ -81,18 +88,18 @@ fn handle_input<Display>(term: &mut Terminal<Display>, input: &Vec<u8>)
     }
 }
 
-fn handle_resize<Display>(term: &mut Terminal<Display>, rows: i32, columns: i32)
+fn handle_resize<Display>(term: &mut Terminal<Display>, result: &display::UpdateResult)
     where Display: display::Display
 {
-    term.buffer.resize(rows, columns);
+    term.buffer.resize(result.rows, result.columns);
     unsafe
     {
         let mut size = libc::winsize
         {
-            ws_row: rows as u16,
-            ws_col: columns as u16,
-            ws_xpixel: rows as u16,
-            ws_ypixel: columns as u16,
+            ws_row: result.rows as u16,
+            ws_col: result.columns as u16,
+            ws_xpixel: result.width as u16,
+            ws_ypixel: result.height as u16,
         };
 
         if libc::ioctl(term.master, libc::TIOCSWINSZ, &mut size) < 0 {
@@ -110,7 +117,7 @@ fn handle_update<Display>(term: &mut Terminal<Display>)
         match result.result_type
         {
             display::UpdateResultType::Input => handle_input(term, &result.input),
-            display::UpdateResultType::Resize => handle_resize(term, result.rows, result.columns),
+            display::UpdateResultType::Resize => handle_resize(term, &result),
         }
     }
 }

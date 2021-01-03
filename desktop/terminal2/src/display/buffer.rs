@@ -97,6 +97,7 @@ impl Buffer
 
     pub fn scroll(&mut self, amount: i32)
     {
+        println!("Scroll {}", amount);
         if amount < 0
         {
             let start_row = self.scroll_region_top;
@@ -116,6 +117,7 @@ impl Buffer
                 self.move_row(row, row - amount);
             }
             for row in self.scroll_region_top..start_row {
+                println!("Clear row {}", row);
                 self.clear_row(row);
             }
         }
@@ -239,13 +241,19 @@ impl Buffer
         let end = self.rows - count;
         for row in (start..end).rev()
         {
-            for column in 0..self.columns
-            {
-                let new_index = ((row + count) * self.columns + column) as usize;
-                let old_index = (row * self.columns + column) as usize;
-                self.content[new_index] = self.content[old_index].clone();
-                self.changes[new_index] = true;
+            self.move_row(row + count, row);
+            if row < count {
+                self.clear_row(row);
             }
+        }
+    }
+    
+    pub fn delete_lines(&mut self, count: i32)
+    {
+        let start = self.cursor.get_row();
+        let end = self.rows - count;
+        for row in start..end {
+            self.move_row(row, row + count);
         }
     }
 
@@ -309,12 +317,21 @@ impl Buffer
     pub fn cursor_up(&mut self, amount: i32) { self.cursor_move(-amount, 0) }
     pub fn cursor_down(&mut self, amount: i32) { self.cursor_move(amount, 0) }
 
+    fn blank_rune(&self) -> Rune
+    {
+        Rune
+        {
+            code_point: ' ' as u32,
+            attribute: self.attribute.clone(),
+        }
+    }
+
     pub fn clear_line_range(&mut self, start: i32, end: i32)
     {
         for column in start..end
         {
             let pos = CursorPos::new(self.cursor.get_row(), column);
-            self.set_rune_at(&pos, Rune::default());
+            self.set_rune_at(&pos, self.blank_rune());
         }
     }
 
@@ -325,7 +342,7 @@ impl Buffer
             for column in 0..self.columns
             {
                 let pos = CursorPos::new(row, column);
-                self.set_rune_at(&pos, Rune::default());
+                self.set_rune_at(&pos, self.blank_rune());
             }
         }
     }
