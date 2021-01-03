@@ -24,6 +24,7 @@ pub struct XLibDisplay
     draw: *mut xft::XftDraw,
 
     // Terminal
+    scroll_offset: i32,
     font_width: i32,
     font_height: i32,
     font_descent: i32,
@@ -62,7 +63,7 @@ impl XLibDisplay
             
             // Select inputs
             xlib::XSelectInput(self.display, self.window, 
-                xlib::ExposureMask | xlib::KeyPressMask | xlib::StructureNotifyMask);
+                xlib::ExposureMask | xlib::KeyPressMask | xlib::StructureNotifyMask | xlib::ButtonPressMask);
             
             // Set title and open window
             let title_c_str = CString::new(title).expect("Failed to create C string");
@@ -76,12 +77,11 @@ impl XLibDisplay
     fn load_font(&mut self)
     {
         assert!(self.display != ptr::null_mut());
-
         unsafe
         {
             let screen = xlib::XDefaultScreen(self.display);
             let root_window = xlib::XDefaultRootWindow(self.display);
-            let font_name = "DejaVu Sans Mono:size=16:antialias=true";
+            let font_name = "DejaVu Sans Mono:size=22:antialias=true";
             
             // Create font
             self.font = xft::XftFontOpenName(self.display, screen, 
@@ -156,6 +156,7 @@ impl XLibDisplay
             colors: HashMap::new(),
             draw: ptr::null_mut(),
 
+            scroll_offset: 10,
             font_width: 0,
             font_height: 0,
             font_descent: 0,
@@ -181,13 +182,9 @@ impl XLibDisplay
     fn draw_rune_internal(&mut self, buffer: &Buffer, at: &CursorPos)
     {
         // Fetch rune at position
-        let rune_or_none = buffer.rune_at(&at);
-        if rune_or_none.is_none() {
-            return;
-        }
+        let rune = buffer.rune_at(&at, self.scroll_offset);
 
         // Draw background
-        let rune = rune_or_none.unwrap();
         let x = at.get_column() * self.font_width;
         let y = (at.get_row() + 1) * self.font_height;
         self.draw_rect(
@@ -272,6 +269,27 @@ impl XLibDisplay
         return UpdateResult::resize(rows, columns, width, height);
     }
 
+    fn on_button(&mut self, event: &xlib::XEvent, buffer: &Buffer)
+    {
+        let button = unsafe { event.button.button };
+        match button
+        {
+            xlib::Button4 => 
+            {
+                self.scroll_offset += 1;
+                self.paint(buffer);
+            },
+
+            xlib::Button5 => 
+            {
+                self.scroll_offset -= 1;
+                self.paint(buffer);
+            },
+            
+            _ => {}
+        }
+    }
+
 }
 
 impl Drop for XLibDisplay
@@ -312,6 +330,7 @@ impl super::Display for XLibDisplay
                     xlib::Expose => self.paint(buffer),
                     xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
                     xlib::ConfigureNotify => results.push(self.on_resize(&mut event)),
+                    xlib::ButtonPress => self.on_button(&event, buffer),
                     _ => {},
                 }
             }
@@ -337,6 +356,15 @@ impl super::Display for XLibDisplay
     fn draw_rune(&mut self, buffer: &Buffer, at: &CursorPos)
     {
         self.draw_rune_internal(buffer, at);
+    }
+
+    fn on_input(&mut self, buffer: &Buffer)
+    {
+        if self.scroll_offset != 0
+        {
+            self.scroll_offset = 0;
+            self.redraw(buffer);
+        }
     }
 
     fn should_close(&self) -> bool

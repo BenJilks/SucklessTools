@@ -23,6 +23,8 @@ struct Terminal<'a, Display>
 fn flush<Display>(term: &mut Terminal<Display>)
     where Display: display::Display
 {
+    term.display.on_input(&term.buffer);
+    
     let changes = term.buffer.get_changes();
     for row in 0..term.buffer.get_rows()
     {

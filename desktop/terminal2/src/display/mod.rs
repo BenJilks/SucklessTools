@@ -63,6 +63,7 @@ pub trait Display
     fn draw_rune(&mut self, buffer: &buffer::Buffer, at: &cursor::CursorPos);
     fn redraw(&mut self, buffer: &buffer::Buffer);
     fn flush(&mut self);
+    fn on_input(&mut self, buffer: &buffer::Buffer);
     
     fn get_fd(&self) -> i32;
 }

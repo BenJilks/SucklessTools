@@ -17,8 +17,11 @@ pub struct Buffer
     columns: i32,
     scroll_region_top: i32,
     scroll_region_bottom: i32,
+    
     content: Box<[Rune]>,
     changes: Box<[bool]>,
+    scrollback: Vec<Rune>,
+    scrollback_rows: i32,
 }
 
 impl Buffer
@@ -35,8 +38,11 @@ impl Buffer
             columns: columns,
             scroll_region_top: 0,
             scroll_region_bottom: rows,
+
             content: vec![Rune::default(); (rows * columns) as usize].into_boxed_slice(),
             changes: vec![false; (rows * columns) as usize].into_boxed_slice(),
+            scrollback: Vec::new(),
+            scrollback_rows: 0,
         };
     }
 
@@ -47,9 +53,14 @@ impl Buffer
 
     pub fn resize(&mut self, rows: i32, columns: i32)
     {
+        // Noop
+        if self.rows == rows && self.columns == columns {
+            return;
+        }
+
+        // Update main content
         let mut new_content = vec![Rune::default(); (rows * columns) as usize].into_boxed_slice();
         let new_changes = vec![true; (rows * columns) as usize].into_boxed_slice();
-        
         for row in 0..min(rows, self.rows)
         {
             for column in 0..min(columns, self.columns)
@@ -59,9 +70,15 @@ impl Buffer
                 new_content[new_index] = self.content[old_index].clone();
             }
         }
-
         self.content = new_content;
         self.changes = new_changes;
+        
+        // Update scrollback
+        // TODO: Actually resize this instead of just resetting
+        self.scrollback.clear();
+        self.scrollback_rows = 0;
+
+        // Update sizes
         self.scroll_region_top = 0;
         self.scroll_region_bottom = rows;
         self.rows = rows;
@@ -95,31 +112,51 @@ impl Buffer
         }
     }
 
+    fn scroll_up(&mut self, amount: i32)
+    {
+        let start_row = self.scroll_region_top + amount;
+        let end_row = self.scroll_region_bottom;
+        for row in (start_row..end_row).rev() {
+            self.move_row(row, row - amount);
+        }
+        for row in self.scroll_region_top..start_row {
+            self.clear_row(row);
+        }
+    }
+
+    fn scroll_down(&mut self, amount: i32)
+    {
+        let start_row = self.scroll_region_top;
+        let end_row = self.scroll_region_bottom - amount;
+
+        // Copy old rows into scrollback
+        for row in start_row..(start_row + amount) 
+        {
+            for column in 0..self.columns 
+            {
+                let index = (row * self.columns + column) as usize;
+                self.scrollback.push(self.content[index].clone());
+            }
+            self.scrollback_rows += 1;
+        }
+
+        // Move rows up
+        for row in start_row..end_row {
+            self.move_row(row, row + amount);
+        }
+
+        // Clear new rows
+        for row in end_row..self.scroll_region_bottom {
+            self.clear_row(row);
+        }
+    }
+
     pub fn scroll(&mut self, amount: i32)
     {
-        println!("Scroll {}", amount);
-        if amount < 0
-        {
-            let start_row = self.scroll_region_top;
-            let end_row = self.scroll_region_bottom + amount;
-            for row in start_row..end_row {
-                self.move_row(row, row - amount);
-            }
-            for row in end_row..self.scroll_region_bottom {
-                self.clear_row(row);
-            }
-        }
-        else if amount > 0
-        {
-            let start_row = self.scroll_region_top + amount;
-            let end_row = self.scroll_region_bottom;
-            for row in (start_row..end_row).rev() {
-                self.move_row(row, row - amount);
-            }
-            for row in self.scroll_region_top..start_row {
-                println!("Clear row {}", row);
-                self.clear_row(row);
-            }
+        if amount < 0 {
+            self.scroll_down(-amount);
+        } else if amount > 0 {
+            self.scroll_up(amount);
         }
         self.cursor_move(amount, 0);
     }
@@ -137,18 +174,33 @@ impl Buffer
             pos.get_column() < 0 || pos.get_column() >= self.columns;
     }
 
-    pub fn rune_at(&self, at: &CursorPos) -> Option<Rune>
+    fn rune_in_scrollback(&self, row_offset: i32, column: i32) -> Rune
     {
-        if self.out_of_bounds(at) {
-            return None;
+        let row = self.scrollback_rows + row_offset;
+        let index = row * self.columns + column;
+        if index < 0 || index >= self.scrollback.len() as i32 {
+            return Rune::default();
         }
 
-        let index = at.get_row() * self.columns + at.get_column();
+        return self.scrollback[index as usize].clone();
+    }
+
+    pub fn rune_at(&self, at: &CursorPos, scroll_offset: i32) -> Rune
+    {
+        let row = at.get_row() - scroll_offset;
+        if row < 0 {
+            return self.rune_in_scrollback(row, at.get_column());
+        }
+        if row >= self.rows {
+            return Rune::default();
+        }
+        
+        let index = row * self.columns + at.get_column();
         let mut rune = self.content[index as usize].clone();
-        if *at == self.cursor {
+        if CursorPos::new(row, at.get_column()) == self.cursor {
             rune.attribute = self.attribute.inverted();
         }
-        return Some( rune );
+        return rune;
     }
 
     fn index_from_cursor(&self, at: &CursorPos) -> usize

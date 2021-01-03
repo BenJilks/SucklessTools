@@ -101,7 +101,10 @@ fn decode_non_16color(args: &Vec<i32>, buffer: &mut Buffer)
         }
         else 
         {
-            panic!()
+            if SHOW_UNKOWN_ESCAPES {
+                println!("Invalid 246color code {}", code);
+            }
+            0
         };
 }
 
