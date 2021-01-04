@@ -1,12 +1,14 @@
 pub mod xlib_display;
-pub mod buffer;
 pub mod cursor;
 pub mod rune;
+use rune::Rune;
+use cursor::CursorPos;
 
 pub enum UpdateResultType
 {
     Input,
     Resize,
+    Redraw,
 }
 
 pub struct UpdateResult
@@ -53,18 +55,32 @@ impl UpdateResult
         };
     }
 
+    pub fn redraw() -> Self
+    {
+        return Self
+        {
+            result_type: UpdateResultType::Redraw,
+            input: Vec::new(),
+            rows: 0,
+            columns: 0,
+            width: 0,
+            height: 0,
+        };
+    }
+
 }
 
 pub trait Display
 {
-    fn update(&mut self, buffer: &buffer::Buffer) -> Vec<UpdateResult>;
+    // Management
+    fn update(&mut self) -> Vec<UpdateResult>;
     fn should_close(&self) -> bool;
-
-    fn draw_rune(&mut self, buffer: &buffer::Buffer, at: &cursor::CursorPos);
-    fn redraw(&mut self, buffer: &buffer::Buffer);
-    fn flush(&mut self);
-    fn on_input(&mut self, buffer: &buffer::Buffer);
-    
     fn get_fd(&self) -> i32;
+
+    // Draw routines
+    fn draw_rune(&mut self, rune: &Rune, at: &CursorPos);
+    fn draw_scroll(&mut self, amount: i32, top: i32, bottom: i32);
+    fn flush(&mut self);
+    
 }
 

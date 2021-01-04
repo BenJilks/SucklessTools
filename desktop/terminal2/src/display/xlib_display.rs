@@ -1,7 +1,7 @@
 extern crate x11;
-use std::{ptr, mem, collections::HashMap, ffi::CString};
-use x11::{xlib, xft, keysym};
-use super::{buffer::*, cursor::*, UpdateResult};
+use super::{ cursor::*, rune::*, UpdateResult };
+use x11::{ xlib, xft, keysym };
+use std::{ ptr, mem, collections::HashMap, ffi::CString };
 use std::os::raw::
 {
     c_ulong,
@@ -11,14 +11,19 @@ use std::os::raw::
 
 pub struct XLibDisplay
 {
-    // xlib
+    // Xlib
     display: *mut xlib::Display,
-    window: c_ulong,
     visual: *mut xlib::Visual,
+    gc: xlib::GC,
+    window: c_ulong,
     cmap: c_ulong,
+    
+    // Window metrics
     fd: i32,
+    width: i32,
+    height: i32,
 
-    // xft
+    // Xft
     font: *mut xft::XftFont,
     colors: HashMap<u32, xft::XftColor>,
     draw: *mut xft::XftDraw,
@@ -70,6 +75,8 @@ impl XLibDisplay
             xlib::XStoreName(self.display, self.window, title_c_str.as_ptr() as *const i8);
             xlib::XMapWindow(self.display, self.window);
 
+            let screen = xlib::XDefaultScreen(self.display);
+            self.gc = xlib::XDefaultGC(self.display, screen);
             self.fd = xlib::XConnectionNumber(self.display);
         }
     }
@@ -81,7 +88,7 @@ impl XLibDisplay
         {
             let screen = xlib::XDefaultScreen(self.display);
             let root_window = xlib::XDefaultRootWindow(self.display);
-            let font_name = "DejaVu Sans Mono:size=22:antialias=true";
+            let font_name = "DejaVu Sans Mono:size=16:antialias=true";
             
             // Create font
             self.font = xft::XftFontOpenName(self.display, screen, 
@@ -147,10 +154,13 @@ impl XLibDisplay
         let mut display = Self
         {
             display: ptr::null_mut(),
-            window: 0,
             visual: ptr::null_mut(),
+            gc: ptr::null_mut(),
+            window: 0,
             cmap: 0,
             fd: 0,
+            width: 0,
+            height: 0,
 
             font: ptr::null_mut(),
             colors: HashMap::new(),
@@ -171,19 +181,14 @@ impl XLibDisplay
     {
         unsafe
         {
-            let screen = xlib::XDefaultScreen(self.display);
-            let gc = xlib::XDefaultGC(self.display, screen);
-            xlib::XSetForeground(self.display, gc, ((color & 0xFFFFFF00) >> 8) as u64);
-            xlib::XFillRectangle(self.display, self.window, gc, 
+            xlib::XSetForeground(self.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
+            xlib::XFillRectangle(self.display, self.window, self.gc, 
                 x, y, width as u32, height as u32);
         }
     }
     
-    fn draw_rune_internal(&mut self, buffer: &Buffer, at: &CursorPos)
+    fn draw_rune_impl(&mut self, rune: &Rune, at: &CursorPos)
     {
-        // Fetch rune at position
-        let rune = buffer.rune_at(&at, self.scroll_offset);
-
         // Draw background
         let x = at.get_column() * self.font_width;
         let y = (at.get_row() + 1) * self.font_height;
@@ -215,15 +220,51 @@ impl XLibDisplay
         }
     }
 
-    fn paint(&mut self, buffer: &Buffer)
+    fn draw_scroll_down(&mut self, amount: i32, top: i32, bottom: i32, height: i32)
     {
-        for row in 0..buffer.get_rows()
+        unsafe
         {
-            for column in 0..buffer.get_columns()
-            {
-                let pos = CursorPos::new(row, column);
-                self.draw_rune_internal(buffer, &pos);
-            }
+            xlib::XCopyArea(self.display, self.window, self.window, self.gc,
+                0, top + amount, 
+                self.width as u32, (height - amount) as u32, 
+                0, top);
+
+            self.draw_rect(0, bottom - amount, self.width, amount, 
+                StandardColor::DefaultBackground.color());
+        }
+    }
+
+    fn draw_scroll_up(&mut self, amount: i32, top: i32, height: i32)
+    {
+        unsafe
+        {
+            xlib::XCopyArea(self.display, self.window, self.window, self.gc,
+                0, top,
+                self.width as u32, (height - self.font_height) as u32,
+                0, top + amount);
+
+            self.draw_rect(0, top, self.width, amount, 
+                StandardColor::DefaultBackground.color());
+        }
+    }
+
+    fn draw_scroll_impl(&mut self, amount: i32, top: i32, bottom: i32)
+    {
+        let amount_pixels = amount * self.font_height;
+        let top_pixels = top * self.font_height;
+        let bottom_pixels = bottom * self.font_height;
+        let height_pixels = bottom_pixels - top_pixels;
+        println!("Draw scroll {} -> {} by {}", top, bottom, amount);
+        
+        if amount < 0 
+        {
+            self.draw_scroll_down(-amount_pixels, 
+                top_pixels, bottom_pixels, height_pixels);
+        }
+        else
+        {
+            self.draw_scroll_up(amount_pixels, 
+                top_pixels, height_pixels);
         }
     }
 
@@ -262,34 +303,24 @@ impl XLibDisplay
 
     fn on_resize(&mut self, event: &mut xlib::XEvent) -> UpdateResult
     {
-        let width = unsafe { event.configure.width };
-        let height = unsafe { event.configure.height };
-        let rows = height / self.font_height;
-        let columns = width / self.font_width;
-        return UpdateResult::resize(rows, columns, width, height);
+        self.width = unsafe { event.configure.width };
+        self.height = unsafe { event.configure.height };
+        let rows = self.height / self.font_height;
+        let columns = self.width / self.font_width;
+        return UpdateResult::resize(rows, columns, self.width, self.height);
     }
 
-    fn on_button(&mut self, event: &xlib::XEvent, buffer: &Buffer)
+    fn on_button(&mut self, event: &xlib::XEvent)
     {
         let button = unsafe { event.button.button };
         match button
         {
-            xlib::Button4 => 
-            {
-                self.scroll_offset += 1;
-                self.paint(buffer);
-            },
-
-            xlib::Button5 => 
-            {
-                self.scroll_offset -= 1;
-                self.paint(buffer);
-            },
-            
+            xlib::Button4 => self.scroll_offset += 1,
+            xlib::Button5 => self.scroll_offset -= 1,
             _ => {}
         }
     }
-
+    
 }
 
 impl Drop for XLibDisplay
@@ -316,7 +347,7 @@ impl Drop for XLibDisplay
 impl super::Display for XLibDisplay
 {
 
-    fn update(&mut self, buffer: &Buffer) -> Vec<UpdateResult>
+    fn update(&mut self) -> Vec<UpdateResult>
     {
         let mut results = Vec::<UpdateResult>::new();
         unsafe
@@ -327,10 +358,10 @@ impl super::Display for XLibDisplay
                 xlib::XNextEvent(self.display, &mut event);
                 match event.get_type()
                 {
-                    xlib::Expose => self.paint(buffer),
+                    xlib::Expose => results.push(UpdateResult::redraw()),
                     xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
                     xlib::ConfigureNotify => results.push(self.on_resize(&mut event)),
-                    xlib::ButtonPress => self.on_button(&event, buffer),
+                    xlib::ButtonPress => self.on_button(&event),
                     _ => {},
                 }
             }
@@ -339,32 +370,19 @@ impl super::Display for XLibDisplay
         return results;
     }
 
-    fn redraw(&mut self, buffer: &Buffer)
+    fn draw_rune(&mut self, rune: &Rune, at: &CursorPos)
     {
-        self.paint(buffer);
-        self.flush();
-    }
-
-    fn flush(&mut self)
-    {
-        unsafe
-        {
-            xlib::XFlush(self.display);
-        }
+        self.draw_rune_impl(rune, at);
     }
     
-    fn draw_rune(&mut self, buffer: &Buffer, at: &CursorPos)
+    fn draw_scroll(&mut self, amount: i32, top: i32, bottom: i32)
     {
-        self.draw_rune_internal(buffer, at);
+        self.draw_scroll_impl(amount, top, bottom);
     }
-
-    fn on_input(&mut self, buffer: &Buffer)
+    
+    fn flush(&mut self)
     {
-        if self.scroll_offset != 0
-        {
-            self.scroll_offset = 0;
-            self.redraw(buffer);
-        }
+        unsafe { xlib::XFlush(self.display); }
     }
 
     fn should_close(&self) -> bool

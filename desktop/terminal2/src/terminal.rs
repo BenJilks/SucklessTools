@@ -1,9 +1,7 @@
 use super::display;
 use super::decoder::*;
-use super::display::cursor::*;
-use super::display::buffer::*;
+use super::buffer::*;
 use std::{ptr, mem, ffi::CString};
-use libc;
 
 fn c_str(string: &str) -> CString
 {
@@ -11,33 +9,12 @@ fn c_str(string: &str) -> CString
         .expect("Could not create c string");
 }
 
-struct Terminal<'a, Display>
+struct Terminal<Display>
     where Display: display::Display
 {
-    buffer: Buffer,
+    buffer: Buffer<Display>,
     decoder: Decoder,
-    display: &'a mut Display,
     master: i32,
-}
-
-fn flush<Display>(term: &mut Terminal<Display>)
-    where Display: display::Display
-{
-    term.display.on_input(&term.buffer);
-    
-    let changes = term.buffer.get_changes();
-    for row in 0..term.buffer.get_rows()
-    {
-        for column in 0..term.buffer.get_columns()
-        {
-            let index = row * term.buffer.get_columns() + column;
-            if changes[index as usize] {
-                term.display.draw_rune(&term.buffer, &CursorPos::new(row, column));
-            }
-        }
-    }
-    term.buffer.flush();
-    term.display.flush();
 }
 
 fn read_from_terminal<Display>(term: &mut Terminal<Display>) -> Vec<u8>
@@ -68,7 +45,6 @@ fn handle_output<Display>(term: &mut Terminal<Display>)
     let bytes = read_from_terminal(term);
     let response = term.decoder.decode(
         bytes, &mut term.buffer);
-    flush(term);
     
     if response.len() > 0 {
         handle_input(term, &response);
@@ -113,13 +89,14 @@ fn handle_resize<Display>(term: &mut Terminal<Display>, result: &display::Update
 fn handle_update<Display>(term: &mut Terminal<Display>)
     where Display: display::Display
 {
-    let results = term.display.update(&term.buffer);
+    let results = term.buffer.get_display().update();
     for result in &results
     {
         match result.result_type
         {
             display::UpdateResultType::Input => handle_input(term, &result.input),
             display::UpdateResultType::Resize => handle_resize(term, &result),
+            display::UpdateResultType::Redraw => term.buffer.redraw(),
         }
     }
 }
@@ -192,7 +169,7 @@ fn open_terminal() -> Option<(i32, libc::pid_t)>
     return Some( (master, slave_pid) );
 }
 
-pub fn run<Display>(display: &mut Display)
+pub fn run<Display>(display: Display)
     where Display: display::Display
 {
     let fd_or_error = open_terminal();
@@ -203,21 +180,21 @@ pub fn run<Display>(display: &mut Display)
     let (master, slave_pid) = fd_or_error.unwrap();
     let mut term = Terminal
     {
-        buffer: Buffer::new(100, 50),
+        buffer: Buffer::new(100, 50, display),
         decoder: Decoder::new(),
-        display: display,
         master: master,
     };
 
+    let display_fd = term.buffer.get_display().get_fd();
     unsafe
     {
         let mut fds: libc::fd_set = mem::zeroed();
-        while !term.display.should_close()
+        while !term.buffer.get_display().should_close()
         {
             libc::FD_ZERO(&mut fds);
             libc::FD_SET(master, &mut fds);
-            libc::FD_SET(term.display.get_fd(), &mut fds);
-            if libc::select(master + term.display.get_fd() + 1, &mut fds, 
+            libc::FD_SET(display_fd, &mut fds);
+            if libc::select(master + display_fd + 1, &mut fds, 
                 ptr::null_mut(), ptr::null_mut(), ptr::null_mut()) < 0
             {
                 libc::perror(c_str("select").as_ptr());
@@ -233,7 +210,7 @@ pub fn run<Display>(display: &mut Display)
                 handle_output(&mut term);
             }
 
-            if libc::FD_ISSET(term.display.get_fd(), &mut fds) {
+            if libc::FD_ISSET(display_fd, &mut fds) {
                 handle_update(&mut term);
             }
         }

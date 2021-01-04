@@ -1,9 +1,10 @@
-use super::display::buffer::*;
+use super::buffer::*;
 use super::display::rune::*;
+use super::display;
 use std::io::Write;
 
 const SHOW_STREAM_LOG: bool = false;
-const SHOW_UNKOWN_ESCAPES: bool = true;
+const SHOW_UNKOWN_ESCAPES: bool = false;
 const SHOW_ALL_ESCAPES: bool = false;
 
 #[derive(Debug)]
@@ -59,16 +60,18 @@ fn decode_standard_color(code: &i32, color_type: &ColorType) -> Option<StandardC
     }
 }
 
-fn decode_non_16color(args: &Vec<i32>, buffer: &mut Buffer)
+fn decode_non_16color<Display>(args: &Vec<i32>, buffer: &mut Buffer<Display>)
+    where Display: display::Display
 {
     assert!(args.len() == 3);
     assert!(args[1] == 5);
 
     let color_type = 
-        if args[0] == 38 
-            { ColorType::Foreground } 
-        else 
-            { ColorType::Background };
+        if args[0] == 38 { 
+            ColorType::Foreground 
+        } else {
+            ColorType::Background 
+        };
     let code = args[2];
     let attribute = buffer.get_attribute();
 
@@ -79,7 +82,7 @@ fn decode_non_16color(args: &Vec<i32>, buffer: &mut Buffer)
             let standard_color = decode_standard_color(&code, &color_type);
             standard_color.unwrap().color()
         }
-        else if code >= 16 && code <= 231 
+        else if (16..=231).contains(&code) 
         {
             // Cube 
             let cube = code - 16;
@@ -92,7 +95,7 @@ fn decode_non_16color(args: &Vec<i32>, buffer: &mut Buffer)
             let b = (bf * 255.0) as u32;
             (r << 24) | (g << 16) | (b << 8)
         }
-        else if code >= 232 && code <= 255
+        else if (232..=255).contains(&code)
         {
             // Grayscale 
             let factor = (code - 232) as f32 / 24.0;
@@ -108,7 +111,8 @@ fn decode_non_16color(args: &Vec<i32>, buffer: &mut Buffer)
         };
 }
 
-fn decode_color(mut code: i32, buffer: &mut Buffer)
+fn decode_color<Display>(mut code: i32, buffer: &mut Buffer<Display>)
+    where Display: display::Display
 {
     let original_code = code;
     let attribute = buffer.get_attribute();
@@ -194,17 +198,18 @@ impl Decoder
         self.buffer.clear();
     }
 
-    fn finish_escape(&mut self, buffer: &mut Buffer, response: &mut Vec<u8>)
+    fn finish_escape<Display>(&mut self, buffer: &mut Buffer<Display>, response: &mut Vec<u8>)
+        where Display: display::Display
     {
         let args = &self.args;
-        let def = |val| { if args.len() >= 1 {args[0]} else {val} };
+        let def = |val| { if !args.is_empty() {args[0]} else {val} };
         let def_or_zero = |val| { if def(val) == 0 {val} else {def(val)} };
 
         match self.command
         {
             'm' =>
             {
-                if args.len() == 0 
+                if args.is_empty() 
                 {
                     decode_color(0, buffer);
                 } 
@@ -241,7 +246,7 @@ impl Decoder
                     1 => buffer.clear_from_cursor_left(),
                     2 => buffer.clear_whole_line(),
                     3 => {},
-                    _ => assert!(false),
+                    _ => panic!(),
                 }
             },
 
@@ -253,7 +258,7 @@ impl Decoder
                     1 => buffer.clear_from_cursor_up(),
                     2 => buffer.clear_whole_screen(),
                     3 => {},
-                    _ => assert!(false),
+                    _ => panic!(),
                 }
             },
 
@@ -313,13 +318,14 @@ impl Decoder
         self.command = '\0';
     }
 
-    fn finish_single_char_code(&mut self, buffer: &mut Buffer)
+    fn finish_single_char_code<Display>(&mut self, buffer: &mut Buffer<Display>)
+        where Display: display::Display
     {
         match self.command
         {
             'D' => buffer.cursor_down(1),
             'M' => buffer.cursor_up(1),
-            'E' => buffer.type_special(Special::NewLine),
+            'E' => buffer.new_line(),
 
             _ =>
             {
@@ -352,7 +358,8 @@ impl Decoder
         self.command = '\0';
     }
 
-    fn finish_hash(&mut self, buffer: &mut Buffer)
+    fn finish_hash<Display>(&mut self, buffer: &mut Buffer<Display>)
+        where Display: display::Display
     {
         match self.command
         {
@@ -383,7 +390,8 @@ impl Decoder
         self.args.clear();
     }
 
-    pub fn decode(&mut self, output: Vec<u8>, buffer: &mut Buffer) -> Vec<u8>
+    pub fn decode<Display>(&mut self, output: Vec<u8>, buffer: &mut Buffer<Display>) -> Vec<u8>
+        where Display: display::Display
     {
         let mut response = Vec::<u8>::new();
         let mut i = 0;
@@ -393,7 +401,7 @@ impl Decoder
             if !self.reconsume
             {
                 if i >= output.len() {
-                    return response;
+                    break;
                 }
                 
                 self.c = output[i as usize] as char;
@@ -438,8 +446,8 @@ impl Decoder
                     {
                         match self.c
                         {
-                            '\n' => buffer.type_special(Special::NewLine),
-                            '\r' => buffer.type_special(Special::Return),
+                            '\n' => buffer.new_line(),
+                            '\r' => buffer.carriage_return(),
                             '\x07' => println!("Bell!!!"),
                             '\x08' => buffer.cursor_left(1),
                             '\x1b' => self.state = State::Escape,
@@ -566,7 +574,7 @@ impl Decoder
                         _ => 
                         {
                             println!("{}", self.c as u8);
-                            assert!(false);
+                            panic!();
                         },
                     }
                 },
@@ -600,6 +608,9 @@ impl Decoder
                 
             }
         }
+
+        buffer.get_display().flush();
+        return response;
     }
 
 }

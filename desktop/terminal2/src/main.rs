@@ -1,11 +1,11 @@
 mod terminal;
 mod display;
 mod decoder;
+mod buffer;
 use display::xlib_display::XLibDisplay;
 
 fn main() 
 {
-    let mut display = XLibDisplay::new("Rust Terminal");
-    terminal::run(&mut display);
+    let display = XLibDisplay::new("Rust Terminal");
+    terminal::run(display);
 }
-
