@@ -24,13 +24,6 @@ pub struct Buffer<Display>
     viewport_offset: i32,
 }
 
-#[derive(PartialEq)]
-enum DrawMode
-{
-    Runes,
-    Nothing,
-}
-
 impl<Display> Buffer<Display>
     where Display: display::Display
 {
@@ -153,30 +146,23 @@ impl<Display> Buffer<Display>
         self.scroll_region_bottom = bottom;
     }
 
-    fn move_row(&mut self, to: i32, from: i32, draw_mode: DrawMode)
+    fn move_row(&mut self, to: i32, from: i32)
     {
         for column in 0..self.columns
         {
             let to_index = (to * self.columns + column) as usize;
             let from_index = (from * self.columns + column) as usize;
             let rune = self.content[from_index].clone();
-            if draw_mode == DrawMode::Runes {
-                self.display.draw_rune(&rune, &CursorPos::new(to, column));
-            }
             self.content[to_index] = rune;
         }
     }
 
-    fn clear_row(&mut self, row: i32, draw_mode: DrawMode)
+    fn clear_row(&mut self, row: i32)
     {
         for column in 0..self.columns
         {
             let index = (row * self.columns + column) as usize;
             self.content[index] = Rune::default();
-
-            if draw_mode == DrawMode::Runes {
-                self.display.draw_rune(&Rune::default(), &CursorPos::new(row, column));
-            }
         }
     }
 
@@ -187,10 +173,10 @@ impl<Display> Buffer<Display>
         let end_row = bottom;
         
         for row in (start_row..end_row).rev() {
-            self.move_row(row, row - amount, DrawMode::Nothing);
+            self.move_row(row, row - amount);
         }
         for row in top..start_row {
-            self.clear_row(row, DrawMode::Nothing);
+            self.clear_row(row);
         }
     }
 
@@ -213,12 +199,12 @@ impl<Display> Buffer<Display>
 
         // Move rows up
         for row in start_row..end_row {
-            self.move_row(row, row + amount, DrawMode::Nothing);
+            self.move_row(row, row + amount);
         }
 
         // Clear new rows
         for row in end_row..bottom {
-            self.clear_row(row, DrawMode::Nothing);
+            self.clear_row(row);
         }
     }
 
