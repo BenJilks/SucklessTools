@@ -389,6 +389,7 @@ impl Decoder
         let mut response = Vec::<u8>::new();
         let mut i = 0;
 
+        buffer.reset_viewport();
         loop
         {
             if !self.reconsume

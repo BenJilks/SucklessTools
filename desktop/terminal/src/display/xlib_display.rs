@@ -30,7 +30,6 @@ pub struct XLibDisplay
     draw: *mut xft::XftDraw,
 
     // Terminal
-    scroll_offset: i32,
     font_width: i32,
     font_height: i32,
     font_descent: i32,
@@ -73,7 +72,7 @@ impl XLibDisplay
             
             // Set title and open window
             let title_c_str = CString::new(title).expect("Failed to create C string");
-            xlib::XStoreName(self.display, self.window, title_c_str.as_ptr() as *const i8);
+            xlib::XStoreName(self.display, self.window, title_c_str.as_ptr() as *const u8);
             xlib::XMapWindow(self.display, self.window);
 
             let screen = xlib::XDefaultScreen(self.display);
@@ -169,7 +168,6 @@ impl XLibDisplay
             colors: HashMap::new(),
             draw: ptr::null_mut(),
 
-            scroll_offset: 10,
             font_width: 0,
             font_height: 0,
             font_descent: 0,
@@ -300,7 +298,7 @@ impl XLibDisplay
         {
             buffer = mem::zeroed();
             len = xlib::XLookupString(&mut event.key, 
-                buffer.as_mut_ptr() as *mut i8, buffer.len() as i32, 
+                buffer.as_mut_ptr() as *mut u8, buffer.len() as i32, 
                 ptr::null_mut(), ptr::null_mut());
         }
          
@@ -316,13 +314,13 @@ impl XLibDisplay
         return UpdateResult::resize(rows, columns, self.width, self.height);
     }
 
-    fn on_button(&mut self, event: &xlib::XEvent)
+    fn on_button(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
     {
         let button = unsafe { event.button.button };
         match button
         {
-            xlib::Button4 => self.scroll_offset += 1,
-            xlib::Button5 => self.scroll_offset -= 1,
+            xlib::Button4 => results.push(UpdateResult::scroll_viewport(1)),
+            xlib::Button5 => results.push(UpdateResult::scroll_viewport(-1)),
             _ => {}
         }
     }
@@ -367,7 +365,7 @@ impl super::Display for XLibDisplay
                     xlib::Expose => results.push(UpdateResult::redraw()),
                     xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
                     xlib::ConfigureNotify => results.push(self.on_resize(&mut event)),
-                    xlib::ButtonPress => self.on_button(&event),
+                    xlib::ButtonPress => self.on_button(&event, &mut results),
                     _ => {},
                 }
             }

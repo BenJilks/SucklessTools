@@ -9,12 +9,15 @@ pub enum UpdateResultType
     Input,
     Resize,
     Redraw,
+    ScrollViewport,
 }
 
 pub struct UpdateResult
 {
     pub result_type: UpdateResultType,
     pub input: Vec<u8>,
+    pub amount: i32,
+
     pub rows: i32,
     pub columns: i32,
     pub width: i32,
@@ -30,6 +33,7 @@ impl UpdateResult
         {
             result_type: UpdateResultType::Input,
             input: input.to_vec(),
+            amount: 0,
             rows: 0,
             columns: 0,
             width: 0,
@@ -48,6 +52,7 @@ impl UpdateResult
         {
             result_type: UpdateResultType::Resize,
             input: Vec::new(),
+            amount: 0,
             rows: rows,
             columns: columns,
             width: width,
@@ -61,6 +66,21 @@ impl UpdateResult
         {
             result_type: UpdateResultType::Redraw,
             input: Vec::new(),
+            amount: 0,
+            rows: 0,
+            columns: 0,
+            width: 0,
+            height: 0,
+        };
+    }
+
+    pub fn scroll_viewport(amount: i32) -> Self
+    {
+        return Self
+        {
+            result_type: UpdateResultType::ScrollViewport,
+            input: Vec::new(),
+            amount: amount,
             rows: 0,
             columns: 0,
             width: 0,

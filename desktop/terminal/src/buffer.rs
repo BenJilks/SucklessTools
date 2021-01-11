@@ -21,6 +21,7 @@ pub struct Buffer<Display>
     content: Box<[Rune]>,
     scrollback: Vec<Rune>,
     scrollback_rows: i32,
+    viewport_offset: i32,
 }
 
 #[derive(PartialEq)]
@@ -50,6 +51,7 @@ impl<Display> Buffer<Display>
             content: vec![Rune::default(); (rows * columns) as usize].into_boxed_slice(),
             scrollback: Vec::new(),
             scrollback_rows: 0,
+            viewport_offset: 0,
         };
     }
 
@@ -57,29 +59,60 @@ impl<Display> Buffer<Display>
     pub fn get_attribute(&mut self) -> &mut Attribute { &mut self.attribute }
     pub fn get_display(&mut self) -> &mut Display { &mut self.display }
 
-    pub fn redraw(&mut self)
+    fn redraw_row(&mut self, row_in_viewport: i32)
     {
-        for row in 0..self.rows
+        let row_in_buffer = row_in_viewport - self.viewport_offset;
+        if row_in_buffer >= self.rows {
+            return;
+        }
+
+        if row_in_buffer >= 0
         {
             for column in 0..self.columns
             {
-                let index = (row * self.columns + column) as usize;
+                let index = (row_in_buffer * self.columns + column) as usize;
                 let rune = &self.content[index];
-                self.display.draw_rune(rune, &CursorPos::new(row, column));
+                self.display.draw_rune(rune, &CursorPos::new(row_in_viewport, column));
             }
+        }
+        else if -row_in_buffer <= self.scrollback_rows
+        {
+            let row_in_scrollback = self.scrollback_rows + row_in_buffer;
+            for column in 0..self.columns
+            {
+                let index = (row_in_scrollback * self.columns + column) as usize;
+                let rune = &self.scrollback[index];
+                self.display.draw_rune(rune, &CursorPos::new(row_in_viewport, column));
+            }
+        }
+    }
+
+    pub fn redraw(&mut self)
+    {
+        for row in 0..self.rows {
+            self.redraw_row(row);
         }
     }
 
     pub fn flush(&mut self)
     {
-        let cursor = &self.cursor;
-        let index = (cursor.get_row() * self.columns + cursor.get_column()) as usize;
-        let mut inverted_rune = self.content[index].clone();
-        inverted_rune.attribute = inverted_rune.attribute.inverted();
+        let mut cursor = self.cursor.clone();
+        cursor.move_by(self.viewport_offset, 0);
+        
+        if (0..self.rows).contains(&cursor.get_row())
+        {
+            let index = (cursor.get_row() * self.columns + cursor.get_column()) as usize;
+            let mut inverted_rune = self.content[index].clone();
+            inverted_rune.attribute = inverted_rune.attribute.inverted();
 
-        self.display.draw_rune(&inverted_rune, cursor);
-        self.display.flush();
-        self.display.draw_rune(&self.content[index], cursor);
+            self.display.draw_rune(&inverted_rune, &cursor);
+            self.display.flush();
+            self.display.draw_rune(&self.content[index], &cursor);
+        }
+        else
+        {
+            self.display.flush();
+        }
     }
 
     pub fn resize(&mut self, rows: i32, columns: i32)
@@ -207,6 +240,36 @@ impl<Display> Buffer<Display>
         let top = self.scroll_region_top;
         let bottom = self.scroll_region_bottom;
         self.scroll_in_bounds(amount, top, bottom);
+    }
+
+    pub fn scroll_viewport(&mut self, amount: i32)
+    {
+        // Move viewport
+        self.viewport_offset += amount;
+        
+        // If we scroll more then a screen height, 
+        // just redraw the whole thing
+        if i32::abs(amount) > self.rows
+        {
+            self.redraw();
+            return;
+        }
+
+        // Otherwise, only redraw what we need to
+        self.display.draw_scroll(amount, 0, self.rows);
+        let range = 
+            if amount < 0 { self.rows+amount..self.rows }
+            else { 0..amount };
+        for row in range {
+            self.redraw_row(row);
+        }
+    }
+
+    pub fn reset_viewport(&mut self)
+    {
+        if self.viewport_offset != 0 {
+            self.scroll_viewport(-self.viewport_offset);
+        }
     }
 
     fn out_of_bounds(&self, pos: &CursorPos) -> bool

@@ -94,6 +94,7 @@ fn handle_update<Display>(term: &mut Terminal<Display>)
             display::UpdateResultType::Input => handle_input(term, &result.input),
             display::UpdateResultType::Resize => handle_resize(term, &result),
             display::UpdateResultType::Redraw => term.buffer.redraw(),
+            display::UpdateResultType::ScrollViewport => term.buffer.scroll_viewport(result.amount),
         }
     }
     term.buffer.flush();
@@ -122,7 +123,7 @@ fn execute_child_process(master: i32, slave: i32)
         libc::close(master);
 
         // Setup envirement
-        libc::putenv(term.as_ptr() as *mut i8);
+        libc::putenv(term.as_ptr() as *mut u8);
         
         // Execute shell
         if libc::execl(shell.as_ptr(), shell.as_ptr(), 0) < 0 {
