@@ -273,6 +273,7 @@ impl Decoder
 
             'L' => buffer.insert_lines(def(1)),
             'M' => buffer.delete_lines(def(1)),
+            'X' => buffer.erase(def(1)),
 
             'r' =>
             {
@@ -288,15 +289,7 @@ impl Decoder
                     .as_bytes()
                     .to_vec());
             },
-
-            'X' =>
-            {
-                let count = def(1);
-                for _ in 0..count {
-                    buffer.type_rune(' ' as u32);
-                }
-            }
-
+            
             _ => 
             {
                 if SHOW_UNKOWN_ESCAPES
@@ -390,7 +383,7 @@ impl Decoder
         self.args.clear();
     }
 
-    pub fn decode<Display>(&mut self, output: Vec<u8>, buffer: &mut Buffer<Display>) -> Vec<u8>
+    pub fn decode<Display>(&mut self, output: &[u8], buffer: &mut Buffer<Display>) -> Vec<u8>
         where Display: display::Display
     {
         let mut response = Vec::<u8>::new();
@@ -609,7 +602,7 @@ impl Decoder
             }
         }
 
-        buffer.get_display().flush();
+        buffer.flush();
         return response;
     }
 

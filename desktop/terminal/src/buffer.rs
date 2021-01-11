@@ -70,6 +70,18 @@ impl<Display> Buffer<Display>
         }
     }
 
+    pub fn flush(&mut self)
+    {
+        let cursor = &self.cursor;
+        let index = (cursor.get_row() * self.columns + cursor.get_column()) as usize;
+        let mut inverted_rune = self.content[index].clone();
+        inverted_rune.attribute = inverted_rune.attribute.inverted();
+
+        self.display.draw_rune(&inverted_rune, cursor);
+        self.display.flush();
+        self.display.draw_rune(&self.content[index], cursor);
+    }
+
     pub fn resize(&mut self, rows: i32, columns: i32)
     {
         // Noop
@@ -345,25 +357,41 @@ impl<Display> Buffer<Display>
 
     /* Clear lines */
     
-    pub fn clear_line_range(&mut self, start: i32, end: i32)
+    fn clear_line_range(&mut self, start: i32, end: i32)
     {
+        let row = self.cursor.get_row();
+        if !(0..=self.rows).contains(&row) 
+            || !(0..=self.columns).contains(&start) 
+            || !(0..=self.columns).contains(&end) 
+        {
+            return;
+        }
+
         for column in start..end
         {
-            let pos = CursorPos::new(self.cursor.get_row(), column);
-            self.set_rune_at(&pos, self.rune_from_code_point(' ' as u32));
+            let index = (row * self.columns + column) as usize;
+            self.content[index] = self.rune_from_code_point(' ' as u32);
         }
+        self.display.draw_clear(&self.attribute, row, start, end - start, 1);
     }
 
-    pub fn clear_block_range(&mut self, start: i32, end: i32)
+    fn clear_block_range(&mut self, start: i32, end: i32)
     {
+        if !(0..=self.rows).contains(&start) 
+            || !(0..=self.rows).contains(&end) 
+        {
+            return;
+        }
+        
         for row in start..end
         {
             for column in 0..self.columns
             {
-                let pos = CursorPos::new(row, column);
-                self.set_rune_at(&pos, self.rune_from_code_point(' ' as u32));
+                let index = (row * self.columns + column) as usize;
+                self.content[index] = self.rune_from_code_point(' ' as u32);
             }
         }
+        self.display.draw_clear(&self.attribute, start, 0, self.columns, end - start);
     }
 
     pub fn clear_from_cursor_right(&mut self) {
@@ -374,6 +402,12 @@ impl<Display> Buffer<Display>
     }
     pub fn clear_whole_line(&mut self) { 
         self.clear_line_range(0, self.columns);
+    }
+
+    pub fn erase(&mut self, count: i32) 
+    {
+        let column = self.cursor.get_column();
+        self.clear_line_range(column, column + count);
     }
     
     pub fn clear_from_cursor_down(&mut self) {

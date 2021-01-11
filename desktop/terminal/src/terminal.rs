@@ -17,35 +17,32 @@ struct Terminal<Display>
     master: i32,
 }
 
-fn read_from_terminal<Display>(term: &mut Terminal<Display>) -> Vec<u8>
+fn read_from_terminal<Display>(term: &mut Terminal<Display>, buffer: &mut [u8]) -> Option<usize>
     where Display: display::Display
 {
-    let mut bytes = Vec::<u8>::new();
-    unsafe
-    {
-        let mut buffer: [u8; 1024] = mem::zeroed();
-        let count_read = libc::read(
-            term.master, 
-            buffer.as_mut_ptr() as *mut libc::c_void, 
-            buffer.len()) as i32;
-
-        if count_read < 0 {
-            libc::perror(c_str("read").as_ptr());
-        } else {
-            bytes.extend_from_slice(&buffer[..count_read as usize]);
-        }
-    }
+    let count_read = unsafe { libc::read(
+        term.master, 
+        buffer.as_mut_ptr() as *mut libc::c_void, 
+        buffer.len()) } as i32;
     
-    return bytes;
+    if count_read < 0 {
+        unsafe { libc::perror(c_str("read").as_ptr()) };
+        return None
+    }
+    return Some ( count_read as usize );
 }
 
 fn handle_output<Display>(term: &mut Terminal<Display>)
     where Display: display::Display
 {
-    let bytes = read_from_terminal(term);
+    let mut buffer = [0 as u8; 80];
+    let count_read = read_from_terminal(term, &mut buffer);
+    if count_read.is_none() {
+        return;
+    }
+
     let response = term.decoder.decode(
-        bytes, &mut term.buffer);
-    
+        &buffer[0..count_read.unwrap()], &mut term.buffer);
     if response.len() > 0 {
         handle_input(term, &response);
     }
@@ -99,6 +96,7 @@ fn handle_update<Display>(term: &mut Terminal<Display>)
             display::UpdateResultType::Redraw => term.buffer.redraw(),
         }
     }
+    term.buffer.flush();
 }
 
 fn execute_child_process(master: i32, slave: i32)

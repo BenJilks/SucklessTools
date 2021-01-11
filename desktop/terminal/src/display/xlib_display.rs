@@ -17,6 +17,7 @@ pub struct XLibDisplay
     gc: xlib::GC,
     window: c_ulong,
     cmap: c_ulong,
+    last_foreground_color: u32,
     
     // Window metrics
     fd: i32,
@@ -88,7 +89,7 @@ impl XLibDisplay
         {
             let screen = xlib::XDefaultScreen(self.display);
             let root_window = xlib::XDefaultRootWindow(self.display);
-            let font_name = "DejaVu Sans Mono:size=16:antialias=true";
+            let font_name = "DejaVu Sans Mono:size=20:antialias=true";
             
             // Create font
             self.font = xft::XftFontOpenName(self.display, screen, 
@@ -158,6 +159,8 @@ impl XLibDisplay
             gc: ptr::null_mut(),
             window: 0,
             cmap: 0,
+            last_foreground_color: 0,
+
             fd: 0,
             width: 0,
             height: 0,
@@ -181,7 +184,11 @@ impl XLibDisplay
     {
         unsafe
         {
-            xlib::XSetForeground(self.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
+            if self.last_foreground_color != color 
+            {
+                xlib::XSetForeground(self.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
+                self.last_foreground_color = color;
+            }
             xlib::XFillRectangle(self.display, self.window, self.gc, 
                 x, y, width as u32, height as u32);
         }
@@ -254,7 +261,6 @@ impl XLibDisplay
         let top_pixels = top * self.font_height;
         let bottom_pixels = bottom * self.font_height;
         let height_pixels = bottom_pixels - top_pixels;
-        println!("Draw scroll {} -> {} by {}", top, bottom, amount);
         
         if amount < 0 
         {
@@ -378,6 +384,15 @@ impl super::Display for XLibDisplay
     fn draw_scroll(&mut self, amount: i32, top: i32, bottom: i32)
     {
         self.draw_scroll_impl(amount, top, bottom);
+    }
+    
+    fn draw_clear(&mut self, attribute: &Attribute, 
+        row: i32, column: i32, width: i32, height: i32)
+    {
+        self.draw_rect(
+            column * self.font_width, row * self.font_height, 
+            width * self.font_width, height * self.font_height, 
+            attribute.background);
     }
     
     fn flush(&mut self)

@@ -9,3 +9,4 @@ fn main()
     let display = XLibDisplay::new("Rust Terminal");
     terminal::run(display);
 }
+
