@@ -16,6 +16,7 @@ pub struct XLibDisplay
     visual: *mut xlib::Visual,
     gc: xlib::GC,
     window: c_ulong,
+    back_buffer: xlib::Pixmap,
     cmap: c_ulong,
     last_foreground_color: u32,
     
@@ -40,6 +41,9 @@ impl XLibDisplay
    
     fn create_window(&mut self, title: &str)
     {
+        self.width = 1600;
+        self.height = 800;
+
         unsafe
         {
             // Open display
@@ -58,14 +62,18 @@ impl XLibDisplay
             let black_pixel = xlib::XBlackPixel(self.display, screen);
             let white_pixel = xlib::XWhitePixel(self.display, screen);
             self.window = xlib::XCreateSimpleWindow(
-                self.display, root_window, 0, 0, 1600, 800, 0, 
+                self.display, root_window, 0, 0, self.width as u32, self.height as u32, 0, 
                 white_pixel, black_pixel);
             if self.window == 0
             {
                 println!("Unable to open x11 window");
                 assert!(false);
             }
-            
+
+            // Create back buffer
+            self.back_buffer = xlib::XCreatePixmap(self.display, self.window, 
+                self.width as u32, self.height as u32, 24);
+
             // Select inputs
             xlib::XSelectInput(self.display, self.window, 
                 xlib::ExposureMask | xlib::KeyPressMask | xlib::StructureNotifyMask | xlib::ButtonPressMask);
@@ -111,7 +119,7 @@ impl XLibDisplay
                 root_window, self.visual, xlib::AllocNone);
 
             // Create draw
-            self.draw = xft::XftDrawCreate(self.display, self.window, self.visual, self.cmap);
+            self.draw = xft::XftDrawCreate(self.display, self.back_buffer, self.visual, self.cmap);
             if self.draw == ptr::null_mut()
             {
                 println!("Unable to create Xft draw");
@@ -157,6 +165,7 @@ impl XLibDisplay
             visual: ptr::null_mut(),
             gc: ptr::null_mut(),
             window: 0,
+            back_buffer: 0,
             cmap: 0,
             last_foreground_color: 0,
 
@@ -187,7 +196,7 @@ impl XLibDisplay
                 xlib::XSetForeground(self.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
                 self.last_foreground_color = color;
             }
-            xlib::XFillRectangle(self.display, self.window, self.gc, 
+            xlib::XFillRectangle(self.display, self.back_buffer, self.gc, 
                 x, y, width as u32, height as u32);
         }
     }
@@ -229,7 +238,7 @@ impl XLibDisplay
     {
         unsafe
         {
-            xlib::XCopyArea(self.display, self.window, self.window, self.gc,
+            xlib::XCopyArea(self.display, self.back_buffer, self.back_buffer, self.gc,
                 0, top + amount, 
                 self.width as u32, (height - amount) as u32, 
                 0, top);
@@ -243,7 +252,7 @@ impl XLibDisplay
     {
         unsafe
         {
-            xlib::XCopyArea(self.display, self.window, self.window, self.gc,
+            xlib::XCopyArea(self.display, self.back_buffer, self.back_buffer, self.gc,
                 0, top,
                 self.width as u32, (height - self.font_height) as u32,
                 0, top + amount);
@@ -305,13 +314,24 @@ impl XLibDisplay
         return UpdateResult::input(&buffer[..len as usize]);
     }
 
-    fn on_resize(&mut self, event: &mut xlib::XEvent) -> UpdateResult
+    fn on_resize(&mut self, event: &mut xlib::XEvent, results: &mut Vec<UpdateResult>)
     {
         self.width = unsafe { event.configure.width };
         self.height = unsafe { event.configure.height };
         let rows = self.height / self.font_height;
         let columns = self.width / self.font_width;
-        return UpdateResult::resize(rows, columns, self.width, self.height);
+
+        // Resize backbuffer
+        unsafe
+        {
+            xlib::XFreePixmap(self.display, self.back_buffer);
+            self.back_buffer = xlib::XCreatePixmap(self.display, self.window, 
+                self.width as u32, self.height as u32, 24);
+
+            xft::XftDrawDestroy(self.draw);
+            self.draw = xft::XftDrawCreate(self.display, self.back_buffer, self.visual, self.cmap);
+        }
+        results.push(UpdateResult::resize(rows, columns, self.width, self.height));
     }
 
     fn on_button(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
@@ -364,7 +384,7 @@ impl super::Display for XLibDisplay
                 {
                     xlib::Expose => results.push(UpdateResult::redraw()),
                     xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
-                    xlib::ConfigureNotify => results.push(self.on_resize(&mut event)),
+                    xlib::ConfigureNotify => self.on_resize(&mut event, &mut results),
                     xlib::ButtonPress => self.on_button(&event, &mut results),
                     _ => {},
                 }
@@ -395,7 +415,12 @@ impl super::Display for XLibDisplay
     
     fn flush(&mut self)
     {
-        unsafe { xlib::XFlush(self.display); }
+        unsafe 
+        {
+            xlib::XCopyArea(self.display, self.back_buffer, self.window, self.gc, 
+                0, 0, self.width as u32, self.height as u32, 0, 0);
+            xlib::XFlush(self.display);
+        }
     }
 
     fn should_close(&self) -> bool
@@ -409,4 +434,3 @@ impl super::Display for XLibDisplay
     }
 
 }
-

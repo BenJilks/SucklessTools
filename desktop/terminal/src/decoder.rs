@@ -603,9 +603,7 @@ impl Decoder
             }
         }
 
-        buffer.flush();
         return response;
     }
 
 }
-

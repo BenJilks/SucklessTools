@@ -146,24 +146,25 @@ impl<Display> Buffer<Display>
         self.scroll_region_bottom = bottom;
     }
 
+    fn row_slice(&mut self, row: i32) -> &mut [Rune]
+    {
+        let columns = self.columns as usize;
+        let urow = row as usize;
+        let range = (urow * columns)..((urow + 1) * columns);
+        return &mut self.content[range];
+    }
+
     fn move_row(&mut self, to: i32, from: i32)
     {
-        for column in 0..self.columns
-        {
-            let to_index = (to * self.columns + column) as usize;
-            let from_index = (from * self.columns + column) as usize;
-            let rune = self.content[from_index].clone();
-            self.content[to_index] = rune;
-        }
+        let mut row = vec![Rune::default(); self.columns as usize];
+        row.clone_from_slice(self.row_slice(from));
+        self.row_slice(to).clone_from_slice(&row);
     }
 
     fn clear_row(&mut self, row: i32)
     {
-        for column in 0..self.columns
-        {
-            let index = (row * self.columns + column) as usize;
-            self.content[index] = Rune::default();
-        }
+        let cleared_row = vec![Rune::default(); self.columns as usize];
+        self.row_slice(row).clone_from_slice(&cleared_row);
     }
 
     fn scroll_up(&mut self, mut amount: i32, top: i32, bottom: i32)
@@ -187,20 +188,20 @@ impl<Display> Buffer<Display>
         let end_row = bottom - amount;
 
         // Copy old rows into scrollback
-        for row in start_row..(start_row + amount) 
-        {
-            for column in 0..self.columns 
-            {
-                let index = (row * self.columns + column) as usize;
-                self.scrollback.push(self.content[index].clone());
-            }
-            self.scrollback_rows += 1;
-        }
+        let old_start_index = (top * self.columns) as usize;
+        let old_end_index = ((top + amount) * self.columns) as usize;
+        self.scrollback.append(&mut self.content[old_start_index..old_end_index].to_vec());
+        self.scrollback_rows += amount;
 
         // Move rows up
-        for row in start_row..end_row {
-            self.move_row(row, row + amount);
-        }
+        let dest_start_index = (start_row * self.columns) as usize;
+        let dest_end_index = (end_row * self.columns) as usize;
+        let src_start_index = dest_start_index + (amount * self.columns) as usize;
+        let src_end_index = dest_end_index + (amount * self.columns) as usize;
+
+        let mut block = vec![Rune::default(); src_end_index - src_start_index];
+        block.clone_from_slice(&self.content[src_start_index..src_end_index]);
+        self.content[dest_start_index..dest_end_index].clone_from_slice(&block);
 
         // Clear new rows
         for row in end_row..bottom {
@@ -249,6 +250,8 @@ impl<Display> Buffer<Display>
         for row in range {
             self.redraw_row(row);
         }
+
+        self.flush();
     }
 
     pub fn reset_viewport(&mut self)
@@ -385,7 +388,7 @@ impl<Display> Buffer<Display>
     
     pub fn cursor_set(&mut self, row: i32, column: i32) 
     { 
-        self.cursor.move_to(row, column); 
+        self.cursor.move_to(row, column);
         self.cursor_check_move();
     }
 

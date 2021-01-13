@@ -3,6 +3,8 @@ use super::decoder::*;
 use super::buffer::*;
 use std::{ptr, mem, ffi::CString};
 
+const INPUT_BUFFER_SIZE: usize = 1024 * 10; // 10MB
+
 fn c_str(string: &str) -> CString
 {
     return CString::new(string)
@@ -15,15 +17,16 @@ struct Terminal<Display>
     buffer: Buffer<Display>,
     decoder: Decoder,
     master: i32,
+    input_buffer: Vec<u8>,
 }
 
-fn read_from_terminal<Display>(term: &mut Terminal<Display>, buffer: &mut [u8]) -> Option<usize>
+fn read_from_terminal<Display>(term: &mut Terminal<Display>) -> Option<usize>
     where Display: display::Display
 {
     let count_read = unsafe { libc::read(
         term.master, 
-        buffer.as_mut_ptr() as *mut libc::c_void, 
-        buffer.len()) } as i32;
+        term.input_buffer.as_mut_ptr() as *mut libc::c_void, 
+        term.input_buffer.len()) } as i32;
     
     if count_read < 0 {
         unsafe { libc::perror(c_str("read").as_ptr()) };
@@ -35,17 +38,17 @@ fn read_from_terminal<Display>(term: &mut Terminal<Display>, buffer: &mut [u8]) 
 fn handle_output<Display>(term: &mut Terminal<Display>)
     where Display: display::Display
 {
-    let mut buffer = [0 as u8; 80];
-    let count_read = read_from_terminal(term, &mut buffer);
+    let count_read = read_from_terminal(term);
     if count_read.is_none() {
         return;
     }
 
     let response = term.decoder.decode(
-        &buffer[0..count_read.unwrap()], &mut term.buffer);
+        &term.input_buffer[0..count_read.unwrap()], &mut term.buffer);
     if response.len() > 0 {
         handle_input(term, &response);
     }
+    term.buffer.flush();
 }
 
 fn handle_input<Display>(term: &mut Terminal<Display>, input: &Vec<u8>)
@@ -97,7 +100,6 @@ fn handle_update<Display>(term: &mut Terminal<Display>)
             display::UpdateResultType::ScrollViewport => term.buffer.scroll_viewport(result.amount),
         }
     }
-    term.buffer.flush();
 }
 
 fn execute_child_process(master: i32, slave: i32)
@@ -182,6 +184,7 @@ pub fn run<Display>(display: Display)
         buffer: Buffer::new(100, 50, display),
         decoder: Decoder::new(),
         master: master,
+        input_buffer: vec![0; INPUT_BUFFER_SIZE],
     };
 
     let display_fd = term.buffer.get_display().get_fd();
