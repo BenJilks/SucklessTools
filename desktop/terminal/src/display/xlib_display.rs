@@ -30,6 +30,9 @@ pub struct XLibDisplay
     colors: HashMap<u32, xft::XftColor>,
     draw: *mut xft::XftDraw,
 
+    // Draw call buffer
+    draw_calls: HashMap<u32, Vec<xft::XftGlyphFontSpec>>,
+
     // Terminal
     font_width: i32,
     font_height: i32,
@@ -71,8 +74,9 @@ impl XLibDisplay
             }
 
             // Create back buffer
-            self.back_buffer = xlib::XCreatePixmap(self.display, self.window, 
-                self.width as u32, self.height as u32, 24);
+            self.back_buffer = self.window;
+            //self.back_buffer = xlib::XCreatePixmap(self.display, self.window, 
+            //    self.width as u32, self.height as u32, 24);
 
             // Select inputs
             xlib::XSelectInput(self.display, self.window, 
@@ -176,6 +180,7 @@ impl XLibDisplay
             font: ptr::null_mut(),
             colors: HashMap::new(),
             draw: ptr::null_mut(),
+            draw_calls: HashMap::new(),
 
             font_width: 0,
             font_height: 0,
@@ -216,22 +221,40 @@ impl XLibDisplay
             return;
         }
 
-        unsafe
-        {
-            // Fetch char data
-            let glyph = xft::XftCharIndex(self.display, self.font, rune.code_point);
-            let mut spec = xft::XftGlyphSpec 
-            { 
-                glyph: glyph, 
-                x: x as i16, 
-                y: (y - self.font_descent) as i16, 
-            };
+        // Fetch char data
+        let glyph = unsafe { xft::XftCharIndex(self.display, self.font, rune.code_point) };
+        let spec = xft::XftGlyphFontSpec 
+        { 
+            glyph: glyph,
+            x: x as i16,
+            y: (y - self.font_descent) as i16,
+            font: self.font,
+        };
 
-            // Draw to screen
-            let color = self.font_color(&rune.attribute.foreground);
-            xft::XftDrawGlyphSpec(self.draw, 
-                &color, self.font, &mut spec, 1);
+        // Add to draw calls
+        let color = rune.attribute.foreground;
+        if !self.draw_calls.contains_key(&color) {
+            self.draw_calls.insert(color, Vec::new());
         }
+        self.draw_calls.get_mut(&color).unwrap().push(spec);
+    }
+
+    fn flush_draw_calls(&mut self)
+    {
+        if self.draw_calls.is_empty() {
+            return;
+        }
+
+        for (color, specs) in self.draw_calls.clone()
+        {
+            let mut xft_color = self.font_color(&color);
+            unsafe
+            {
+                xft::XftDrawGlyphFontSpec(self.draw, 
+                    &mut xft_color, specs.as_ptr(), specs.len() as i32);
+            }
+        }
+        self.draw_calls.clear();
     }
 
     fn draw_scroll_down(&mut self, amount: i32, top: i32, bottom: i32, height: i32)
@@ -264,6 +287,7 @@ impl XLibDisplay
 
     fn draw_scroll_impl(&mut self, amount: i32, top: i32, bottom: i32)
     {
+        self.flush_draw_calls();
         let amount_pixels = amount * self.font_height;
         let top_pixels = top * self.font_height;
         let bottom_pixels = bottom * self.font_height;
@@ -322,6 +346,7 @@ impl XLibDisplay
         let columns = self.width / self.font_width;
 
         // Resize backbuffer
+        /*
         unsafe
         {
             xlib::XFreePixmap(self.display, self.back_buffer);
@@ -331,6 +356,7 @@ impl XLibDisplay
             xft::XftDrawDestroy(self.draw);
             self.draw = xft::XftDrawCreate(self.display, self.back_buffer, self.visual, self.cmap);
         }
+        */
         results.push(UpdateResult::resize(rows, columns, self.width, self.height));
     }
 
@@ -398,7 +424,7 @@ impl super::Display for XLibDisplay
     {
         self.draw_rune_impl(rune, at);
     }
-    
+
     fn draw_scroll(&mut self, amount: i32, top: i32, bottom: i32)
     {
         self.draw_scroll_impl(amount, top, bottom);
@@ -415,10 +441,11 @@ impl super::Display for XLibDisplay
     
     fn flush(&mut self)
     {
+        self.flush_draw_calls();
         unsafe 
         {
-            xlib::XCopyArea(self.display, self.back_buffer, self.window, self.gc, 
-                0, 0, self.width as u32, self.height as u32, 0, 0);
+            //xlib::XCopyArea(self.display, self.back_buffer, self.window, self.gc, 
+            //    0, 0, self.width as u32, self.height as u32, 0, 0);
             xlib::XFlush(self.display);
         }
     }

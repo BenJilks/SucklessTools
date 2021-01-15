@@ -1,10 +1,64 @@
 use std::cmp::min;
+use std::ops::{Index, IndexMut};
+use std::rc::Rc;
+use std::cell::RefCell;
 use super::display::
 {
     self, 
-    cursor::*, 
+    cursor::*,
     rune::*,
 };
+
+struct Line
+{
+    content: Vec<Rune>,
+    columns: i32,
+}
+type LineRef = Rc<RefCell<Line>>;
+
+impl Line
+{
+    pub fn new(columns: i32) -> LineRef
+    {
+        return Rc::from(RefCell::new(Self
+        {
+            content: vec![Rune::default(); columns as usize],
+            columns: columns,
+        }));
+    }
+
+    pub fn resize(&mut self, columns: i32)
+    {
+        if columns == self.columns {
+            return;
+        }
+
+        self.content.resize(columns as usize, Rune::default());
+        self.columns = columns;
+    }
+
+    pub fn clear(&mut self)
+    {
+        for rune in &mut self.content {
+            *rune = Rune::default();
+        }
+    }
+}
+
+impl Index<usize> for Line
+{
+    type Output = Rune;
+    fn index(&self, i: usize) -> &Rune {
+        &self.content[i]
+    }
+}
+
+impl IndexMut<usize> for Line
+{
+    fn index_mut(&mut self, i: usize) -> &mut Rune {
+        &mut self.content[i]
+    }
+}
 
 pub struct Buffer<Display>
     where Display: display::Display
@@ -18,9 +72,8 @@ pub struct Buffer<Display>
     scroll_region_top: i32,
     scroll_region_bottom: i32,
     
-    content: Box<[Rune]>,
-    scrollback: Vec<Rune>,
-    scrollback_rows: i32,
+    content: Vec<LineRef>,
+    scrollback: Vec<LineRef>,
     viewport_offset: i32,
 }
 
@@ -30,7 +83,7 @@ impl<Display> Buffer<Display>
     
     pub fn new(rows: i32, columns: i32, display: Display) -> Self
     {
-        return Self
+        let mut buffer = Self
         {
             cursor: CursorPos::new(0, 0),
             attribute: Attribute::default(),
@@ -41,42 +94,48 @@ impl<Display> Buffer<Display>
             scroll_region_top: 0,
             scroll_region_bottom: rows,
 
-            content: vec![Rune::default(); (rows * columns) as usize].into_boxed_slice(),
+            content: vec![Line::new(columns); (rows * columns) as usize],
             scrollback: Vec::new(),
-            scrollback_rows: 0,
             viewport_offset: 0,
         };
+
+        for row in 0..rows {
+            buffer.content[row as usize] = Line::new(columns);
+        }
+        return buffer;
     }
 
     pub fn get_rows(&self) -> i32 { self.rows }
     pub fn get_attribute(&mut self) -> &mut Attribute { &mut self.attribute }
     pub fn get_display(&mut self) -> &mut Display { &mut self.display }
 
+    fn redraw_line(&mut self, line_ref: &LineRef, row: i32)
+    {
+        let line = &line_ref.borrow();
+        for column in 0..self.columns 
+        {
+            let rune = &line.content[column as usize];
+            self.display.draw_rune(rune, &CursorPos::new(row, column));
+        }
+    }
+
     fn redraw_row(&mut self, row_in_viewport: i32)
     {
         let row_in_buffer = row_in_viewport - self.viewport_offset;
-        if row_in_buffer >= self.rows {
+        if row_in_buffer >= self.rows as i32 {
             return;
         }
 
         if row_in_buffer >= 0
         {
-            for column in 0..self.columns
-            {
-                let index = (row_in_buffer * self.columns + column) as usize;
-                let rune = &self.content[index];
-                self.display.draw_rune(rune, &CursorPos::new(row_in_viewport, column));
-            }
+            let line = self.content[row_in_buffer as usize].clone();
+            self.redraw_line(&line, row_in_viewport);
         }
-        else if -row_in_buffer <= self.scrollback_rows
+        else if -row_in_buffer <= self.scrollback.len() as i32
         {
-            let row_in_scrollback = self.scrollback_rows + row_in_buffer;
-            for column in 0..self.columns
-            {
-                let index = (row_in_scrollback * self.columns + column) as usize;
-                let rune = &self.scrollback[index];
-                self.display.draw_rune(rune, &CursorPos::new(row_in_viewport, column));
-            }
+            let row_in_scrollback = self.scrollback.len() as i32 + row_in_buffer;
+            let line = self.scrollback[row_in_scrollback as usize].clone();
+            self.redraw_line(&line, row_in_viewport);
         }
     }
 
@@ -94,18 +153,30 @@ impl<Display> Buffer<Display>
         
         if (0..self.rows).contains(&cursor.get_row())
         {
-            let index = (cursor.get_row() * self.columns + cursor.get_column()) as usize;
-            let mut inverted_rune = self.content[index].clone();
+            let rune = self.rune_at_cursor(&cursor);
+            let mut inverted_rune = rune.clone();
             inverted_rune.attribute = inverted_rune.attribute.inverted();
 
             self.display.draw_rune(&inverted_rune, &cursor);
             self.display.flush();
-            self.display.draw_rune(&self.content[index], &cursor);
+            self.display.draw_rune(&rune, &cursor);
         }
         else
         {
             self.display.flush();
         }
+    }
+
+    fn rune_at_cursor(&mut self, pos: &CursorPos) -> Rune
+    {
+        let line = &mut self.content[pos.get_row() as usize].borrow_mut();
+        return line[pos.get_column() as usize].clone();
+    }
+    fn set_rune_at_cursor(&mut self, pos: &CursorPos, rune: Rune)
+    {
+        let line = &mut self.content[pos.get_row() as usize].borrow_mut();
+        self.display.draw_rune(&rune, pos);
+        line[pos.get_column() as usize] = rune;
     }
 
     pub fn resize(&mut self, rows: i32, columns: i32)
@@ -116,22 +187,14 @@ impl<Display> Buffer<Display>
         }
 
         // Update main content
-        let mut new_content = vec![Rune::default(); (rows * columns) as usize].into_boxed_slice();
-        for row in 0..min(rows, self.rows)
-        {
-            for column in 0..min(columns, self.columns)
-            {
-                let old_index = (row * self.columns + column) as usize;
-                let new_index = (row * columns + column) as usize;
-                new_content[new_index] = self.content[old_index].clone();
-            }
+        self.content.resize(rows as usize, Line::new(columns));
+        for line in &mut self.content {
+            line.borrow_mut().resize(columns);
         }
-        self.content = new_content;
         
         // Update scrollback
         // TODO: Actually resize this instead of just resetting
         self.scrollback.clear();
-        self.scrollback_rows = 0;
 
         // Update sizes
         self.scroll_region_top = 0;
@@ -146,27 +209,6 @@ impl<Display> Buffer<Display>
         self.scroll_region_bottom = bottom;
     }
 
-    fn row_slice(&mut self, row: i32) -> &mut [Rune]
-    {
-        let columns = self.columns as usize;
-        let urow = row as usize;
-        let range = (urow * columns)..((urow + 1) * columns);
-        return &mut self.content[range];
-    }
-
-    fn move_row(&mut self, to: i32, from: i32)
-    {
-        let mut row = vec![Rune::default(); self.columns as usize];
-        row.clone_from_slice(self.row_slice(from));
-        self.row_slice(to).clone_from_slice(&row);
-    }
-
-    fn clear_row(&mut self, row: i32)
-    {
-        let cleared_row = vec![Rune::default(); self.columns as usize];
-        self.row_slice(row).clone_from_slice(&cleared_row);
-    }
-
     fn scroll_up(&mut self, mut amount: i32, top: i32, bottom: i32)
     {
         amount = min(amount, bottom - top);
@@ -174,10 +216,10 @@ impl<Display> Buffer<Display>
         let end_row = bottom;
         
         for row in (start_row..end_row).rev() {
-            self.move_row(row, row - amount);
+            self.content[(row - amount) as usize] = self.content[row as usize].clone();
         }
         for row in top..start_row {
-            self.clear_row(row);
+            self.content[row as usize] = Line::new(self.columns);
         }
     }
 
@@ -188,24 +230,18 @@ impl<Display> Buffer<Display>
         let end_row = bottom - amount;
 
         // Copy old rows into scrollback
-        let old_start_index = (top * self.columns) as usize;
-        let old_end_index = ((top + amount) * self.columns) as usize;
+        let old_start_index = top as usize;
+        let old_end_index = (top + amount) as usize;
         self.scrollback.append(&mut self.content[old_start_index..old_end_index].to_vec());
-        self.scrollback_rows += amount;
 
         // Move rows up
-        let dest_start_index = (start_row * self.columns) as usize;
-        let dest_end_index = (end_row * self.columns) as usize;
-        let src_start_index = dest_start_index + (amount * self.columns) as usize;
-        let src_end_index = dest_end_index + (amount * self.columns) as usize;
-
-        let mut block = vec![Rune::default(); src_end_index - src_start_index];
-        block.clone_from_slice(&self.content[src_start_index..src_end_index]);
-        self.content[dest_start_index..dest_end_index].clone_from_slice(&block);
+        for row in start_row..end_row {
+            self.content[row as usize] = self.content[(row + amount) as usize].clone();
+        }
 
         // Clear new rows
         for row in end_row..bottom {
-            self.clear_row(row);
+            self.content[row as usize] = Line::new(self.columns);
         }
     }
 
@@ -273,9 +309,7 @@ impl<Display> Buffer<Display>
             return;
         }
 
-        let index = (at.get_row() * self.columns + at.get_column()) as usize;
-        self.display.draw_rune(&rune, at);
-        self.content[index] = rune;
+        self.set_rune_at_cursor(at, rune);
     }
 
     fn rune_from_code_point(&self, code_point: u32) -> Rune
@@ -315,28 +349,28 @@ impl<Display> Buffer<Display>
         let start = self.cursor.get_column();
         let end = self.columns - count as i32;
         let row = self.cursor.get_row();
+
+        let line = &mut self.content[row as usize].borrow_mut();
         for column in (start..end).rev()
         {
-            let index = (row * self.columns + column) as usize;
-            let rune = self.content[index - count].clone();
+            let rune = line[column as usize - count].clone();
             self.display.draw_rune(&rune, &CursorPos::new(row, column));
-            self.content[index] = rune;
+            line[column as usize] = rune;
         }
     }
 
     pub fn delete(&mut self, count: usize)
     {
         let start = self.cursor.get_column();
-        let end = self.columns;
+        let end = self.columns - count as i32;
         let row = self.cursor.get_row();
+
+        let line = &mut self.content[row as usize].borrow_mut();
         for column in start..end
         {
-            let index = (row * self.columns + column) as usize;
-            if column >= start - 1 + count as i32 {
-                let rune = self.content[index + count].clone();
-                self.display.draw_rune(&rune, &CursorPos::new(row, column));
-                self.content[index] = rune;
-            }
+            let rune = line[column as usize + count].clone();
+            self.display.draw_rune(&rune, &CursorPos::new(row, column));
+            line[column as usize] = rune;
         }
     }
 
@@ -419,10 +453,9 @@ impl<Display> Buffer<Display>
             return;
         }
 
-        for column in start..end
-        {
-            let index = (row * self.columns + column) as usize;
-            self.content[index] = self.rune_from_code_point(' ' as u32);
+        let line = &mut self.content[row as usize].borrow_mut();
+        for column in start..end {
+            line[column as usize] = self.rune_from_code_point(' ' as u32);
         }
         self.display.draw_clear(&self.attribute, row, start, end - start, 1);
     }
@@ -435,13 +468,8 @@ impl<Display> Buffer<Display>
             return;
         }
         
-        for row in start..end
-        {
-            for column in 0..self.columns
-            {
-                let index = (row * self.columns + column) as usize;
-                self.content[index] = self.rune_from_code_point(' ' as u32);
-            }
+        for row in start..end {
+            self.content[row as usize].borrow_mut().clear();
         }
         self.display.draw_clear(&self.attribute, start, 0, self.columns, end - start);
     }

@@ -105,4 +105,3 @@ pub trait Display
     fn flush(&mut self);
     
 }
-
