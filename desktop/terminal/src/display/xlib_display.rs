@@ -31,12 +31,14 @@ pub struct XLibDisplay
     draw: *mut xft::XftDraw,
 
     // Draw call buffer
-    draw_calls: HashMap<u32, Vec<xft::XftGlyphFontSpec>>,
+    draw_buffer: Box<[Option<Rune>]>,
 
     // Terminal
     font_width: i32,
     font_height: i32,
     font_descent: i32,
+    rows: i32,
+    columns: i32,
 }
 
 impl XLibDisplay
@@ -44,9 +46,6 @@ impl XLibDisplay
    
     fn create_window(&mut self, title: &str)
     {
-        self.width = 1600;
-        self.height = 800;
-
         unsafe
         {
             // Open display
@@ -161,8 +160,19 @@ impl XLibDisplay
         return *self.colors.get(&color).unwrap();
     }
 
+    fn create_new_draw_buffer(&mut self)
+    {
+        self.flush_draw_buffer();
+        self.rows = self.height / self.font_height;
+        self.columns = self.width / self.font_width;
+        self.draw_buffer = vec![None; (self.rows * self.columns) as usize].into_boxed_slice();
+    }
+
     pub fn new(title: &str) -> Self
     {
+        let width = 1600;
+        let height = 800;
+
         let mut display = Self
         {
             display: ptr::null_mut(),
@@ -174,21 +184,24 @@ impl XLibDisplay
             last_foreground_color: 0,
 
             fd: 0,
-            width: 0,
-            height: 0,
+            width: width,
+            height: height,
 
             font: ptr::null_mut(),
             colors: HashMap::new(),
             draw: ptr::null_mut(),
-            draw_calls: HashMap::new(),
+            draw_buffer: vec![None; 0].into_boxed_slice(),
 
             font_width: 0,
             font_height: 0,
             font_descent: 0,
+            rows: 0,
+            columns: 0,
         };
 
         display.create_window(title);
         display.load_font();
+        display.create_new_draw_buffer();
         return display;
     }
 
@@ -221,31 +234,51 @@ impl XLibDisplay
             return;
         }
 
-        // Fetch char data
-        let glyph = unsafe { xft::XftCharIndex(self.display, self.font, rune.code_point) };
-        let spec = xft::XftGlyphFontSpec 
-        { 
-            glyph: glyph,
-            x: x as i16,
-            y: (y - self.font_descent) as i16,
-            font: self.font,
-        };
-
-        // Add to draw calls
-        let color = rune.attribute.foreground;
-        if !self.draw_calls.contains_key(&color) {
-            self.draw_calls.insert(color, Vec::new());
-        }
-        self.draw_calls.get_mut(&color).unwrap().push(spec);
+        let index = (at.get_row() * self.columns + at.get_column()) as usize;
+        self.draw_buffer[index] = Some( rune.clone() );
     }
 
-    fn flush_draw_calls(&mut self)
+    fn flush_draw_buffer(&mut self)
     {
-        if self.draw_calls.is_empty() {
+        let mut draw_calls = HashMap::<u32, Vec<xft::XftGlyphFontSpec>>::new();
+        for row in 0..self.rows
+        {
+            let y = (row + 1) * self.font_height;
+            for column in 0..self.columns
+            {
+                let index = (row * self.columns + column) as usize;
+                let rune_or_none = self.draw_buffer[index].clone();
+                if rune_or_none.is_none() {
+                    continue;
+                }
+
+                // Fetch char data
+                let rune = rune_or_none.unwrap();
+                let x = column * self.font_width;
+                let glyph = unsafe { xft::XftCharIndex(self.display, self.font, rune.code_point) };
+                let spec = xft::XftGlyphFontSpec 
+                { 
+                    glyph: glyph,
+                    x: x as i16,
+                    y: (y - self.font_descent) as i16,
+                    font: self.font,
+                };
+
+                // Add to draw calls
+                let color = rune.attribute.foreground;
+                if !draw_calls.contains_key(&color) {
+                    draw_calls.insert(color, Vec::new());
+                }
+                draw_calls.get_mut(&color).unwrap().push(spec);
+                self.draw_buffer[index] = None;
+            }
+        }
+
+        if draw_calls.is_empty() {
             return;
         }
 
-        for (color, specs) in self.draw_calls.clone()
+        for (color, specs) in draw_calls.clone()
         {
             let mut xft_color = self.font_color(&color);
             unsafe
@@ -254,7 +287,6 @@ impl XLibDisplay
                     &mut xft_color, specs.as_ptr(), specs.len() as i32);
             }
         }
-        self.draw_calls.clear();
     }
 
     fn draw_scroll_down(&mut self, amount: i32, top: i32, bottom: i32, height: i32)
@@ -285,9 +317,39 @@ impl XLibDisplay
         }
     }
 
+    fn move_draw_buffer_block(&mut self, 
+        start: i32, end: i32, to: i32)
+    {
+        // Calculate ranges
+        let height = end - start;
+        let src_start = (start * self.columns) as usize;
+        let src_end = (end * self.columns) as usize;
+        let dest_start = (to * self.columns) as usize;
+        let dest_end = ((to + height) * self.columns) as usize;
+
+        // Move chunk
+        let mut temp = vec![Option::<Rune>::None; (height * self.columns) as usize];
+        temp.clone_from_slice(&self.draw_buffer[src_start..src_end]);
+        self.draw_buffer[dest_start..dest_end].clone_from_slice(&temp);
+    }
+
+    fn scroll_draw_buffer(&mut self, amount: i32, top: i32, bottom: i32)
+    {
+        if amount < 0
+        {
+            self.move_draw_buffer_block(
+                top - amount, bottom, top);
+        }
+        else
+        {
+            self.move_draw_buffer_block(
+                top, bottom - amount, top + amount);
+        }
+    }
+
     fn draw_scroll_impl(&mut self, amount: i32, top: i32, bottom: i32)
     {
-        self.flush_draw_calls();
+        self.scroll_draw_buffer(amount, top, bottom);
         let amount_pixels = amount * self.font_height;
         let top_pixels = top * self.font_height;
         let bottom_pixels = bottom * self.font_height;
@@ -342,22 +404,8 @@ impl XLibDisplay
     {
         self.width = unsafe { event.configure.width };
         self.height = unsafe { event.configure.height };
-        let rows = self.height / self.font_height;
-        let columns = self.width / self.font_width;
-
-        // Resize backbuffer
-        /*
-        unsafe
-        {
-            xlib::XFreePixmap(self.display, self.back_buffer);
-            self.back_buffer = xlib::XCreatePixmap(self.display, self.window, 
-                self.width as u32, self.height as u32, 24);
-
-            xft::XftDrawDestroy(self.draw);
-            self.draw = xft::XftDrawCreate(self.display, self.back_buffer, self.visual, self.cmap);
-        }
-        */
-        results.push(UpdateResult::resize(rows, columns, self.width, self.height));
+        self.create_new_draw_buffer();
+        results.push(UpdateResult::resize(self.rows, self.columns, self.width, self.height));
     }
 
     fn on_button(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
@@ -441,7 +489,7 @@ impl super::Display for XLibDisplay
     
     fn flush(&mut self)
     {
-        self.flush_draw_calls();
+        self.flush_draw_buffer();
         unsafe 
         {
             //xlib::XCopyArea(self.display, self.back_buffer, self.window, self.gc, 
