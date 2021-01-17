@@ -12,6 +12,7 @@ struct Line
 {
     content: Vec<Rune>,
     changes: Vec<bool>,
+    columns: usize,
     dirty: bool,
 }
 type LineRef = Rc<RefCell<Line>>;
@@ -24,6 +25,7 @@ impl Line
         {
             content: vec![Rune::default(); columns as usize],
             changes: vec![true; columns as usize],
+            columns: columns as usize,
             dirty: true,
         }));
     }
@@ -36,11 +38,12 @@ impl Line
 
         self.content.resize(columns as usize, Rune::default());
         self.changes.resize(columns as usize, true);
+        self.columns = columns as usize;
     }
 
     pub fn clear(&mut self)
     {
-        for i in 0..self.content.len() {
+        for i in 0..self.columns {
             self.content[i] = Rune::default();
             self.changes[i] = true;
         }
@@ -66,7 +69,8 @@ impl Line
         }
 
         let mut runes = Vec::<(Rune, CursorPos)>::new();
-        for i in 0..self.content.len() 
+        runes.reserve(self.columns);
+        for i in 0..self.columns 
         {
             if self.changes[i]
             {
@@ -180,6 +184,7 @@ impl<Display> Buffer<Display>
     pub fn draw(&mut self) -> Vec<(Rune, CursorPos)>
     {
         let mut runes = Vec::<(Rune, CursorPos)>::new();
+        runes.reserve((self.columns * self.rows) as usize);
         for row in 0..self.rows {
             runes.append(&mut self.draw_row(row));
         }
