@@ -98,7 +98,7 @@ pub trait Display
     fn get_fd(&self) -> i32;
 
     // Draw routines
-    fn draw_rune(&mut self, rune: &Rune, at: &CursorPos);
+    fn draw_runes(&mut self, runes: &[(Rune, CursorPos)]);
     fn draw_scroll(&mut self, amount: i32, top: i32, bottom: i32);
     fn draw_clear(&mut self, attribute: &rune::Attribute, 
         row: i32, column: i32, width: i32, height: i32);

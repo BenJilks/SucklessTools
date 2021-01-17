@@ -1,5 +1,4 @@
 use std::cmp::min;
-use std::ops::{Index, IndexMut};
 use std::rc::Rc;
 use std::cell::RefCell;
 use super::display::
@@ -12,7 +11,8 @@ use super::display::
 struct Line
 {
     content: Vec<Rune>,
-    columns: i32,
+    changes: Vec<bool>,
+    dirty: bool,
 }
 type LineRef = Rc<RefCell<Line>>;
 
@@ -23,40 +23,68 @@ impl Line
         return Rc::from(RefCell::new(Self
         {
             content: vec![Rune::default(); columns as usize],
-            columns: columns,
+            changes: vec![true; columns as usize],
+            dirty: true,
         }));
     }
 
     pub fn resize(&mut self, columns: i32)
     {
-        if columns == self.columns {
+        if columns == self.content.len() as i32 {
             return;
         }
 
         self.content.resize(columns as usize, Rune::default());
-        self.columns = columns;
+        self.changes.resize(columns as usize, true);
     }
 
     pub fn clear(&mut self)
     {
-        for rune in &mut self.content {
-            *rune = Rune::default();
+        for i in 0..self.content.len() {
+            self.content[i] = Rune::default();
+            self.changes[i] = true;
         }
+        self.dirty = true;
     }
-}
 
-impl Index<usize> for Line
-{
-    type Output = Rune;
-    fn index(&self, i: usize) -> &Rune {
-        &self.content[i]
+    pub fn set(&mut self, column: i32, rune: Rune)
+    {
+        self.content[column as usize] = rune;
+        self.changes[column as usize] = true;
+        self.dirty = true;
     }
-}
 
-impl IndexMut<usize> for Line
-{
-    fn index_mut(&mut self, i: usize) -> &mut Rune {
-        &mut self.content[i]
+    pub fn get(&self, column: i32) -> &Rune
+    {
+        &self.content[column as usize]
+    }
+
+    pub fn draw(&mut self, row: i32) -> Vec<(Rune, CursorPos)>
+    {
+        if !self.dirty {
+            return Vec::new();
+        }
+
+        let mut runes = Vec::<(Rune, CursorPos)>::new();
+        for i in 0..self.content.len() 
+        {
+            if self.changes[i]
+            {
+                let pos = CursorPos::new(row, i as i32);
+                runes.push((self.content[i].clone(), pos));
+                self.changes[i] = false;
+            }
+        }
+        self.dirty = false;
+        return runes;
+    }
+
+    pub fn invalidate(&mut self)
+    {
+        for it in &mut self.changes {
+            *it = true;
+        }
+        self.dirty = true;
     }
 }
 
@@ -71,6 +99,7 @@ pub struct Buffer<Display>
     columns: i32,
     scroll_region_top: i32,
     scroll_region_bottom: i32,
+    scroll_buffer: i32,
     
     content: Vec<LineRef>,
     scrollback: Vec<LineRef>,
@@ -93,6 +122,7 @@ impl<Display> Buffer<Display>
             columns: columns,
             scroll_region_top: 0,
             scroll_region_bottom: rows,
+            scroll_buffer: 0,
 
             content: vec![Line::new(columns); (rows * columns) as usize],
             scrollback: Vec::new(),
@@ -109,60 +139,92 @@ impl<Display> Buffer<Display>
     pub fn get_attribute(&mut self) -> &mut Attribute { &mut self.attribute }
     pub fn get_display(&mut self) -> &mut Display { &mut self.display }
 
-    fn redraw_line(&mut self, line_ref: &LineRef, row: i32)
-    {
-        let line = &line_ref.borrow();
-        for column in 0..self.columns 
-        {
-            let rune = &line.content[column as usize];
-            self.display.draw_rune(rune, &CursorPos::new(row, column));
-        }
-    }
-
-    fn redraw_row(&mut self, row_in_viewport: i32)
+    fn line_for_row(&mut self, row_in_viewport: i32) -> Option<&mut LineRef>
     {
         let row_in_buffer = row_in_viewport - self.viewport_offset;
         if row_in_buffer >= self.rows as i32 {
-            return;
+            return None;
         }
 
         if row_in_buffer >= 0
         {
-            let line = self.content[row_in_buffer as usize].clone();
-            self.redraw_line(&line, row_in_viewport);
+            let line = &mut self.content[row_in_buffer as usize];
+            return Some( line );
         }
         else if -row_in_buffer <= self.scrollback.len() as i32
         {
             let row_in_scrollback = self.scrollback.len() as i32 + row_in_buffer;
-            let line = self.scrollback[row_in_scrollback as usize].clone();
-            self.redraw_line(&line, row_in_viewport);
+            let line = &mut self.scrollback[row_in_scrollback as usize];
+            return Some( line );
         }
+        return None;
+    }
+
+    fn draw_row(&mut self, row_in_viewport: i32) -> Vec<(Rune, CursorPos)>
+    {
+        let line = self.line_for_row(row_in_viewport);
+        if line.is_none() {
+            return Vec::new();
+        }
+        return line.unwrap().borrow_mut().draw(row_in_viewport);
+    }
+
+    fn invalidate_row(&mut self, row_in_viewport: i32)
+    {
+        let line = self.line_for_row(row_in_viewport);
+        if line.is_some() {
+            line.unwrap().borrow_mut().invalidate();
+        }
+    }
+
+    pub fn draw(&mut self) -> Vec<(Rune, CursorPos)>
+    {
+        let mut runes = Vec::<(Rune, CursorPos)>::new();
+        for row in 0..self.rows {
+            runes.append(&mut self.draw_row(row));
+        }
+        return runes;
     }
 
     pub fn redraw(&mut self)
     {
         for row in 0..self.rows {
-            self.redraw_row(row);
+            self.invalidate_row(row);
+        }
+        self.flush();
+    }
+
+    fn flush_scroll_buffer(&mut self)
+    {
+        if self.scroll_buffer != 0
+        {
+            self.display.draw_scroll(self.scroll_buffer, 
+                self.scroll_region_top, self.scroll_region_bottom);
+            self.scroll_buffer = 0;
         }
     }
 
     pub fn flush(&mut self)
     {
+        self.flush_scroll_buffer();
         let mut cursor = self.cursor.clone();
         cursor.move_by(self.viewport_offset, 0);
-        
+
+        let mut runes = self.draw();
         if (0..self.rows).contains(&cursor.get_row())
         {
-            let rune = self.rune_at_cursor(&cursor);
+            let rune = self.rune_at_cursor(&cursor).clone();
             let mut inverted_rune = rune.clone();
             inverted_rune.attribute = inverted_rune.attribute.inverted();
+            runes.push((inverted_rune, cursor.clone()));
 
-            self.display.draw_rune(&inverted_rune, &cursor);
+            self.display.draw_runes(&runes);
             self.display.flush();
-            self.display.draw_rune(&rune, &cursor);
+            self.display.draw_runes(&[(rune, cursor)]);
         }
         else
         {
+            self.display.draw_runes(&runes);
             self.display.flush();
         }
     }
@@ -170,13 +232,12 @@ impl<Display> Buffer<Display>
     fn rune_at_cursor(&mut self, pos: &CursorPos) -> Rune
     {
         let line = &mut self.content[pos.get_row() as usize].borrow_mut();
-        return line[pos.get_column() as usize].clone();
+        return line.get(pos.get_column()).clone();
     }
     fn set_rune_at_cursor(&mut self, pos: &CursorPos, rune: Rune)
     {
         let line = &mut self.content[pos.get_row() as usize].borrow_mut();
-        self.display.draw_rune(&rune, pos);
-        line[pos.get_column() as usize] = rune;
+        line.set(pos.get_column(), rune);
     }
 
     pub fn resize(&mut self, rows: i32, columns: i32)
@@ -205,6 +266,7 @@ impl<Display> Buffer<Display>
 
     pub fn set_scroll_region(&mut self, top: i32, bottom: i32)
     {
+        self.flush_scroll_buffer();
         self.scroll_region_top = top;
         self.scroll_region_bottom = bottom;
     }
@@ -216,7 +278,7 @@ impl<Display> Buffer<Display>
         let end_row = bottom;
         
         for row in (start_row..end_row).rev() {
-            self.content[(row - amount) as usize] = self.content[row as usize].clone();
+            self.content[row as usize] = self.content[(row - amount) as usize].clone();
         }
         for row in top..start_row {
             self.content[row as usize] = Line::new(self.columns);
@@ -253,8 +315,11 @@ impl<Display> Buffer<Display>
             self.scroll_up(amount, top, bottom);
         }
 
-        self.display.draw_scroll(amount, 
-            top, bottom);
+        if top == self.scroll_region_top && bottom == self.scroll_region_bottom {
+            self.scroll_buffer += amount;
+        } else {
+            self.display.draw_scroll(amount, top, bottom);
+        }
         self.cursor_move(amount, 0);
     }
 
@@ -284,7 +349,7 @@ impl<Display> Buffer<Display>
             if amount < 0 { self.rows+amount..self.rows }
             else { 0..amount };
         for row in range {
-            self.redraw_row(row);
+            self.invalidate_row(row);
         }
 
         self.flush();
@@ -353,9 +418,8 @@ impl<Display> Buffer<Display>
         let line = &mut self.content[row as usize].borrow_mut();
         for column in (start..end).rev()
         {
-            let rune = line[column as usize - count].clone();
-            self.display.draw_rune(&rune, &CursorPos::new(row, column));
-            line[column as usize] = rune;
+            let rune = line.get(column - count as i32).clone();
+            line.set(column, rune);
         }
     }
 
@@ -368,9 +432,8 @@ impl<Display> Buffer<Display>
         let line = &mut self.content[row as usize].borrow_mut();
         for column in start..end
         {
-            let rune = line[column as usize + count].clone();
-            self.display.draw_rune(&rune, &CursorPos::new(row, column));
-            line[column as usize] = rune;
+            let rune = line.get(column + count as i32).clone();
+            line.set(column, rune);
         }
     }
 
@@ -455,7 +518,7 @@ impl<Display> Buffer<Display>
 
         let line = &mut self.content[row as usize].borrow_mut();
         for column in start..end {
-            line[column as usize] = self.rune_from_code_point(' ' as u32);
+            line.set(column, self.rune_from_code_point(' ' as u32));
         }
         self.display.draw_clear(&self.attribute, row, start, end - start, 1);
     }
