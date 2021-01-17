@@ -42,7 +42,7 @@ pub struct Attribute
     pub foreground: u32,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ColorType
 {
     Foreground,

@@ -43,10 +43,16 @@ fn handle_output<Display>(term: &mut Terminal<Display>)
         return;
     }
 
-    let response = term.decoder.decode(
-        &term.input_buffer[0..count_read.unwrap()], &mut term.buffer);
-    if response.len() > 0 {
-        handle_input(term, &response);
+    let actions = term.decoder.decode(
+        &term.input_buffer[0..count_read.unwrap()]);
+
+    term.buffer.reset_viewport();
+    for action in actions
+    {
+        let response = term.buffer.do_action(action);
+        if response.len() > 0 {
+            handle_input(term, &response);
+        }
     }
     term.buffer.flush();
 }
@@ -218,4 +224,3 @@ pub fn run<Display>(display: Display)
         }
     }
 }
-

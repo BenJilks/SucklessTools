@@ -1,7 +1,7 @@
-use super::buffer::*;
-use super::display::rune::*;
-use super::display;
+pub mod action;
+use crate::display::rune::*;
 use std::io::Write;
+use action::Action;
 
 const SHOW_STREAM_LOG: bool = false;
 const SHOW_UNKOWN_ESCAPES: bool = false;
@@ -60,8 +60,7 @@ fn decode_standard_color(code: &i32, color_type: &ColorType) -> Option<StandardC
     }
 }
 
-fn decode_non_16color<Display>(args: &Vec<i32>, buffer: &mut Buffer<Display>)
-    where Display: display::Display
+fn decode_non_16color(args: &Vec<i32>, actions: &mut Vec<Action>)
 {
     assert!(args.len() == 3);
     assert!(args[1] == 5);
@@ -73,9 +72,8 @@ fn decode_non_16color<Display>(args: &Vec<i32>, buffer: &mut Buffer<Display>)
             ColorType::Background 
         };
     let code = args[2];
-    let attribute = buffer.get_attribute();
 
-    *attribute.from_type(&color_type) =
+    actions.push(Action::set_color(color_type.clone(),
         if code <= 7
         {
             // Standard 
@@ -108,22 +106,23 @@ fn decode_non_16color<Display>(args: &Vec<i32>, buffer: &mut Buffer<Display>)
                 println!("Invalid 246color code {}", code);
             }
             0
-        };
+        })
+    );
 }
 
-fn decode_color<Display>(mut code: i32, buffer: &mut Buffer<Display>)
-    where Display: display::Display
+fn decode_color(mut code: i32, actions: &mut Vec<Action>)
 {
     let original_code = code;
-    let attribute = buffer.get_attribute();
 
     match code
     {
         // Reset all attributes
         0 =>
         {
-            attribute.background = StandardColor::DefaultBackground.color();
-            attribute.foreground = StandardColor::DefaultForeground.color();
+            let background = StandardColor::DefaultBackground.color();
+            let foreground = StandardColor::DefaultForeground.color();
+            actions.push(Action::set_color(ColorType::Background, background));
+            actions.push(Action::set_color(ColorType::Foreground, foreground));
             //m_flags = 0;
             return;
         },
@@ -136,7 +135,7 @@ fn decode_color<Display>(mut code: i32, buffer: &mut Buffer<Display>)
 
         7 | 27 =>
         {
-            *attribute = attribute.inverted();
+            actions.push(Action::color_invert());
             return;
         },
 
@@ -166,7 +165,7 @@ fn decode_color<Display>(mut code: i32, buffer: &mut Buffer<Display>)
         return;
     }
 
-    *attribute.from_type(&color_type) = color.unwrap().color();
+    actions.push(Action::set_color(color_type, color.unwrap().color()));
 }
 
 impl Decoder
@@ -198,8 +197,7 @@ impl Decoder
         self.buffer.clear();
     }
 
-    fn finish_escape<Display>(&mut self, buffer: &mut Buffer<Display>, response: &mut Vec<u8>)
-        where Display: display::Display
+    fn finish_escape(&mut self, actions: &mut Vec<Action>)
     {
         let args = &self.args;
         let def = |val| { if !args.is_empty() {args[0]} else {val} };
@@ -211,16 +209,16 @@ impl Decoder
             {
                 if args.is_empty() 
                 {
-                    decode_color(0, buffer);
+                    decode_color(0, actions);
                 } 
                 else if args[0] == 38 || args[0] == 48 
                 {
-                    decode_non_16color(args, buffer);
+                    decode_non_16color(args, actions);
                 } 
                 else 
                 {
                     for color_code in args {
-                        decode_color(*color_code, buffer);
+                        decode_color(*color_code, actions);
                     }
                 }
             },
@@ -230,21 +228,21 @@ impl Decoder
             {
                 let row = if args.len() == 2 {args[0] - 1} else {0};
                 let column = if args.len() == 2 {args[1] - 1} else {0};
-                buffer.cursor_set(row, column);
+                actions.push(Action::cursor_set(row, column));
             },
 
-            'A' => buffer.cursor_up(def_or_zero(1)),
-            'B' => buffer.cursor_down(def_or_zero(1)),
-            'C' => buffer.cursor_right(def_or_zero(1)),
-            'D' => buffer.cursor_left(def_or_zero(1)),
+            'A' => actions.push(Action::cursor_movement(action::CursorDirection::Up, def_or_zero(1))),
+            'B' => actions.push(Action::cursor_movement(action::CursorDirection::Down, def_or_zero(1))),
+            'C' => actions.push(Action::cursor_movement(action::CursorDirection::Right, def_or_zero(1))),
+            'D' => actions.push(Action::cursor_movement(action::CursorDirection::Left, def_or_zero(1))),
             
             'K' =>
             {
                 match def(0)
                 {
-                    0 => buffer.clear_from_cursor_right(),
-                    1 => buffer.clear_from_cursor_left(),
-                    2 => buffer.clear_whole_line(),
+                    0 => actions.push(Action::clear_from_cursor(action::CursorDirection::Right)),
+                    1 => actions.push(Action::clear_from_cursor(action::CursorDirection::Left)),
+                    2 => actions.push(Action::clear_line()),
                     3 => {},
                     _ => panic!(),
                 }
@@ -254,40 +252,40 @@ impl Decoder
             {
                 match def(0)
                 {
-                    0 => buffer.clear_from_cursor_down(),
-                    1 => buffer.clear_from_cursor_up(),
-                    2 => buffer.clear_whole_screen(),
+                    0 => actions.push(Action::clear_from_cursor(action::CursorDirection::Down)),
+                    1 => actions.push(Action::clear_from_cursor(action::CursorDirection::Up)),
+                    2 => actions.push(Action::clear_screen()),
                     3 => {},
                     _ => panic!(),
                 }
             },
 
             // Line Position Absolute [row] (default = [1,column]) (VPA)
-            'd' => buffer.cursor_set_row(def(1) - 1),
+            'd' => actions.push(Action::cursor_set_row(def(1) - 1)),
             
             // Cursor Character Absolute [column] (default = [row,1]) (CHA)
-            'G' => buffer.cursor_set_column(def(1) - 1),
+            'G' => actions.push(Action::cursor_set_column(def(1) - 1)),
 
-            '@' => buffer.insert(def(1) as usize),
-            'P' => buffer.delete(def(1) as usize),
+            '@' => actions.push(Action::insert(def(1))),
+            'P' => actions.push(Action::delete(def(1))),
+            'X' => actions.push(Action::erase(def(1))),
 
-            'L' => buffer.insert_lines(def(1)),
-            'M' => buffer.delete_lines(def(1)),
-            'X' => buffer.erase(def(1)),
+            'L' => actions.push(Action::insert_lines(def(1))),
+            'M' => actions.push(Action::delete_lines(def(1))),
 
             'r' =>
             {
-                let top = if args.len() == 2 {args[0] - 1} else {0};
-                let bottom = if args.len() == 2 {args[1]} else {buffer.get_rows()};
-                buffer.set_scroll_region(top, bottom);
+                let top = if args.len() == 2 { Some( args[0] - 1) } else { None };
+                let bottom = if args.len() == 2 { Some( args[1] ) } else { None };
+                actions.push(Action::set_scroll_region(top, bottom));
             },
 
             'c' =>
             {
                 assert!(def(0) == 0);
-                response.append(&mut "\x1b[1;2c"
+                actions.push(Action::response("\x1b[1;2c"
                     .as_bytes()
-                    .to_vec());
+                    .to_vec()));
             },
             
             _ => 
@@ -311,14 +309,13 @@ impl Decoder
         self.command = '\0';
     }
 
-    fn finish_single_char_code<Display>(&mut self, buffer: &mut Buffer<Display>)
-        where Display: display::Display
+    fn finish_single_char_code(&mut self, actions: &mut Vec<Action>)
     {
         match self.command
         {
-            'D' => buffer.cursor_down(1),
-            'M' => buffer.cursor_up(1),
-            'E' => buffer.new_line(),
+            'D' => actions.push(Action::cursor_movement(action::CursorDirection::Down, 1)),
+            'M' => actions.push(Action::cursor_movement(action::CursorDirection::Up, 1)),
+            'E' => actions.push(Action::new_line()),
 
             _ =>
             {
@@ -351,15 +348,11 @@ impl Decoder
         self.command = '\0';
     }
 
-    fn finish_hash<Display>(&mut self, buffer: &mut Buffer<Display>)
-        where Display: display::Display
+    fn finish_hash(&mut self, actions: &mut Vec<Action>)
     {
         match self.command
         {
-            '8' =>
-            {
-                buffer.fill('E' as u32);
-            },
+            '8' => actions.push(Action::fill('E' as u32)),
 
             _ =>
             {
@@ -383,13 +376,10 @@ impl Decoder
         self.args.clear();
     }
 
-    pub fn decode<Display>(&mut self, output: &[u8], buffer: &mut Buffer<Display>) -> Vec<u8>
-        where Display: display::Display
+    pub fn decode(&mut self, output: &[u8]) -> Vec<Action>
     {
-        let mut response = Vec::<u8>::new();
+        let mut actions = Vec::<Action>::new();
         let mut i = 0;
-
-        buffer.reset_viewport();
         loop
         {
             if !self.reconsume
@@ -440,12 +430,12 @@ impl Decoder
                     {
                         match self.c
                         {
-                            '\n' => buffer.new_line(),
-                            '\r' => buffer.carriage_return(),
+                            '\n' => actions.push(Action::new_line()),
+                            '\r' => actions.push(Action::carriage_return()),
                             '\x07' => println!("Bell!!!"),
-                            '\x08' => buffer.cursor_left(1),
+                            '\x08' => actions.push(Action::cursor_movement(action::CursorDirection::Left, 1)),
                             '\x1b' => self.state = State::Escape,
-                            _ => buffer.type_rune(self.c as u32),
+                            _ => actions.push(Action::type_code_point(self.c as u32)),
                         }
                     }
                 },
@@ -462,7 +452,7 @@ impl Decoder
                     {
                         self.curr_rune |= self.c as u32 & 0b00111111;
                         self.state = State::Ascii;
-                        buffer.type_rune(self.curr_rune);
+                        actions.push(Action::type_code_point(self.curr_rune));
                     }
                 },
                 
@@ -508,7 +498,7 @@ impl Decoder
                         {
                             self.state = State::Ascii;
                             self.command = self.c;
-                            self.finish_single_char_code(buffer);
+                            self.finish_single_char_code(&mut actions);
                         },
                     }
                 },
@@ -544,7 +534,7 @@ impl Decoder
                             self.state = State::Ascii;
                             self.command = self.c;
                             self.finish_argument();
-                            self.finish_escape(buffer, &mut response);
+                            self.finish_escape(&mut actions);
                         },
                     }
                 },
@@ -597,13 +587,13 @@ impl Decoder
                 {
                     self.state = State::Ascii;
                     self.command = self.c;
-                    self.finish_hash(buffer);
+                    self.finish_hash(&mut actions);
                 },
                 
             }
         }
 
-        return response;
+        return actions;
     }
 
 }

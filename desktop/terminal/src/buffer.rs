@@ -1,3 +1,4 @@
+use crate::decoder::action::{Action, ActionType, CursorDirection};
 use std::cmp::min;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -139,8 +140,6 @@ impl<Display> Buffer<Display>
         return buffer;
     }
 
-    pub fn get_rows(&self) -> i32 { self.rows }
-    pub fn get_attribute(&mut self) -> &mut Attribute { &mut self.attribute }
     pub fn get_display(&mut self) -> &mut Display { &mut self.display }
 
     fn line_for_row(&mut self, row_in_viewport: i32) -> Option<&mut LineRef>
@@ -181,7 +180,7 @@ impl<Display> Buffer<Display>
         }
     }
 
-    pub fn draw(&mut self) -> Vec<(Rune, CursorPos)>
+    fn draw(&mut self) -> Vec<(Rune, CursorPos)>
     {
         let mut runes = Vec::<(Rune, CursorPos)>::new();
         runes.reserve((self.columns * self.rows) as usize);
@@ -269,7 +268,7 @@ impl<Display> Buffer<Display>
         self.columns = columns;
     }
 
-    pub fn set_scroll_region(&mut self, top: i32, bottom: i32)
+    fn set_scroll_region(&mut self, top: i32, bottom: i32)
     {
         self.flush_scroll_buffer();
         self.scroll_region_top = top;
@@ -328,7 +327,7 @@ impl<Display> Buffer<Display>
         self.cursor_move(amount, 0);
     }
 
-    pub fn scroll(&mut self, amount: i32)
+    fn scroll(&mut self, amount: i32)
     {
         let top = self.scroll_region_top;
         let bottom = self.scroll_region_bottom;
@@ -391,7 +390,7 @@ impl<Display> Buffer<Display>
         };
     }
 
-    pub fn type_rune(&mut self, code_point: u32)
+    fn type_rune(&mut self, code_point: u32)
     {
         let cursor = self.cursor.clone();
         let rune = self.rune_from_code_point(code_point);
@@ -399,7 +398,7 @@ impl<Display> Buffer<Display>
         self.cursor_move(0, 1);
     }
 
-    pub fn fill(&mut self, code_point: u32)
+    fn fill(&mut self, code_point: u32)
     {
         let mut rune = Rune::default();
         rune.code_point = code_point;
@@ -414,7 +413,7 @@ impl<Display> Buffer<Display>
         }
     }
 
-    pub fn insert(&mut self, count: usize)
+    fn insert(&mut self, count: usize)
     {
         let start = self.cursor.get_column();
         let end = self.columns - count as i32;
@@ -428,7 +427,7 @@ impl<Display> Buffer<Display>
         }
     }
 
-    pub fn delete(&mut self, count: usize)
+    fn delete(&mut self, count: usize)
     {
         let start = self.cursor.get_column();
         let end = self.columns - count as i32;
@@ -442,27 +441,27 @@ impl<Display> Buffer<Display>
         }
     }
 
-    pub fn insert_lines(&mut self, count: i32)
+    fn insert_lines(&mut self, count: i32)
     {
         let top = self.cursor.get_row();
         let bottom = self.scroll_region_bottom;
         self.scroll_in_bounds(count, top, bottom);
     }
     
-    pub fn delete_lines(&mut self, count: i32)
+    fn delete_lines(&mut self, count: i32)
     {
         let top = self.cursor.get_row();
         let bottom = self.scroll_region_bottom;
         self.scroll_in_bounds(-count, top, bottom);
     }
 
-    pub fn new_line(&mut self)
+    fn new_line(&mut self)
     {
         self.cursor_move(1, 0);
         self.cursor.carriage_return();
     }
 
-    pub fn carriage_return(&mut self)
+    fn carriage_return(&mut self)
     {
         self.cursor.carriage_return();
     }
@@ -488,26 +487,26 @@ impl<Display> Buffer<Display>
         self.cursor_check_move();
     }
     
-    pub fn cursor_set(&mut self, row: i32, column: i32) 
+    fn cursor_set(&mut self, row: i32, column: i32) 
     { 
         self.cursor.move_to(row, column);
         self.cursor_check_move();
     }
 
-    pub fn cursor_set_row(&mut self, row: i32)
+    fn cursor_set_row(&mut self, row: i32)
     {
         self.cursor_set(row, self.cursor.get_column());
     }
     
-    pub fn cursor_set_column(&mut self, column: i32)
+    fn cursor_set_column(&mut self, column: i32)
     {
         self.cursor_set(self.cursor.get_row(), column);
     }
 
-    pub fn cursor_left(&mut self, amount: i32) { self.cursor_move(0, -amount) }
-    pub fn cursor_right(&mut self, amount: i32) { self.cursor_move(0, amount) }
-    pub fn cursor_up(&mut self, amount: i32) { self.cursor_move(-amount, 0) }
-    pub fn cursor_down(&mut self, amount: i32) { self.cursor_move(amount, 0) }
+    fn cursor_left(&mut self, amount: i32) { self.cursor_move(0, -amount) }
+    fn cursor_right(&mut self, amount: i32) { self.cursor_move(0, amount) }
+    fn cursor_up(&mut self, amount: i32) { self.cursor_move(-amount, 0) }
+    fn cursor_down(&mut self, amount: i32) { self.cursor_move(amount, 0) }
 
     /* Clear lines */
     
@@ -542,32 +541,90 @@ impl<Display> Buffer<Display>
         self.display.draw_clear(&self.attribute, start, 0, self.columns, end - start);
     }
 
-    pub fn clear_from_cursor_right(&mut self) {
+    fn clear_from_cursor_right(&mut self) {
         self.clear_line_range(self.cursor.get_column(), self.columns);
     }
-    pub fn clear_from_cursor_left(&mut self) { 
+    fn clear_from_cursor_left(&mut self) { 
         self.clear_line_range(0, self.cursor.get_column());
     }
-    pub fn clear_whole_line(&mut self) { 
+    fn clear_whole_line(&mut self) { 
         self.clear_line_range(0, self.columns);
     }
 
-    pub fn erase(&mut self, count: i32) 
+    fn erase(&mut self, count: i32) 
     {
         let column = self.cursor.get_column();
         self.clear_line_range(column, column + count);
     }
     
-    pub fn clear_from_cursor_down(&mut self) {
+    fn clear_from_cursor_down(&mut self) {
         self.clear_from_cursor_right();
         self.clear_block_range(self.cursor.get_row() + 1, self.rows);
     }
-    pub fn clear_from_cursor_up(&mut self) {
+    fn clear_from_cursor_up(&mut self) {
         self.clear_from_cursor_left();
         self.clear_block_range(0, self.cursor.get_row());
     }
-    pub fn clear_whole_screen(&mut self) {
+    fn clear_whole_screen(&mut self) {
         self.clear_block_range(0, self.rows);
+    }
+
+    pub fn do_action(&mut self, action: Action) -> Vec<u8>
+    {
+        match action.action_type
+        {
+            ActionType::None => panic!(),
+            ActionType::TypeCodePoint => self.type_rune(action.code_point.unwrap()),
+            ActionType::Insert => self.insert(action.amount.unwrap() as usize),
+            ActionType::Delete => self.delete(action.amount.unwrap() as usize),
+            ActionType::Erase => self.erase(action.amount.unwrap()),
+
+            ActionType::NewLine => self.new_line(),
+            ActionType::CarriageReturn => self.carriage_return(),
+            ActionType::InsetLines => self.insert_lines(action.amount.unwrap()),
+            ActionType::DeleteLines => self.delete_lines(action.amount.unwrap()),
+
+            ActionType::CursorMovement =>
+            {
+                match action.cursor_direction.unwrap()
+                {
+                    CursorDirection::Up => self.cursor_up(action.amount.unwrap()),
+                    CursorDirection::Down => self.cursor_down(action.amount.unwrap()),
+                    CursorDirection::Left => self.cursor_left(action.amount.unwrap()),
+                    CursorDirection::Right => self.cursor_right(action.amount.unwrap()),
+                }
+            },
+            ActionType::CursorSet => self.cursor_set(action.row.unwrap(), action.column.unwrap()),
+            ActionType::CursorSetRow => self.cursor_set_row(action.row.unwrap()),
+            ActionType::CursorSetColumn => self.cursor_set_column(action.column.unwrap()),
+
+            ActionType::ClearFromCursor =>
+            {
+                match action.cursor_direction.unwrap()
+                {
+                    CursorDirection::Up => self.clear_from_cursor_up(),
+                    CursorDirection::Down => self.clear_from_cursor_down(),
+                    CursorDirection::Left => self.clear_from_cursor_left(),
+                    CursorDirection::Right => self.clear_from_cursor_right(),
+                }
+            },
+            ActionType::ClearLine => self.clear_whole_line(),
+            ActionType::ClearScreen => self.clear_whole_screen(),
+
+            ActionType::SetScrollRegion =>
+            {
+                let top = action.top.unwrap_or(0);
+                let bottom = action.top.unwrap_or(self.rows);
+                self.set_scroll_region(top, bottom);
+            },
+            ActionType::Response => return action.message.unwrap(),
+            ActionType::Fill => self.fill(action.code_point.unwrap()),
+
+            ActionType::SetColor => *self.attribute.from_type(&action.color_type.unwrap()) = action.color.unwrap(),
+            ActionType::ColorInvert => self.attribute = self.attribute.inverted(),
+        };
+
+        return Vec::new();
     }
 
 }
