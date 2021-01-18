@@ -51,5 +51,11 @@ impl CursorPos
     pub fn get_row(&self) -> i32 { self.row }
     pub fn get_column(&self) -> i32 { self.column }
 
+    pub fn in_bounds(&self, rows: i32, columns: i32) -> bool
+    {
+        return (0..rows).contains(&self.row) 
+            && (0..columns).contains(&self.column);
+    }
+
 }
 

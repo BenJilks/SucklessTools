@@ -215,7 +215,7 @@ impl<Display> Buffer<Display>
         cursor.move_by(self.viewport_offset, 0);
 
         let mut runes = self.draw();
-        if (0..self.rows).contains(&cursor.get_row())
+        if cursor.in_bounds(self.rows, self.columns)
         {
             let rune = self.rune_at_cursor(&cursor).clone();
             let mut inverted_rune = rune.clone();
@@ -253,8 +253,14 @@ impl<Display> Buffer<Display>
 
         // Update main content
         self.content.resize(rows as usize, Line::new(columns));
-        for line in &mut self.content {
-            line.borrow_mut().resize(columns);
+        for i in 0..self.content.len() 
+        {
+            let line = &mut self.content[i];
+            if i >= self.rows as usize {
+                *line = Line::new(columns);
+            } else {
+                line.borrow_mut().resize(columns);
+            }
         }
         
         // Update scrollback
@@ -574,6 +580,7 @@ impl<Display> Buffer<Display>
         match action.action_type
         {
             ActionType::None => panic!(),
+
             ActionType::TypeCodePoint => self.type_rune(action.code_point.unwrap()),
             ActionType::Insert => self.insert(action.amount.unwrap() as usize),
             ActionType::Delete => self.delete(action.amount.unwrap() as usize),
@@ -614,7 +621,7 @@ impl<Display> Buffer<Display>
             ActionType::SetScrollRegion =>
             {
                 let top = action.top.unwrap_or(0);
-                let bottom = action.top.unwrap_or(self.rows);
+                let bottom = action.bottom.unwrap_or(self.rows);
                 self.set_scroll_region(top, bottom);
             },
             ActionType::Response => return action.message.unwrap(),
@@ -628,4 +635,3 @@ impl<Display> Buffer<Display>
     }
 
 }
-

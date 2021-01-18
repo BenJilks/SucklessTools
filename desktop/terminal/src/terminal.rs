@@ -1,6 +1,7 @@
 use super::display;
-use super::decoder::*;
+use super::decoder::{*, action::Action};
 use super::buffer::*;
+use std::sync::mpsc::{channel, Sender, Receiver};
 use std::{ptr, mem, ffi::CString};
 
 const INPUT_BUFFER_SIZE: usize = 1024 * 10; // 10MB
@@ -11,17 +12,41 @@ fn c_str(string: &str) -> CString
         .expect("Could not create c string");
 }
 
-struct Terminal<Display>
-    where Display: display::Display
+struct Terminal
 {
-    buffer: Buffer<Display>,
     decoder: Decoder,
     master: i32,
+    slave_pid: i32,
     input_buffer: Vec<u8>,
 }
 
-fn read_from_terminal<Display>(term: &mut Terminal<Display>) -> Option<usize>
-    where Display: display::Display
+enum MessageType
+{
+    NotifyUpdate,
+    ResetViewport,
+    Flush,
+    Action,
+}
+
+struct Message
+{
+    message_type: MessageType,
+    action: Option<Action>,
+}
+
+impl Message
+{
+    pub fn new(message_type: MessageType) -> Self
+    {
+        Self
+        {
+            message_type: message_type,
+            action: None,
+        }
+    }
+}
+
+fn read_from_terminal(term: &mut Terminal) -> Option<usize>
 {
     let count_read = unsafe { libc::read(
         term.master, 
@@ -35,77 +60,25 @@ fn read_from_terminal<Display>(term: &mut Terminal<Display>) -> Option<usize>
     return Some ( count_read as usize );
 }
 
-fn handle_output<Display>(term: &mut Terminal<Display>)
-    where Display: display::Display
+fn handle_output(term: &mut Terminal, display: &Sender<Message>)
 {
     let count_read = read_from_terminal(term);
     if count_read.is_none() {
         return;
     }
 
-    let actions = term.decoder.decode(
-        &term.input_buffer[0..count_read.unwrap()]);
-
-    term.buffer.reset_viewport();
-    for action in actions
+    let on_action = |action: Action|
     {
-        let response = term.buffer.do_action(action);
-        if response.len() > 0 {
-            handle_input(term, &response);
-        }
-    }
-    term.buffer.flush();
-}
+        display.send(Message 
+        { 
+            message_type: MessageType::Action,
+            action: Some( action ),
+        }).unwrap();
+    };
 
-fn handle_input<Display>(term: &mut Terminal<Display>, input: &Vec<u8>)
-    where Display: display::Display
-{
-    unsafe
-    {
-        if libc::write(
-            term.master, 
-            input.as_ptr() as *const libc::c_void, 
-            input.len()) < 0 
-        {
-            libc::perror(c_str("write").as_ptr());
-        }
-    }
-}
-
-fn handle_resize<Display>(term: &mut Terminal<Display>, result: &display::UpdateResult)
-    where Display: display::Display
-{
-    term.buffer.resize(result.rows, result.columns);
-    unsafe
-    {
-        let mut size = libc::winsize
-        {
-            ws_row: result.rows as u16,
-            ws_col: result.columns as u16,
-            ws_xpixel: result.width as u16,
-            ws_ypixel: result.height as u16,
-        };
-
-        if libc::ioctl(term.master, libc::TIOCSWINSZ, &mut size) < 0 {
-            libc::perror(c_str("ioctl(TIOCSWINSZ)").as_ptr());
-        }
-    }
-}
-
-fn handle_update<Display>(term: &mut Terminal<Display>)
-    where Display: display::Display
-{
-    let results = term.buffer.get_display().update();
-    for result in &results
-    {
-        match result.result_type
-        {
-            display::UpdateResultType::Input => handle_input(term, &result.input),
-            display::UpdateResultType::Resize => handle_resize(term, &result),
-            display::UpdateResultType::Redraw => term.buffer.redraw(),
-            display::UpdateResultType::ScrollViewport => term.buffer.scroll_viewport(result.amount),
-        }
-    }
+    display.send(Message::new(MessageType::ResetViewport)).unwrap();
+    term.decoder.decode(&term.input_buffer[0..count_read.unwrap()], &on_action);
+    display.send(Message::new(MessageType::Flush)).unwrap();
 }
 
 fn execute_child_process(master: i32, slave: i32)
@@ -141,7 +114,7 @@ fn execute_child_process(master: i32, slave: i32)
     }
 }
 
-fn open_terminal() -> Option<(i32, libc::pid_t)>
+fn open_terminal() -> Option<Terminal>
 {
     let mut master: i32 = 0;
     let mut slave: i32 = 0;
@@ -157,7 +130,7 @@ fn open_terminal() -> Option<(i32, libc::pid_t)>
             return None;
         }
 
-        // Fork off a new child process to 
+        // Fork off a new child process to
         // run the shell in
         slave_pid = libc::fork();
         if slave_pid < 0
@@ -173,31 +146,23 @@ fn open_terminal() -> Option<(i32, libc::pid_t)>
         libc::close(slave);
     }
 
-    return Some( (master, slave_pid) );
+    return Some(Terminal
+    {
+        decoder: Decoder::new(),
+        master: master, 
+        slave_pid: slave_pid,
+        input_buffer: vec![0; INPUT_BUFFER_SIZE],
+    });
 }
 
-pub fn run<Display>(display: Display)
-    where Display: display::Display
+fn terminal_thread(mut term: Terminal, display_fd: i32, display: Sender<Message>)
 {
-    let fd_or_error = open_terminal();
-    if fd_or_error.is_none() {
-        return;
-    }
-
-    let (master, slave_pid) = fd_or_error.unwrap();
-    let mut term = Terminal
-    {
-        buffer: Buffer::new(100, 50, display),
-        decoder: Decoder::new(),
-        master: master,
-        input_buffer: vec![0; INPUT_BUFFER_SIZE],
-    };
-
-    let display_fd = term.buffer.get_display().get_fd();
+    let master = term.master;
+    let slave_pid = term.slave_pid;
     unsafe
     {
         let mut fds: libc::fd_set = mem::zeroed();
-        while !term.buffer.get_display().should_close()
+        loop
         {
             libc::FD_ZERO(&mut fds);
             libc::FD_SET(master, &mut fds);
@@ -215,12 +180,103 @@ pub fn run<Display>(display: Display)
             }
 
             if libc::FD_ISSET(master, &mut fds) {
-                handle_output(&mut term);
+                handle_output(&mut term, &display);
             }
 
             if libc::FD_ISSET(display_fd, &mut fds) {
-                handle_update(&mut term);
+                display.send(Message::new(MessageType::NotifyUpdate)).unwrap();
             }
         }
     }
+}
+
+fn handle_resize<Display>(buffer: &mut Buffer<Display>, master: i32, result: &display::UpdateResult)
+    where Display: display::Display
+{
+    buffer.resize(result.rows, result.columns);
+    unsafe
+    {
+        let mut size = libc::winsize
+        {
+            ws_row: result.rows as u16,
+            ws_col: result.columns as u16,
+            ws_xpixel: result.width as u16,
+            ws_ypixel: result.height as u16,
+        };
+
+        if libc::ioctl(master, libc::TIOCSWINSZ, &mut size) < 0 {
+            libc::perror(c_str("ioctl(TIOCSWINSZ)").as_ptr());
+        }
+    }
+}
+
+fn handle_input(master: i32, input: &Vec<u8>)
+{
+    unsafe
+    {
+        if libc::write(
+            master, 
+            input.as_ptr() as *const libc::c_void, 
+            input.len()) < 0 
+        {
+            libc::perror(c_str("write").as_ptr());
+        }
+    }
+}
+
+fn handle_update<Display>(buffer: &mut Buffer<Display>, master: i32)
+    where Display: display::Display
+{
+    let results = buffer.get_display().update();
+    for result in &results
+    {
+        match result.result_type
+        {
+            display::UpdateResultType::Input => handle_input(master, &result.input),
+            display::UpdateResultType::Resize => handle_resize(buffer, master, &result),
+            display::UpdateResultType::Redraw => buffer.redraw(),
+            display::UpdateResultType::ScrollViewport => buffer.scroll_viewport(result.amount),
+        }
+    }
+}
+
+fn display_thread<Display>(display: Display, master: i32, terminal: Receiver<Message>)
+    where Display: display::Display
+{
+    let mut buffer = Buffer::new(100, 50, display);
+    for message in terminal
+    {
+        match message.message_type
+        {
+            MessageType::NotifyUpdate => handle_update(&mut buffer, master),
+            MessageType::ResetViewport => buffer.reset_viewport(),
+            MessageType::Flush => buffer.flush(),
+            MessageType::Action =>
+            {
+                let result = buffer.do_action(message.action.unwrap());
+                if !result.is_empty() {
+                    handle_input(master, &result);
+                }
+            }
+        };
+    }
+}
+
+pub fn run<Display>(display: Display)
+    where Display: display::Display
+{
+    let term_or_error = open_terminal();
+    if term_or_error.is_none() {
+        return;
+    }
+    let (message_sender, message_reciver) = channel::<Message>();
+
+    let term = term_or_error.unwrap();
+    let display_fd = display.get_fd();
+    let master = term.master;
+    std::thread::spawn(move ||
+    {
+        terminal_thread(term, display_fd, message_sender)
+    });
+    display_thread(display, master, message_reciver);
 }
