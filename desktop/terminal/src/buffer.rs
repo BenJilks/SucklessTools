@@ -96,16 +96,23 @@ impl Line
 pub struct Buffer<Display>
     where Display: display::Display
 {
+    // State
     cursor: CursorPos,
     attribute: Attribute,
     display: Display,
 
+    // Dimensions
     rows: i32,
     columns: i32,
     scroll_region_top: i32,
     scroll_region_bottom: i32,
     scroll_buffer: i32,
-    
+
+    // Selection
+    selection_start_pos: Option<CursorPos>,
+    selection_end_pos: Option<CursorPos>,
+
+    // Data
     content: Vec<LineRef>,
     scrollback: Vec<LineRef>,
     viewport_offset: i32,
@@ -129,6 +136,9 @@ impl<Display> Buffer<Display>
             scroll_region_bottom: rows,
             scroll_buffer: 0,
 
+            selection_start_pos: None,
+            selection_end_pos: None,
+
             content: vec![Line::new(columns); (rows * columns) as usize],
             scrollback: Vec::new(),
             viewport_offset: 0,
@@ -141,6 +151,8 @@ impl<Display> Buffer<Display>
     }
 
     pub fn get_display(&mut self) -> &mut Display { &mut self.display }
+
+    /* Drawing */
 
     fn line_for_row(&mut self, row_in_viewport: i32) -> Option<&mut LineRef>
     {
@@ -232,6 +244,33 @@ impl<Display> Buffer<Display>
             self.display.flush();
         }
     }
+
+    /* Selection */
+
+    fn selection_end(&mut self)
+    {
+        self.selection_start_pos = None;
+        self.selection_end_pos = None;
+    }
+
+    pub fn selection_start(&mut self, row: i32, column: i32)
+    {
+        self.selection_end();
+        self.selection_start_pos = Some( CursorPos::new(row, column) );
+
+        println!("Start selection at ({},{})", row, column);
+    }
+
+    pub fn selection_update(&mut self, row: i32, column: i32)
+    {
+        self.selection_end_pos = Some( CursorPos::new(row, column) );
+
+        let start = self.selection_start_pos.clone().unwrap();
+        println!("Selection ({},{}) -> ({},{})", 
+            start.get_row(), start.get_column(), row, column);
+    }
+
+    /* Misc */
 
     fn rune_at_cursor(&mut self, pos: &CursorPos) -> Rune
     {

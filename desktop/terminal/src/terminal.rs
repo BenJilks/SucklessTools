@@ -236,6 +236,9 @@ fn handle_update<Display>(buffer: &mut Buffer<Display>, master: i32)
             display::UpdateResultType::Resize => handle_resize(buffer, master, &result),
             display::UpdateResultType::Redraw => buffer.redraw(),
             display::UpdateResultType::ScrollViewport => buffer.scroll_viewport(result.amount),
+
+            display::UpdateResultType::MouseDown => buffer.selection_start(result.rows, result.columns),
+            display::UpdateResultType::MouseDrag => buffer.selection_update(result.rows, result.columns),
         }
     }
 }

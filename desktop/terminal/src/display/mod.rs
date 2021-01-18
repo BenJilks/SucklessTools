@@ -10,6 +10,8 @@ pub enum UpdateResultType
     Resize,
     Redraw,
     ScrollViewport,
+    MouseDown,
+    MouseDrag,
 }
 
 pub struct UpdateResult
@@ -24,6 +26,26 @@ pub struct UpdateResult
     pub height: i32,
 }
 
+impl Default for UpdateResult
+{
+
+    fn default() -> Self
+    {
+        Self
+        {
+            result_type: UpdateResultType::Redraw,
+            input: Vec::new(),
+            amount: 0,
+
+            rows: 0,
+            columns: 0,
+            width: 0,
+            height: 0,
+        }
+    }
+
+}
+
 impl UpdateResult
 {
 
@@ -33,11 +55,7 @@ impl UpdateResult
         {
             result_type: UpdateResultType::Input,
             input: input.to_vec(),
-            amount: 0,
-            rows: 0,
-            columns: 0,
-            width: 0,
-            height: 0,
+            ..Self::default()
         };
     }
 
@@ -51,12 +69,11 @@ impl UpdateResult
         return Self
         {
             result_type: UpdateResultType::Resize,
-            input: Vec::new(),
-            amount: 0,
             rows: rows,
             columns: columns,
             width: width,
             height: height,
+            ..Self::default()
         };
     }
 
@@ -65,12 +82,7 @@ impl UpdateResult
         return Self
         {
             result_type: UpdateResultType::Redraw,
-            input: Vec::new(),
-            amount: 0,
-            rows: 0,
-            columns: 0,
-            width: 0,
-            height: 0,
+            ..Self::default()
         };
     }
 
@@ -79,12 +91,29 @@ impl UpdateResult
         return Self
         {
             result_type: UpdateResultType::ScrollViewport,
-            input: Vec::new(),
             amount: amount,
-            rows: 0,
-            columns: 0,
-            width: 0,
-            height: 0,
+            ..Self::default()
+        };
+    }
+
+    pub fn mouse_down(row: i32, column: i32) -> Self
+    {
+        return Self
+        {
+            result_type: UpdateResultType::MouseDown,
+            rows: row,
+            columns: column,
+            ..Self::default()
+        };
+    }
+    pub fn mouse_drag(row: i32, column: i32) -> Self
+    {
+        return Self
+        {
+            result_type: UpdateResultType::MouseDrag,
+            rows: row,
+            columns: column,
+            ..Self::default()
         };
     }
 

@@ -24,6 +24,9 @@ pub struct XLibDisplay
     fd: i32,
     width: i32,
     height: i32,
+    rows: i32,
+    columns: i32,
+    is_selecting: bool,
 
     // Xft
     font: *mut xft::XftFont,
@@ -74,7 +77,9 @@ impl XLibDisplay
 
             // Select inputs
             xlib::XSelectInput(self.display, self.window, 
-                xlib::ExposureMask | xlib::KeyPressMask | xlib::StructureNotifyMask | xlib::ButtonPressMask);
+                xlib::ExposureMask | xlib::KeyPressMask | 
+                xlib::StructureNotifyMask | xlib::ButtonPressMask | 
+                xlib::PointerMotionMask | xlib::ButtonReleaseMask);
             
             // Set title and open window
             let title_c_str = CString::new(title).expect("Failed to create C string");
@@ -173,6 +178,9 @@ impl XLibDisplay
             fd: 0,
             width: width,
             height: height,
+            rows: 0,
+            columns: 0,
+            is_selecting: false,
 
             font: ptr::null_mut(),
             colors: HashMap::new(),
@@ -262,10 +270,10 @@ impl XLibDisplay
                 0, top + amount, 
                 self.width as u32, (height - amount) as u32, 
                 0, top);
-
-            self.draw_rect(0, bottom - amount, self.width, amount, 
-                StandardColor::DefaultBackground.color());
         }
+
+        self.draw_rect(0, bottom - amount, self.width, amount, 
+            StandardColor::DefaultBackground.color());
     }
 
     fn draw_scroll_up(&mut self, amount: i32, top: i32, height: i32)
@@ -276,10 +284,10 @@ impl XLibDisplay
                 0, top,
                 self.width as u32, (height - self.font_height) as u32,
                 0, top + amount);
-
-            self.draw_rect(0, top, self.width, amount, 
-                StandardColor::DefaultBackground.color());
         }
+    
+        self.draw_rect(0, top, self.width, amount, 
+            StandardColor::DefaultBackground.color());
     }
 
     fn draw_scroll_impl(&mut self, amount: i32, top: i32, bottom: i32)
@@ -326,8 +334,8 @@ impl XLibDisplay
         unsafe
         {
             buffer = mem::zeroed();
-            len = xlib::XLookupString(&mut event.key, 
-                buffer.as_mut_ptr() as *mut u8, buffer.len() as i32, 
+            len = xlib::XLookupString(&mut event.key,
+                buffer.as_mut_ptr() as *mut u8, buffer.len() as i32,
                 ptr::null_mut(), ptr::null_mut());
         }
          
@@ -338,20 +346,49 @@ impl XLibDisplay
     {
         self.width = unsafe { event.configure.width };
         self.height = unsafe { event.configure.height };
-        let rows = self.height / self.font_height;
-        let columns = self.width / self.font_width;
+        self.rows = self.height / self.font_height;
+        self.columns = self.width / self.font_width;
 
-        results.push(UpdateResult::resize(rows, columns, self.width, self.height));
+        results.push(UpdateResult::resize(self.rows, self.columns, self.width, self.height));
     }
 
-    fn on_button(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
+    fn on_button_pressed(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
     {
         let button = unsafe { event.button.button };
         match button
         {
             xlib::Button4 => results.push(UpdateResult::scroll_viewport(1)),
             xlib::Button5 => results.push(UpdateResult::scroll_viewport(-1)),
-            _ => {}
+            xlib::Button1 =>
+            {
+                let (x, y) = unsafe { (event.button.x, event.button.y) };
+                let row = y / self.font_height;
+                let column = x / self.font_width;
+                results.push(UpdateResult::mouse_down(row, column));
+                self.is_selecting = true;
+            },
+
+            _ => {},
+        }
+    }
+    fn on_button_released(&mut self, event: &xlib::XEvent)
+    {
+        let button = unsafe { event.button.button };
+        match button
+        {
+            xlib::Button1 => self.is_selecting = false,
+            _ => {},
+        }
+    }
+
+    fn on_mouse_move(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
+    {
+        if self.is_selecting
+        {
+            let (x, y) = unsafe { (event.motion.x, event.motion.y) };
+            let row = y / self.font_height;
+            let column = x / self.font_width;
+            results.push(UpdateResult::mouse_drag(row, column));
         }
     }
     
@@ -384,20 +421,19 @@ impl super::Display for XLibDisplay
     fn update(&mut self) -> Vec<UpdateResult>
     {
         let mut results = Vec::<UpdateResult>::new();
-        unsafe
+        let mut event: xlib::XEvent = unsafe { mem::zeroed() };
+        while unsafe { xlib::XPending(self.display) } != 0
         {
-            let mut event: xlib::XEvent = mem::zeroed();
-            while xlib::XPending(self.display) != 0
+            unsafe { xlib::XNextEvent(self.display, &mut event) };
+            match event.get_type()
             {
-                xlib::XNextEvent(self.display, &mut event);
-                match event.get_type()
-                {
-                    xlib::Expose => results.push(UpdateResult::redraw()),
-                    xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
-                    xlib::ConfigureNotify => self.on_resize(&mut event, &mut results),
-                    xlib::ButtonPress => self.on_button(&event, &mut results),
-                    _ => {},
-                }
+                xlib::Expose => results.push(UpdateResult::redraw()),
+                xlib::KeyPress => results.push(self.on_key_pressed(&mut event)),
+                xlib::ConfigureNotify => self.on_resize(&mut event, &mut results),
+                xlib::ButtonPress => self.on_button_pressed(&event, &mut results),
+                xlib::ButtonRelease => self.on_button_released(&event),
+                xlib::MotionNotify => self.on_mouse_move(&event, &mut results),
+                _ => {},
             }
         }
 
