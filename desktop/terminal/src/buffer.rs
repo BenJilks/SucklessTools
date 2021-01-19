@@ -9,10 +9,28 @@ use super::display::
     rune::*,
 };
 
+#[derive(Clone)]
+struct LineElement
+{
+    rune: Rune,
+    dirty: bool,
+}
+
+impl Default for LineElement
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            rune: Rune::default(),
+            dirty: true,
+        }
+    }
+}
+
 struct Line
 {
-    content: Vec<Rune>,
-    changes: Vec<bool>,
+    content: Vec<LineElement>,
     columns: usize,
     dirty: bool,
 }
@@ -24,8 +42,7 @@ impl Line
     {
         return Rc::from(RefCell::new(Self
         {
-            content: vec![Rune::default(); columns as usize],
-            changes: vec![true; columns as usize],
+            content: vec![LineElement::default(); columns as usize],
             columns: columns as usize,
             dirty: true,
         }));
@@ -37,30 +54,31 @@ impl Line
             return;
         }
 
-        self.content.resize(columns as usize, Rune::default());
-        self.changes.resize(columns as usize, true);
+        self.content.resize(columns as usize, LineElement::default());
         self.columns = columns as usize;
     }
 
     pub fn clear(&mut self)
     {
         for i in 0..self.columns {
-            self.content[i] = Rune::default();
-            self.changes[i] = true;
+            let element = &mut self.content[i];
+            element.rune = Rune::default();
+            element.dirty = true;
         }
         self.dirty = true;
     }
 
     pub fn set(&mut self, column: i32, rune: Rune)
     {
-        self.content[column as usize] = rune;
-        self.changes[column as usize] = true;
+        let element = &mut self.content[column as usize];
+        element.rune = rune;
+        element.dirty = true;
         self.dirty = true;
     }
 
     pub fn get(&self, column: i32) -> &Rune
     {
-        &self.content[column as usize]
+        &self.content[column as usize].rune
     }
 
     pub fn draw(&mut self, row: i32) -> Vec<(Rune, CursorPos)>
@@ -73,11 +91,12 @@ impl Line
         runes.reserve(self.columns);
         for i in 0..self.columns 
         {
-            if self.changes[i]
+            let element = &mut self.content[i];
+            if element.dirty
             {
                 let pos = CursorPos::new(row, i as i32);
-                runes.push((self.content[i].clone(), pos));
-                self.changes[i] = false;
+                runes.push((element.rune.clone(), pos));
+                element.dirty = false;
             }
         }
         self.dirty = false;
@@ -86,8 +105,8 @@ impl Line
 
     pub fn invalidate(&mut self)
     {
-        for it in &mut self.changes {
-            *it = true;
+        for it in &mut self.content {
+            it.dirty = true;
         }
         self.dirty = true;
     }
