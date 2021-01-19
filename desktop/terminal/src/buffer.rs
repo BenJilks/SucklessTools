@@ -1,19 +1,18 @@
 use crate::decoder::action::{Action, ActionType, CursorDirection};
+use crate::display::cursor::CursorPos;
+use crate::display::rune::{Rune, Attribute};
+use crate::display;
 use std::cmp::min;
+use std::mem::swap;
 use std::rc::Rc;
 use std::cell::RefCell;
-use super::display::
-{
-    self, 
-    cursor::*,
-    rune::*,
-};
 
 #[derive(Clone)]
 struct LineElement
 {
     rune: Rune,
     dirty: bool,
+    selected: bool,
 }
 
 impl Default for LineElement
@@ -24,6 +23,7 @@ impl Default for LineElement
         {
             rune: Rune::default(),
             dirty: true,
+            selected: false,
         }
     }
 }
@@ -76,6 +76,14 @@ impl Line
         self.dirty = true;
     }
 
+    pub fn set_selected(&mut self, column: i32, selected: bool)
+    {
+        let element = &mut self.content[column as usize];
+        element.selected = selected;
+        element.dirty = true;
+        self.dirty = true;
+    }
+
     pub fn get(&self, column: i32) -> &Rune
     {
         &self.content[column as usize].rune
@@ -94,8 +102,13 @@ impl Line
             let element = &mut self.content[i];
             if element.dirty
             {
+                let mut rune = element.rune.clone();
+                if element.selected {
+                    rune.attribute = rune.attribute.inverted();
+                }
+
                 let pos = CursorPos::new(row, i as i32);
-                runes.push((element.rune.clone(), pos));
+                runes.push((rune, pos));
                 element.dirty = false;
             }
         }
@@ -266,8 +279,56 @@ impl<Display> Buffer<Display>
 
     /* Selection */
 
+    fn for_each_in_selection<Func>(&mut self, callback: &mut Func)
+        where Func: FnMut(&mut Line, i32)
+    {
+        // Check we have both a start and an end
+        if self.selection_start_pos.is_none() || self.selection_end_pos.is_none() {
+            return;
+        }
+
+        // Order points by row first, if they're the same then by column
+        let mut start = self.selection_start_pos.clone().unwrap();
+        let mut end = self.selection_end_pos.clone().unwrap();
+        if start.get_row() > end.get_row() || 
+            start.get_row() == end.get_row() && start.get_column() > end.get_column()
+        {
+            swap(&mut start, &mut end);
+        }
+
+        // Fetch starting state
+        let (mut row, mut column) = (start.get_row(), start.get_column());
+        let start_line = self.line_for_row(row);
+        if start_line.is_none() {
+            return;
+        }
+        let mut line = start_line.unwrap().clone();
+
+        // Iterate though each column of each line, right-down
+        while row < end.get_row() || column <= end.get_column()
+        {
+            callback(&mut line.borrow_mut(), column);
+
+            column += 1;
+            if column >= self.columns {
+                row += 1;
+                column = 0;
+                
+                let new_line = self.line_for_row(row);
+                if new_line.is_none() {
+                    break;
+                }
+                line = new_line.unwrap().clone();
+            }
+        }
+    }
+
     fn selection_end(&mut self)
     {
+        // Deselect all
+        self.for_each_in_selection(&mut move |line, column| {
+            line.set_selected(column, false);
+        });
         self.selection_start_pos = None;
         self.selection_end_pos = None;
     }
@@ -277,16 +338,33 @@ impl<Display> Buffer<Display>
         self.selection_end();
         self.selection_start_pos = Some( CursorPos::new(row, column) );
 
-        println!("Start selection at ({},{})", row, column);
+        self.for_each_in_selection(&mut move |line, column| {
+            line.set_selected(column, true);
+        });
+        self.flush();
     }
 
     pub fn selection_update(&mut self, row: i32, column: i32)
     {
+        // Check for nooop
+        if self.selection_end_pos.is_some()
+        {
+            let curr = self.selection_end_pos.clone().unwrap();
+            if curr.get_row() == row && curr.get_column() == column {
+                return;
+            }
+        }
+
+        self.for_each_in_selection(&mut move |line, column| {
+            line.set_selected(column, false);
+        });
+
         self.selection_end_pos = Some( CursorPos::new(row, column) );
 
-        let start = self.selection_start_pos.clone().unwrap();
-        println!("Selection ({},{}) -> ({},{})", 
-            start.get_row(), start.get_column(), row, column);
+        self.for_each_in_selection(&mut move |line, column| {
+            line.set_selected(column, true);
+        });
+        self.flush();
     }
 
     /* Misc */
