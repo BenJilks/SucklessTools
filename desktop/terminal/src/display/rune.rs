@@ -20,16 +20,16 @@ impl StandardColor
     {
         match self
         {
-            StandardColor::Black => 0x000000FF,
-            StandardColor::Red => 0xFF0000FF,
-            StandardColor::Green => 0x00FF00FF,
-            StandardColor::Yellow => 0xFFFF00FF,
-            StandardColor::Blue => 0x0000FFFF,
-            StandardColor::Magenta => 0x00FFFFFF,
-            StandardColor::Cyan => 0xFF00FFFF,
+            StandardColor::Black => 0x121212FF,
+            StandardColor::Red => 0xEE494CFF,
+            StandardColor::Green => 0x9EEE69FF,
+            StandardColor::Yellow => 0xECEE65FF,
+            StandardColor::Blue => 0x83EEEAFF,
+            StandardColor::Magenta => 0xAE64EEFF,
+            StandardColor::Cyan => 0x163EEEFF,
             StandardColor::White => 0xFFFFFFFF,
-            StandardColor::DefaultBackground => 0x000000FF,
-            StandardColor::DefaultForeground => 0xFFFFFFFF,
+            StandardColor::DefaultBackground => 0x181C1FFF,
+            StandardColor::DefaultForeground => 0xB7CCD3FF,
         }
     }
 
