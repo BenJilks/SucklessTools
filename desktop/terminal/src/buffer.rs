@@ -363,6 +363,48 @@ impl<Display> Buffer<Display>
         self.flush();
     }
 
+    pub fn selection_word(&mut self, row: i32, column: i32)
+    {
+        self.selection_end();
+        {
+            let line_ref = self.line_for_row(row).unwrap().clone();
+            let line = line_ref.borrow_mut();
+
+            let mut start = column;
+            while start > 0
+            {
+                let c = line.get(start).code_point as u8 as char;
+                if c.is_whitespace() || c == '\0'
+                {
+                    start += 1;
+                    break;
+                }
+                start -= 1;
+            }
+
+            let mut end = column;
+            while end < self.columns - 1
+            {
+                let c = line.get(end).code_point as u8 as char;
+                if c.is_whitespace() || c == '\0'
+                {
+                    end -= 1;
+                    break;
+                }
+                end += 1;
+            }
+
+            self.selection_start_pos = CursorPos::new(row, start);
+            self.selection_end_pos = CursorPos::new(row, end);
+            self.in_selection = true;
+        }
+
+        self.for_each_in_selection(&mut move |line, column| {
+            line.set_selected(column, true);
+        });
+        self.flush();
+    }
+
     /* Misc */
 
     fn rune_at_cursor(&mut self, pos: &CursorPos) -> Rune
@@ -505,6 +547,7 @@ impl<Display> Buffer<Display>
 
     pub fn reset_viewport(&mut self)
     {
+        self.selection_end();
         if self.viewport_offset != 0 {
             self.scroll_viewport(-self.viewport_offset);
         }

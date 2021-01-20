@@ -2,12 +2,8 @@ extern crate x11;
 use super::{ cursor::*, rune::*, UpdateResult };
 use x11::{ xlib, xft, keysym };
 use std::{ ptr, mem, collections::HashMap, ffi::CString };
-use std::os::raw::
-{
-    c_ulong,
-    c_uint,
-    c_char,
-};
+use std::os::raw::{ c_ulong, c_uint, c_char };
+use std::time::Instant;
 
 pub struct XLibDisplay
 {
@@ -27,6 +23,7 @@ pub struct XLibDisplay
     rows: i32,
     columns: i32,
     is_selecting: bool,
+    time_since_last_click: Instant,
 
     // Xft
     font: *mut xft::XftFont,
@@ -181,6 +178,7 @@ impl XLibDisplay
             rows: 0,
             columns: 0,
             is_selecting: false,
+            time_since_last_click: Instant::now(),
 
             font: ptr::null_mut(),
             colors: HashMap::new(),
@@ -364,7 +362,13 @@ impl XLibDisplay
                 let (x, y) = unsafe { (event.button.x, event.button.y) };
                 let row = y / self.font_height;
                 let column = x / self.font_width;
-                results.push(UpdateResult::mouse_down(row, column));
+
+                if self.time_since_last_click.elapsed().as_millis() < 200 {
+                    results.push(UpdateResult::double_click_down(row, column));
+                } else {
+                    results.push(UpdateResult::mouse_down(row, column));
+                }
+                self.time_since_last_click = Instant::now();
                 self.is_selecting = true;
             },
 

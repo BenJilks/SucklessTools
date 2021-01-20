@@ -12,6 +12,7 @@ pub enum UpdateResultType
     ScrollViewport,
     MouseDown,
     MouseDrag,
+    DoubleClickDown,
 }
 
 pub struct UpdateResult
@@ -111,6 +112,16 @@ impl UpdateResult
         return Self
         {
             result_type: UpdateResultType::MouseDrag,
+            rows: row,
+            columns: column,
+            ..Self::default()
+        };
+    }
+    pub fn double_click_down(row: i32, column: i32) -> Self
+    {
+        return Self
+        {
+            result_type: UpdateResultType::DoubleClickDown,
             rows: row,
             columns: column,
             ..Self::default()

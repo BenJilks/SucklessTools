@@ -239,6 +239,7 @@ fn handle_update<Display>(buffer: &mut Buffer<Display>, master: i32)
 
             display::UpdateResultType::MouseDown => buffer.selection_start(result.rows, result.columns),
             display::UpdateResultType::MouseDrag => buffer.selection_update(result.rows, result.columns),
+            display::UpdateResultType::DoubleClickDown => buffer.selection_word(result.rows, result.columns),
         }
     }
 }
