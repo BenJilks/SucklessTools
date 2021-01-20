@@ -333,7 +333,8 @@ impl XLibDisplay
     fn on_key_pressed(&mut self, event: &mut xlib::XEvent) -> UpdateResult
     {
         let state = unsafe { event.key.state };
-        let ctrl_shift = state & xlib::ControlMask != 0 && state & xlib::ShiftMask != 0;
+        let shift = state & xlib::ShiftMask != 0;
+        let ctrl_shift = state & xlib::ControlMask != 0 && shift;
         
         let keysym = unsafe { xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0) };
         match keysym as c_uint
@@ -346,8 +347,20 @@ impl XLibDisplay
             keysym::XK_Home => return UpdateResult::input_str("\x1b[H"),
             keysym::XK_End => return UpdateResult::input_str("\x1b[F"),
             
-            keysym::XK_Page_Up => return UpdateResult::input_str("\x1b[5~"),
-            keysym::XK_Page_Down => return UpdateResult::input_str("\x1b[6~"),
+            keysym::XK_Page_Up => 
+            {
+                if shift {
+                    return UpdateResult::scroll_viewport(self.rows);
+                }
+                return UpdateResult::input_str("\x1b[5~");
+            },
+            keysym::XK_Page_Down => 
+            {
+                if shift {
+                    return UpdateResult::scroll_viewport(-self.rows);
+                }
+                return UpdateResult::input_str("\x1b[6~");
+            },
             keysym::XK_Tab => return UpdateResult::input_str("\t"),
             keysym::XK_Escape => return UpdateResult::input_str("\x1b"),
 
@@ -356,14 +369,14 @@ impl XLibDisplay
                 if ctrl_shift {
                     return self.change_font_size(self.font_size + 1);
                 }
-            }
+            },
             keysym::XK_minus =>
             {
                 if ctrl_shift {
                     return self.change_font_size(self.font_size - 1);
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
 
         let mut buffer: [u8; 80];
