@@ -141,8 +141,9 @@ pub struct Buffer<Display>
     scroll_buffer: i32,
 
     // Selection
-    selection_start_pos: Option<CursorPos>,
-    selection_end_pos: Option<CursorPos>,
+    selection_start_pos: CursorPos,
+    selection_end_pos: CursorPos,
+    in_selection: bool,
 
     // Data
     content: Vec<LineRef>,
@@ -168,8 +169,9 @@ impl<Display> Buffer<Display>
             scroll_region_bottom: rows,
             scroll_buffer: 0,
 
-            selection_start_pos: None,
-            selection_end_pos: None,
+            selection_start_pos: CursorPos::new(0,0),
+            selection_end_pos: CursorPos::new(0,0),
+            in_selection: false,
 
             content: vec![Line::new(columns); (rows * columns) as usize],
             scrollback: Vec::new(),
@@ -282,14 +284,9 @@ impl<Display> Buffer<Display>
     fn for_each_in_selection<Func>(&mut self, callback: &mut Func)
         where Func: FnMut(&mut Line, i32)
     {
-        // Check we have both a start and an end
-        if self.selection_start_pos.is_none() || self.selection_end_pos.is_none() {
-            return;
-        }
-
         // Order points by row first, if they're the same then by column
-        let mut start = self.selection_start_pos.clone().unwrap();
-        let mut end = self.selection_end_pos.clone().unwrap();
+        let mut start = self.selection_start_pos.clone();
+        let mut end = self.selection_end_pos.clone();
         if start.get_row() > end.get_row() || 
             start.get_row() == end.get_row() && start.get_column() > end.get_column()
         {
@@ -325,41 +322,40 @@ impl<Display> Buffer<Display>
 
     fn selection_end(&mut self)
     {
+        // Noop
+        if !self.in_selection {
+            return;
+        }
+
         // Deselect all
         self.for_each_in_selection(&mut move |line, column| {
             line.set_selected(column, false);
         });
-        self.selection_start_pos = None;
-        self.selection_end_pos = None;
+        self.in_selection = false;
+        self.flush();
     }
 
     pub fn selection_start(&mut self, row: i32, column: i32)
     {
         self.selection_end();
-        self.selection_start_pos = Some( CursorPos::new(row, column) );
-
-        self.for_each_in_selection(&mut move |line, column| {
-            line.set_selected(column, true);
-        });
-        self.flush();
+        self.selection_start_pos = CursorPos::new(row, column);
+        self.selection_end_pos = self.selection_start_pos.clone();
     }
 
     pub fn selection_update(&mut self, row: i32, column: i32)
     {
         // Check for nooop
-        if self.selection_end_pos.is_some()
-        {
-            let curr = self.selection_end_pos.clone().unwrap();
-            if curr.get_row() == row && curr.get_column() == column {
-                return;
-            }
+        let curr = &self.selection_end_pos;
+        if curr.get_row() == row && curr.get_column() == column {
+            return;
         }
 
+        self.in_selection = true;
         self.for_each_in_selection(&mut move |line, column| {
             line.set_selected(column, false);
         });
 
-        self.selection_end_pos = Some( CursorPos::new(row, column) );
+        self.selection_end_pos = CursorPos::new(row, column);
 
         self.for_each_in_selection(&mut move |line, column| {
             line.set_selected(column, true);
@@ -455,6 +451,7 @@ impl<Display> Buffer<Display>
 
     fn scroll_in_bounds(&mut self, amount: i32, top: i32, bottom: i32)
     {
+        self.selection_end();
         if amount < 0 {
             self.scroll_down(-amount, top, bottom);
         } else if amount > 0 {
@@ -466,6 +463,7 @@ impl<Display> Buffer<Display>
         } else {
             self.display.draw_scroll(amount, top, bottom);
         }
+
         self.cursor_move(amount, 0);
     }
 
@@ -498,6 +496,10 @@ impl<Display> Buffer<Display>
             self.invalidate_row(row);
         }
 
+        if self.in_selection {
+            self.selection_start_pos.move_by(amount, 0);
+            self.selection_end_pos.move_by(amount, 0);
+        }
         self.flush();
     }
 
