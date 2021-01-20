@@ -31,6 +31,7 @@ pub struct XLibDisplay
     draw: *mut xft::XftDraw,
 
     // Terminal
+    font_size: i32,
     font_width: i32,
     font_height: i32,
     font_descent: i32,
@@ -83,6 +84,17 @@ impl XLibDisplay
             xlib::XStoreName(self.display, self.window, title_c_str.as_ptr() as *const u8);
             xlib::XMapWindow(self.display, self.window);
 
+            // Create visual
+            let mut visual_info: xlib::XVisualInfo = mem::zeroed();
+            if xlib::XMatchVisualInfo(self.display, screen, 24, xlib::TrueColor, &mut visual_info) == 0
+            {
+                println!("Could not create X11 visual");
+                assert!(false);
+            }
+            self.visual = visual_info.visual;
+            self.cmap = xlib::XCreateColormap(self.display, 
+                root_window, self.visual, xlib::AllocNone);
+
             let screen = xlib::XDefaultScreen(self.display);
             self.gc = xlib::XDefaultGC(self.display, screen);
             self.fd = xlib::XConnectionNumber(self.display);
@@ -95,8 +107,7 @@ impl XLibDisplay
         unsafe
         {
             let screen = xlib::XDefaultScreen(self.display);
-            let root_window = xlib::XDefaultRootWindow(self.display);
-            let font_name = "DejaVu Sans Mono:size=20:antialias=true";
+            let font_name = format!("DejaVu Sans Mono:size={}:antialias=true", self.font_size);
             
             // Create font
             self.font = xft::XftFontOpenName(self.display, screen, 
@@ -106,17 +117,6 @@ impl XLibDisplay
                 println!("Cannot open font {}", font_name);
                 assert!(false);
             }
-
-            // Create visual
-            let mut visual_info: xlib::XVisualInfo = mem::zeroed();
-            if xlib::XMatchVisualInfo(self.display, screen, 24, xlib::TrueColor, &mut visual_info) == 0
-            {
-                println!("Could not create X11 visual");
-                assert!(false);
-            }
-            self.visual = visual_info.visual;
-            self.cmap = xlib::XCreateColormap(self.display, 
-                root_window, self.visual, xlib::AllocNone);
 
             // Create draw
             self.draw = xft::XftDrawCreate(self.display, self.back_buffer, self.visual, self.cmap);
@@ -129,6 +129,15 @@ impl XLibDisplay
             self.font_width = (*self.font).max_advance_width;
             self.font_height = (*self.font).height;
             self.font_descent = (*self.font).descent;
+        }
+    }
+
+    fn free_font(&mut self)
+    {
+        unsafe
+        {
+            xft::XftFontClose(self.display, self.font);
+            xft::XftDrawDestroy(self.draw);
         }
     }
 
@@ -184,6 +193,7 @@ impl XLibDisplay
             colors: HashMap::new(),
             draw: ptr::null_mut(),
 
+            font_size: 20,
             font_width: 0,
             font_height: 0,
             font_descent: 0,
@@ -307,8 +317,22 @@ impl XLibDisplay
         }
     }
 
-    fn on_key_pressed(&self, event: &mut xlib::XEvent) -> UpdateResult
+    fn change_font_size(&mut self, font_size: i32) -> UpdateResult
     {
+        self.free_font();
+        self.font_size = font_size;
+        self.load_font();
+
+        self.rows = self.height / self.font_height;
+        self.columns = self.width / self.font_width;
+        return UpdateResult::resize(self.rows, self.columns, self.width, self.height);
+    }
+
+    fn on_key_pressed(&mut self, event: &mut xlib::XEvent) -> UpdateResult
+    {
+        let state = unsafe { event.key.state };
+        let ctrl_shift = state & xlib::ControlMask != 0 && state & xlib::ShiftMask != 0;
+        
         let keysym = unsafe { xlib::XkbKeycodeToKeysym(self.display, event.key.keycode as u8, 0, 0) };
         match keysym as c_uint
         {
@@ -324,6 +348,19 @@ impl XLibDisplay
             keysym::XK_Page_Down => return UpdateResult::input_str("\x1b[6~"),
             keysym::XK_Tab => return UpdateResult::input_str("\t"),
             keysym::XK_Escape => return UpdateResult::input_str("\x1b"),
+
+            keysym::XK_equal =>
+            {
+                if ctrl_shift {
+                    return self.change_font_size(self.font_size + 1);
+                }
+            }
+            keysym::XK_minus =>
+            {
+                if ctrl_shift {
+                    return self.change_font_size(self.font_size - 1);
+                }
+            }
             _ => {}
         }
 
@@ -410,7 +447,7 @@ impl Drop for XLibDisplay
                 xft::XftColorFree(self.display, 
                     self.visual, self.cmap, color.1);
             }
-            xft::XftDrawDestroy(self.draw);
+            self.free_font();
 
             xlib::XDestroyWindow(self.display, self.window);
             xlib::XCloseDisplay(self.display);
@@ -442,6 +479,13 @@ impl super::Display for XLibDisplay
         }
 
         return results;
+    }
+
+    fn clear_screen(&mut self)
+    {
+        self.draw_rect(
+            0, 0, self.width, self.height, 
+            StandardColor::DefaultBackground.color());
     }
 
     fn draw_runes(&mut self, runes: &[(Rune, CursorPos)])

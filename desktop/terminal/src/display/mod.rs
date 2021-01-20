@@ -138,6 +138,7 @@ pub trait Display
     fn get_fd(&self) -> i32;
 
     // Draw routines
+    fn clear_screen(&mut self);
     fn draw_runes(&mut self, runes: &[(Rune, CursorPos)]);
     fn draw_scroll(&mut self, amount: i32, top: i32, bottom: i32);
     fn draw_clear(&mut self, attribute: &rune::Attribute, 

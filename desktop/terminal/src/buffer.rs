@@ -238,6 +238,7 @@ impl<Display> Buffer<Display>
 
     pub fn redraw(&mut self)
     {
+        self.display.clear_screen();
         for row in 0..self.rows {
             self.invalidate_row(row);
         }
@@ -446,6 +447,7 @@ impl<Display> Buffer<Display>
         self.scroll_region_bottom = rows;
         self.rows = rows;
         self.columns = columns;
+        self.redraw();
     }
 
     fn set_scroll_region(&mut self, top: i32, bottom: i32)
@@ -700,7 +702,7 @@ impl<Display> Buffer<Display>
     fn clear_line_range(&mut self, start: i32, end: i32)
     {
         let row = self.cursor.get_row();
-        if !(0..=self.rows).contains(&row) 
+        if !(0..self.rows).contains(&row) 
             || !(0..=self.columns).contains(&start) 
             || !(0..=self.columns).contains(&end) 
         {
@@ -716,8 +718,8 @@ impl<Display> Buffer<Display>
 
     fn clear_block_range(&mut self, start: i32, end: i32)
     {
-        if !(0..=self.rows).contains(&start) 
-            || !(0..=self.rows).contains(&end) 
+        if !(0..self.rows).contains(&start) 
+            || !(0..=self.rows).contains(&end)
         {
             return;
         }
