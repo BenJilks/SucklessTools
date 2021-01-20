@@ -1,5 +1,5 @@
 pub mod action;
-use crate::display::rune::*;
+use crate::display::rune::{ColorType, StandardColor};
 use std::io::Write;
 use action::Action;
 

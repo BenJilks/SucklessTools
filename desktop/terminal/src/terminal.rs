@@ -1,6 +1,7 @@
-use super::display;
-use super::decoder::{*, action::Action};
-use super::buffer::*;
+use crate::display;
+use crate::decoder::action::Action;
+use crate::decoder::Decoder;
+use crate::buffer::Buffer;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::{ptr, mem, ffi::CString};
 

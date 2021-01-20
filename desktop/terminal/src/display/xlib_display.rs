@@ -1,5 +1,7 @@
 extern crate x11;
-use super::{ cursor::*, rune::*, UpdateResult };
+use crate::display::cursor::CursorPos;
+use crate::display::rune::{Rune, StandardColor, Attribute};
+use crate::display::UpdateResult;
 use x11::{ xlib, xft, keysym };
 use std::{ ptr, mem, collections::HashMap, ffi::CString };
 use std::os::raw::{ c_ulong, c_uint, c_char };
