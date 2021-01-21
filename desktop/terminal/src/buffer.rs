@@ -204,6 +204,7 @@ impl<Display> Buffer<Display>
         {
             let row_in_scrollback = self.scrollback.len() as i32 + row_in_buffer;
             let line = &mut self.scrollback[row_in_scrollback as usize];
+            line.borrow_mut().resize(self.columns);
             return Some( line );
         }
         return None;
@@ -437,10 +438,6 @@ impl<Display> Buffer<Display>
                 line.borrow_mut().resize(columns);
             }
         }
-        
-        // Update scrollback
-        // TODO: Actually resize this instead of just resetting
-        self.scrollback.clear();
 
         // Update sizes
         self.scroll_region_top = 0;
