@@ -7,6 +7,36 @@ use std::{ ptr, mem, collections::HashMap, ffi::CString };
 use std::os::raw::{ c_ulong, c_uint, c_char };
 use std::time::Instant;
 
+struct Screen
+{
+    bitmap: xlib::Pixmap,
+    draw: *mut xft::XftDraw,
+}
+
+impl Default for Screen
+{
+    fn default() -> Self
+    {
+        Self
+        {
+            bitmap: 0,
+            draw: ptr::null_mut(),
+        }
+    }
+}
+
+impl Screen
+{
+    pub fn free(&mut self, display: *mut xlib::Display)
+    {
+        unsafe
+        {
+            xlib::XFreePixmap(display, self.bitmap);
+            xft::XftDrawDestroy(self.draw);
+        }
+    }
+}
+
 pub struct XLibDisplay
 {
     // Xlib
@@ -14,9 +44,9 @@ pub struct XLibDisplay
     visual: *mut xlib::Visual,
     gc: xlib::GC,
     window: c_ulong,
-    back_buffer: xlib::Pixmap,
     cmap: c_ulong,
     last_foreground_color: u32,
+    main_screen: Screen,
     
     // Window metrics
     fd: i32,
@@ -30,7 +60,6 @@ pub struct XLibDisplay
     // Xft
     font: *mut xft::XftFont,
     colors: HashMap<u32, xft::XftColor>,
-    draw: *mut xft::XftDraw,
 
     // Terminal
     font_size: i32,
@@ -42,6 +71,32 @@ pub struct XLibDisplay
 impl XLibDisplay
 {
    
+    fn new_screen(&mut self) -> Screen
+    {
+        let bitmap = unsafe { xlib::XCreatePixmap(self.display, self.window, 
+            self.width as u32, self.height as u32, 24) };
+        
+        let draw = unsafe { xft::XftDrawCreate(self.display, bitmap, 
+            self.visual, self.cmap) };
+        if draw == ptr::null_mut()
+        {
+            println!("Unable to create Xft draw");
+            assert!(false);
+        }
+
+        Screen
+        {
+            bitmap: bitmap,
+            draw: draw,
+        }
+    }
+
+    fn resize_screens(&mut self)
+    {
+        self.main_screen.free(self.display);
+        self.main_screen = self.new_screen();
+    }
+
     fn create_window(&mut self, title: &str)
     {
         unsafe
@@ -69,11 +124,6 @@ impl XLibDisplay
                 println!("Unable to open x11 window");
                 assert!(false);
             }
-
-            // Create back buffer
-            self.back_buffer = self.window;
-            //self.back_buffer = xlib::XCreatePixmap(self.display, self.window, 
-            //    self.width as u32, self.height as u32, 24);
 
             // Select inputs
             xlib::XSelectInput(self.display, self.window, 
@@ -120,14 +170,6 @@ impl XLibDisplay
                 assert!(false);
             }
 
-            // Create draw
-            self.draw = xft::XftDrawCreate(self.display, self.back_buffer, self.visual, self.cmap);
-            if self.draw == ptr::null_mut()
-            {
-                println!("Unable to create Xft draw");
-                assert!(false);
-            }
-
             self.font_width = (*self.font).max_advance_width;
             self.font_height = (*self.font).height;
             self.font_descent = (*self.font).descent;
@@ -139,8 +181,13 @@ impl XLibDisplay
         unsafe
         {
             xft::XftFontClose(self.display, self.font);
-            xft::XftDrawDestroy(self.draw);
         }
+    }
+
+    fn reload_font(&mut self)
+    {
+        self.free_font();
+        self.load_font();
     }
 
     fn font_color(&mut self, color: &u32) -> xft::XftColor
@@ -179,9 +226,9 @@ impl XLibDisplay
             visual: ptr::null_mut(),
             gc: ptr::null_mut(),
             window: 0,
-            back_buffer: 0,
             cmap: 0,
             last_foreground_color: 0,
+            main_screen: Screen::default(),
 
             fd: 0,
             width: width,
@@ -193,7 +240,6 @@ impl XLibDisplay
 
             font: ptr::null_mut(),
             colors: HashMap::new(),
-            draw: ptr::null_mut(),
 
             font_size: 20,
             font_width: 0,
@@ -203,6 +249,7 @@ impl XLibDisplay
 
         display.create_window(title);
         display.load_font();
+        display.main_screen = display.new_screen();
         return display;
     }
 
@@ -215,7 +262,7 @@ impl XLibDisplay
                 xlib::XSetForeground(self.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
                 self.last_foreground_color = color;
             }
-            xlib::XFillRectangle(self.display, self.back_buffer, self.gc, 
+            xlib::XFillRectangle(self.display, self.main_screen.bitmap, self.gc, 
                 x, y, width as u32, height as u32);
         }
     }
@@ -266,7 +313,7 @@ impl XLibDisplay
             let mut xft_color = self.font_color(&color);
             unsafe
             {
-                xft::XftDrawGlyphFontSpec(self.draw, 
+                xft::XftDrawGlyphFontSpec(self.main_screen.draw, 
                     &mut xft_color, specs.as_ptr(), specs.len() as i32);
             }
         }
@@ -276,7 +323,7 @@ impl XLibDisplay
     {
         unsafe
         {
-            xlib::XCopyArea(self.display, self.back_buffer, self.back_buffer, self.gc,
+            xlib::XCopyArea(self.display, self.main_screen.bitmap, self.main_screen.bitmap, self.gc,
                 0, top + amount, 
                 self.width as u32, (height - amount) as u32, 
                 0, top);
@@ -290,7 +337,7 @@ impl XLibDisplay
     {
         unsafe
         {
-            xlib::XCopyArea(self.display, self.back_buffer, self.back_buffer, self.gc,
+            xlib::XCopyArea(self.display, self.main_screen.bitmap, self.main_screen.bitmap, self.gc,
                 0, top,
                 self.width as u32, (height - self.font_height) as u32,
                 0, top + amount);
@@ -321,9 +368,9 @@ impl XLibDisplay
 
     fn change_font_size(&mut self, font_size: i32) -> UpdateResult
     {
-        self.free_font();
         self.font_size = font_size;
-        self.load_font();
+        self.reload_font();
+        self.resize_screens();
 
         self.rows = self.height / self.font_height;
         self.columns = self.width / self.font_width;
@@ -398,6 +445,7 @@ impl XLibDisplay
         self.height = unsafe { event.configure.height };
         self.rows = self.height / self.font_height;
         self.columns = self.width / self.font_width;
+        self.resize_screens();
 
         results.push(UpdateResult::resize(self.rows, self.columns, self.width, self.height));
     }
@@ -463,6 +511,7 @@ impl Drop for XLibDisplay
                     self.visual, self.cmap, color.1);
             }
             self.free_font();
+            self.main_screen.free(self.display);
 
             xlib::XDestroyWindow(self.display, self.window);
             xlib::XCloseDisplay(self.display);
@@ -481,6 +530,7 @@ impl super::Display for XLibDisplay
         while unsafe { xlib::XPending(self.display) } != 0
         {
             unsafe { xlib::XNextEvent(self.display, &mut event) };
+
             match event.get_type()
             {
                 xlib::Expose => results.push(UpdateResult::redraw()),
@@ -526,8 +576,8 @@ impl super::Display for XLibDisplay
     {
         unsafe
         {
-            //xlib::XCopyArea(self.display, self.back_buffer, self.window, self.gc, 
-            //    0, 0, self.width as u32, self.height as u32, 0, 0);
+            xlib::XCopyArea(self.display, self.main_screen.bitmap, self.window, self.gc, 
+                0, 0, self.width as u32, self.height as u32, 0, 0);
             xlib::XFlush(self.display);
         }
     }

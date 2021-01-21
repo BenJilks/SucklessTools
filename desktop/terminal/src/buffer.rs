@@ -423,7 +423,9 @@ impl<Display> Buffer<Display>
     pub fn resize(&mut self, rows: i32, columns: i32)
     {
         // Noop
-        if self.rows == rows && self.columns == columns {
+        if self.rows == rows && self.columns == columns 
+        {
+            self.redraw();
             return;
         }
 
