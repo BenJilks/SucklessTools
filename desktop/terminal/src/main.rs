@@ -2,7 +2,7 @@ mod terminal;
 mod display;
 mod decoder;
 mod buffer;
-use display::xlib_display::XLibDisplay;
+use display::xlib::XLibDisplay;
 
 fn main() 
 {

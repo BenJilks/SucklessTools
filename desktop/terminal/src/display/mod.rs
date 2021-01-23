@@ -1,4 +1,4 @@
-pub mod xlib_display;
+pub mod xlib;
 pub mod cursor;
 pub mod rune;
 use rune::Rune;
