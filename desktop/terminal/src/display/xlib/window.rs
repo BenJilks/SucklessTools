@@ -1,8 +1,9 @@
 extern crate x11;
+use crate::display::rune::StandardColor;
 use x11::xlib;
 use std::ptr;
 use std::mem;
-use std::os::raw::c_ulong;
+use std::os::raw::{c_ulong, c_char};
 use std::ffi::CString;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -61,7 +62,7 @@ impl Window
         let title_c_str = CString::new(title).expect("Failed to create C string");
         unsafe
         {
-            xlib::XStoreName(display, window, title_c_str.as_ptr() as *const u8);
+            xlib::XStoreName(display, window, title_c_str.as_ptr() as *const c_char);
             xlib::XMapWindow(display, window);
         }
 
@@ -87,6 +88,19 @@ impl Window
             width: width,
             height: height,
         }))
+    }
+
+    pub fn clear(&mut self)
+    {
+        let color = (StandardColor::DefaultBackground.color() & 0xFFFFFF00) >> 8;
+        unsafe 
+        { 
+            let screen = xlib::XDefaultScreen(self.display);
+            let gc = xlib::XDefaultGC(self.display, screen);
+            xlib::XSetForeground(self.display, gc, color as u64);
+            xlib::XFillRectangle(self.display, self.window, gc, 
+                0, 0, self.width as u32, self.height as u32);
+        }
     }
 
     pub fn get_size(&self) -> (i32, i32)

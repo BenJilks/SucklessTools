@@ -3,7 +3,10 @@ use crate::decoder::action::Action;
 use crate::decoder::Decoder;
 use crate::buffer::Buffer;
 use std::sync::mpsc::{channel, Sender, Receiver};
-use std::{ptr, mem, ffi::CString};
+use std::os::raw::c_char;
+use std::ptr;
+use std::mem;
+use std::ffi::CString;
 
 const INPUT_BUFFER_SIZE: usize = 1024 * 10; // 10MB
 
@@ -105,7 +108,7 @@ fn execute_child_process(master: i32, slave: i32)
         libc::close(master);
 
         // Setup envirement
-        libc::putenv(term.as_ptr() as *mut u8);
+        libc::putenv(term.as_ptr() as *mut c_char);
         
         // Execute shell
         if libc::execl(shell.as_ptr(), shell.as_ptr(), 0) < 0 {
@@ -168,7 +171,7 @@ fn terminal_thread(mut term: Terminal, display_fd: i32, display: Sender<Message>
             libc::FD_ZERO(&mut fds);
             libc::FD_SET(master, &mut fds);
             libc::FD_SET(display_fd, &mut fds);
-            if libc::select(master + display_fd + 1, &mut fds, 
+            if libc::select(master + display_fd + 1, &mut fds,
                 ptr::null_mut(), ptr::null_mut(), ptr::null_mut()) < 0
             {
                 libc::perror(c_str("select").as_ptr());
@@ -216,9 +219,9 @@ fn handle_input(master: i32, input: &Vec<u8>)
     unsafe
     {
         if libc::write(
-            master, 
-            input.as_ptr() as *const libc::c_void, 
-            input.len()) < 0 
+            master,
+            input.as_ptr() as *const libc::c_void,
+            input.len()) < 0
         {
             libc::perror(c_str("write").as_ptr());
         }
@@ -236,7 +239,7 @@ fn handle_update<Display>(buffer: &mut Buffer<Display>, master: i32)
             display::UpdateResultType::Input => handle_input(master, &result.input),
             display::UpdateResultType::Resize => handle_resize(buffer, master, &result),
             display::UpdateResultType::Redraw => buffer.redraw(),
-            display::UpdateResultType::ScrollViewport => buffer.scroll_viewport(result.amount),
+            display::UpdateResultType::RequestScrollack => buffer.request_scrollback(result.start, result.start + result.height),
 
             display::UpdateResultType::MouseDown => buffer.selection_start(result.rows, result.columns),
             display::UpdateResultType::MouseDrag => buffer.selection_update(result.rows, result.columns),

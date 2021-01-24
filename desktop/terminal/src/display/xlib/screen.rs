@@ -5,6 +5,7 @@ use crate::display::xlib::window::Window;
 use crate::display::xlib::font::Font;
 use x11::{xlib, xft};
 use std::ptr;
+use std::mem;
 use std::os::raw::c_ulong;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,20 +20,28 @@ pub struct Screen
 
     bitmap: xlib::Pixmap,
     draw: *mut xft::XftDraw,
+    
+    pub page: i32,
+    width: i32,
+    height: i32,
 }
 
 impl Screen
 {
-    pub fn new(window_ref: Rc<RefCell<Window>>, font: Rc<RefCell<Font>>) -> Self
+    pub fn new(window_ref: Rc<RefCell<Window>>, font: Rc<RefCell<Font>>, page: i32) -> Self
     {
         let bitmap: c_ulong;
         let gc: xlib::GC;
         let draw: *mut xft::XftDraw;
+        let width: i32;
+        let height: i32;
         {
             let window = window_ref.borrow();
+            width = window.width;
+            height = window.height;
 
             bitmap = unsafe { xlib::XCreatePixmap(window.display, window.window, 
-                window.width as u32, window.height as u32, 24) };
+                width as u32, height as u32, 24) };
             
             draw = unsafe { xft::XftDrawCreate(window.display, bitmap, 
                 window.visual, window.cmap) };
@@ -52,10 +61,22 @@ impl Screen
             font: font,
             gc: gc,
             last_foreground_color: 0,
-
+            
             bitmap: bitmap,
             draw: draw,
+            
+            page: page,
+            width: width,
+            height: height,
         }
+    }
+
+    pub fn swap(a: &mut Self, b: &mut Self)
+    {
+        mem::swap(&mut a.bitmap, &mut b.bitmap);
+        mem::swap(&mut a.draw, &mut b.draw);
+        mem::swap(&mut a.gc, &mut b.gc);
+        mem::swap(&mut a.last_foreground_color, &mut b.last_foreground_color);
     }
 
     pub fn resize(&mut self, width: i32, height: i32)
@@ -71,6 +92,9 @@ impl Screen
         // TODO: Better error handling
         assert!(self.bitmap != 0);
         assert!(self.draw != ptr::null_mut());
+
+        self.width = width;
+        self.height = height;
     }
 
     pub fn free(&mut self)
@@ -84,13 +108,17 @@ impl Screen
 
     /* Drawing functions */
 
-    pub fn flush(&mut self)
+    pub fn flush(&mut self, offset: i32)
     {
-        let window = self.window.borrow();
         unsafe
         {
+            let window = self.window.borrow();
             xlib::XCopyArea(window.display, self.bitmap, window.window, self.gc, 
-                0, 0, window.width as u32, window.height as u32, 0, 0);
+                0, 0, self.width as u32, self.height as u32, 0, offset);
+
+            xlib::XSetForeground(window.display, self.gc, (0xFF0000) as u64);
+            xlib::XDrawRectangle(window.display, window.window, self.gc, 
+                0, offset, self.width as u32, self.height as u32);
         }
     }
 
@@ -100,12 +128,12 @@ impl Screen
 
         unsafe
         {
-            if self.last_foreground_color != color 
-            {
+            //if self.last_foreground_color != color 
+            //{
                 xlib::XSetForeground(window.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
-                self.last_foreground_color = color;
-            }
-            xlib::XFillRectangle(window.display, self.bitmap, self.gc, 
+                //self.last_foreground_color = color;
+            //}
+            xlib::XFillRectangle(window.display, self.bitmap, self.gc,
                 x, y, width as u32, height as u32);
         }
     }
@@ -161,17 +189,16 @@ impl Screen
         }
     }
 
-    pub fn draw_runes(&mut self, runes: &[(Rune, CursorPos)])
+    pub fn draw_runes(&mut self, runes: &[(Rune, CursorPos)], rows: i32)
     {
         let font = self.font.borrow().get_metrics();
-        let font_ptr = self.font.borrow().font;
-        let display = self.window.borrow().display;
+        let offset = self.page * rows;
 
         let mut draw_calls = HashMap::<u32, Vec<xft::XftGlyphFontSpec>>::new();
         for (rune, pos) in runes
         {
             let x = pos.get_column() * font.width;
-            let y = (pos.get_row() + 1) * font.height;
+            let y = (pos.get_row() + 1 + offset) * font.height;
 
             // Draw background
             self.draw_rect(
@@ -185,14 +212,7 @@ impl Screen
             }
 
             // Fetch char data
-            let glyph = unsafe { xft::XftCharIndex(display, font_ptr, rune.code_point) };
-            let spec = xft::XftGlyphFontSpec 
-            { 
-                glyph: glyph,
-                x: x as i16,
-                y: (y - font.descent) as i16,
-                font: font_ptr,
-            };
+            let spec = self.font.borrow().get_glyph(x, y, rune.code_point);
 
             // Add to draw calls
             let color = rune.attribute.foreground;
@@ -216,6 +236,13 @@ impl Screen
                     &mut xft_color, specs.as_ptr(), specs.len() as i32);
             }
         }
+    }
+
+    pub fn clear(&mut self)
+    {
+        self.draw_rect(
+            0, 0, self.width, self.height, 
+            StandardColor::DefaultBackground.color());
     }
 
 }

@@ -148,7 +148,6 @@ pub struct Buffer<Display>
     // Data
     content: Vec<LineRef>,
     scrollback: Vec<LineRef>,
-    viewport_offset: i32,
 }
 
 impl<Display> Buffer<Display>
@@ -175,7 +174,6 @@ impl<Display> Buffer<Display>
 
             content: vec![Line::new(columns); (rows * columns) as usize],
             scrollback: Vec::new(),
-            viewport_offset: 0,
         };
 
         for row in 0..rows {
@@ -188,21 +186,20 @@ impl<Display> Buffer<Display>
 
     /* Drawing */
 
-    fn line_for_row(&mut self, row_in_viewport: i32) -> Option<&mut LineRef>
+    fn line_for_row(&mut self, row: i32) -> Option<&mut LineRef>
     {
-        let row_in_buffer = row_in_viewport - self.viewport_offset;
-        if row_in_buffer >= self.rows as i32 {
+        if row >= self.rows as i32 {
             return None;
         }
 
-        if row_in_buffer >= 0
+        if row >= 0
         {
-            let line = &mut self.content[row_in_buffer as usize];
+            let line = &mut self.content[row as usize];
             return Some( line );
         }
-        else if -row_in_buffer <= self.scrollback.len() as i32
+        else if -row <= self.scrollback.len() as i32
         {
-            let row_in_scrollback = self.scrollback.len() as i32 + row_in_buffer;
+            let row_in_scrollback = self.scrollback.len() as i32 + row;
             let line = &mut self.scrollback[row_in_scrollback as usize];
             line.borrow_mut().resize(self.columns);
             return Some( line );
@@ -210,28 +207,28 @@ impl<Display> Buffer<Display>
         return None;
     }
 
-    fn draw_row(&mut self, row_in_viewport: i32) -> Vec<(Rune, CursorPos)>
+    fn draw_row(&mut self, row: i32) -> Vec<(Rune, CursorPos)>
     {
-        let line = self.line_for_row(row_in_viewport);
+        let line = self.line_for_row(row);
         if line.is_none() {
             return Vec::new();
         }
-        return line.unwrap().borrow_mut().draw(row_in_viewport);
+        return line.unwrap().borrow_mut().draw(row);
     }
 
-    fn invalidate_row(&mut self, row_in_viewport: i32)
+    fn invalidate_row(&mut self, row: i32)
     {
-        let line = self.line_for_row(row_in_viewport);
+        let line = self.line_for_row(row);
         if line.is_some() {
             line.unwrap().borrow_mut().invalidate();
         }
     }
 
-    fn draw(&mut self) -> Vec<(Rune, CursorPos)>
+    fn draw(&mut self, start: i32, end: i32) -> Vec<(Rune, CursorPos)>
     {
         let mut runes = Vec::<(Rune, CursorPos)>::new();
         runes.reserve((self.columns * self.rows) as usize);
-        for row in 0..self.rows {
+        for row in start..end {
             runes.append(&mut self.draw_row(row));
         }
         return runes;
@@ -259,10 +256,9 @@ impl<Display> Buffer<Display>
     pub fn flush(&mut self)
     {
         self.flush_scroll_buffer();
-        let mut cursor = self.cursor.clone();
-        cursor.move_by(self.viewport_offset, 0);
 
-        let mut runes = self.draw();
+        let cursor = self.cursor.clone();
+        let mut runes = self.draw(-(self.scrollback.len() as i32), self.rows);
         if cursor.in_bounds(self.rows, self.columns)
         {
             let rune = self.rune_at_cursor(&cursor).clone();
@@ -279,6 +275,16 @@ impl<Display> Buffer<Display>
             self.display.draw_runes(&runes);
             self.display.flush();
         }
+    }
+
+    pub fn request_scrollback(&mut self, start: i32, end: i32)
+    {
+        for row in start..end {
+            self.invalidate_row(row);
+        }
+        let runes = self.draw(start, end);
+        self.display.draw_runes(&runes);
+        self.display.flush();
     }
 
     /* Selection */
@@ -517,41 +523,10 @@ impl<Display> Buffer<Display>
         self.scroll_in_bounds(amount, top, bottom);
     }
 
-    pub fn scroll_viewport(&mut self, amount: i32)
-    {
-        // Move viewport
-        self.viewport_offset += amount;
-        
-        // If we scroll more then a screen height, 
-        // just redraw the whole thing
-        if i32::abs(amount) > self.rows
-        {
-            self.redraw();
-            return;
-        }
-
-        // Otherwise, only redraw what we need to
-        self.display.draw_scroll(amount, 0, self.rows);
-        let range = 
-            if amount < 0 { self.rows+amount..self.rows }
-            else { 0..amount };
-        for row in range {
-            self.invalidate_row(row);
-        }
-
-        if self.in_selection {
-            self.selection_start_pos.move_by(amount, 0);
-            self.selection_end_pos.move_by(amount, 0);
-        }
-        self.flush();
-    }
-
     pub fn reset_viewport(&mut self)
     {
         self.selection_end();
-        if self.viewport_offset != 0 {
-            self.scroll_viewport(-self.viewport_offset);
-        }
+        // TODO: This
     }
 
     fn out_of_bounds(&self, pos: &CursorPos) -> bool

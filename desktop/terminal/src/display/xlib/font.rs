@@ -118,4 +118,17 @@ impl Font
         return *self.colors.get(&color).unwrap();
     }
 
+    pub fn get_glyph(&self, x: i32, y: i32, code_point: u32) -> xft::XftGlyphFontSpec
+    {
+        let display = self.window.borrow().display;
+        let glyph = unsafe { xft::XftCharIndex(display, self.font, code_point) };
+        xft::XftGlyphFontSpec 
+        { 
+            glyph: glyph,
+            x: x as i16,
+            y: (y - self.metrics.descent) as i16,
+            font: self.font,
+        }
+    }
+
 }

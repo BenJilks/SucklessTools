@@ -9,7 +9,7 @@ pub enum UpdateResultType
     Input,
     Resize,
     Redraw,
-    ScrollViewport,
+    RequestScrollack,
     MouseDown,
     MouseDrag,
     DoubleClickDown,
@@ -20,6 +20,7 @@ pub struct UpdateResult
     pub result_type: UpdateResultType,
     pub input: Vec<u8>,
     pub amount: i32,
+    pub start: i32,
 
     pub rows: i32,
     pub columns: i32,
@@ -37,6 +38,7 @@ impl Default for UpdateResult
             result_type: UpdateResultType::Redraw,
             input: Vec::new(),
             amount: 0,
+            start: 0,
 
             rows: 0,
             columns: 0,
@@ -78,21 +80,22 @@ impl UpdateResult
         };
     }
 
+    pub fn request_scrollback(start: i32, height: i32) -> Self
+    {
+        Self
+        {
+            result_type: UpdateResultType::RequestScrollack,
+            start: start,
+            height: height,
+            ..Self::default()
+        }
+    }
+
     pub fn redraw() -> Self
     {
         return Self
         {
             result_type: UpdateResultType::Redraw,
-            ..Self::default()
-        };
-    }
-
-    pub fn scroll_viewport(amount: i32) -> Self
-    {
-        return Self
-        {
-            result_type: UpdateResultType::ScrollViewport,
-            amount: amount,
             ..Self::default()
         };
     }
