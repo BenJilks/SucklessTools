@@ -3,12 +3,13 @@ mod screen;
 mod window;
 mod font;
 use crate::display::cursor::CursorPos;
-use crate::display::rune::{Rune, StandardColor, Attribute};
+use crate::display::rune::{Rune, Attribute};
 use crate::display::UpdateResult;
 use screen::Screen;
 use window::Window;
 use font::Font;
-use x11::{ xlib, keysym };
+use x11::xlib;
+use x11::keysym;
 use std::ptr;
 use std::mem;
 use std::os::raw::{c_uint, c_char};
@@ -72,7 +73,7 @@ impl XLibDisplay
         }
     }
 
-    fn recalculate_sizes(&mut self) -> UpdateResult
+    fn recalculate_sizes(&mut self, results: &mut Vec<UpdateResult>)
     {
         let (window_width, window_height) = self.window.borrow().get_size();
         let font = self.font.borrow().get_metrics();
@@ -84,13 +85,15 @@ impl XLibDisplay
 
         self.main_screen.resize(self.pixel_width, self.pixel_height);
         self.secondary_screen.resize(self.pixel_width, self.pixel_height);
-        return UpdateResult::resize(self.rows, self.columns, window_width, window_height);
+
+        results.push(UpdateResult::resize(self.rows, self.columns, window_width, window_height));
+        self.redraw_rows_in_viewport(results);
     }
 
-    fn change_font_size(&mut self, font_size: i32) -> UpdateResult
+    fn change_font_size(&mut self, font_size: i32, results: &mut Vec<UpdateResult>)
     {
         self.font.borrow_mut().resize(font_size);
-        return self.recalculate_sizes();
+        self.recalculate_sizes(results);
     }
 
     fn handle_type_event(&mut self, event: &mut xlib::XEvent, results: &mut Vec<UpdateResult>)
@@ -149,7 +152,7 @@ impl XLibDisplay
             keysym::XK_equal =>
             {
                 if ctrl_shift {
-                    results.push(self.change_font_size(font.size + 1));
+                    self.change_font_size(font.size + 1, results);
                 } else {
                     self.handle_type_event(event, results);
                 }
@@ -157,7 +160,7 @@ impl XLibDisplay
             keysym::XK_minus =>
             {
                 if ctrl_shift {
-                    results.push(self.change_font_size(font.size - 1));
+                    self.change_font_size(font.size - 1, results);
                 } else {
                     self.handle_type_event(event, results);
                 }
@@ -174,13 +177,18 @@ impl XLibDisplay
             window.width = unsafe { event.configure.width };
             window.height = unsafe { event.configure.height };
         }
-        results.push(self.recalculate_sizes());
+        self.recalculate_sizes(results);
     }
 
     fn window_to_cursor_position(&self, x: i32, y: i32) -> (i32, i32)
     {
         let font = self.font.borrow().get_metrics();
-        let row = (y - self.scroll_offset) / font.height;
+        let mut absoulute_y = y - self.scroll_offset;
+        if absoulute_y < 0 {
+            absoulute_y -= font.height;
+        }
+
+        let row = absoulute_y / font.height;
         let column = x / font.width;
         return (row, column);
     }
@@ -201,7 +209,7 @@ impl XLibDisplay
             }
 
             self.current_page += 1;
-            results.push(UpdateResult::request_scrollback(
+            results.push(UpdateResult::redraw_range(
                 -self.current_page * self.rows, self.rows));
         }
         else if self.scroll_offset < (self.current_page - 1) * self.pixel_height
@@ -215,10 +223,16 @@ impl XLibDisplay
             }
 
             self.current_page -= 1;
-            results.push(UpdateResult::request_scrollback(
+            results.push(UpdateResult::redraw_range(
                 -(self.current_page - 1) * self.rows, self.rows));
         }
         self.flush();
+    }
+
+    fn redraw_rows_in_viewport(&mut self, results: &mut Vec<UpdateResult>)
+    {
+        let start = -self.current_page * self.rows;
+        results.push(UpdateResult::redraw_range(start, self.rows * 2));
     }
 
     fn on_button_pressed(&mut self, event: &xlib::XEvent, results: &mut Vec<UpdateResult>)
@@ -292,7 +306,7 @@ impl super::Display for XLibDisplay
 
             match event.get_type()
             {
-                xlib::Expose => results.push(UpdateResult::redraw()),
+                xlib::Expose => self.redraw_rows_in_viewport(&mut results),
                 xlib::KeyPress => self.on_key_pressed(&mut event, &mut results),
                 xlib::ConfigureNotify => self.on_resize(&mut event, &mut results),
                 xlib::ButtonPress => self.on_button_pressed(&event, &mut results),
@@ -321,10 +335,15 @@ impl super::Display for XLibDisplay
         let mut page_map = HashMap::<i32, Vec<(Rune, CursorPos)>>::new();
         for (rune, pos) in runes
         {
-            let mut page = pos.get_row() / self.rows;
-            if pos.get_row() < 0 {
-                page = -page + 1;
-            }
+            let row = pos.get_row();
+            let page = 
+                if row >= 0 { 
+                    0
+                } else if row == -1 {
+                    1
+                } else {
+                    (-row - 1) / self.rows + 1
+                };
 
             if !page_map.contains_key(&page) {
                 page_map.insert(page, Vec::new());
@@ -336,7 +355,6 @@ impl super::Display for XLibDisplay
 
         for (page, runes) in page_map 
         {
-            println!("Drawing page {}, main = {}, secondary = {}", page, self.main_screen.page, self.secondary_screen.page);
             if page == self.main_screen.page {
                 self.main_screen.draw_runes(&runes, self.rows);
             }
@@ -363,9 +381,14 @@ impl super::Display for XLibDisplay
     
     fn flush(&mut self)
     {
-        self.window.borrow_mut().clear();
+        let local_offset =
+            match self.pixel_height
+            {
+                0 => 0,
+                _ => self.scroll_offset % self.pixel_height,
+            };
 
-        let local_offset = self.scroll_offset % self.pixel_height;
+        self.window.borrow_mut().clear();
         self.main_screen.flush(local_offset);
         self.secondary_screen.flush(local_offset - self.pixel_height);
         unsafe { xlib::XFlush(self.window.borrow().display) };
@@ -379,6 +402,14 @@ impl super::Display for XLibDisplay
     fn get_fd(&self) -> i32
     {
         return self.window.borrow().fd;
+    }
+
+    fn reset_viewport(&mut self)
+    {
+        self.scroll_offset = 0;
+        self.current_page = 0;
+        self.main_screen.page = 0;
+        self.secondary_screen.page = 1;
     }
 
 }

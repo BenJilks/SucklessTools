@@ -16,7 +16,6 @@ pub struct Screen
     window: Rc<RefCell<Window>>,
     font: Rc<RefCell<Font>>,
     gc: xlib::GC,
-    last_foreground_color: u32,
 
     bitmap: xlib::Pixmap,
     draw: *mut xft::XftDraw,
@@ -55,12 +54,11 @@ impl Screen
             gc = unsafe { xlib::XDefaultGC(window.display, screen) };
         }
 
-        Self
+        let mut screen = Self
         {
             window: window_ref,
             font: font,
             gc: gc,
-            last_foreground_color: 0,
             
             bitmap: bitmap,
             draw: draw,
@@ -68,7 +66,10 @@ impl Screen
             page: page,
             width: width,
             height: height,
-        }
+        };
+
+        screen.clear();
+        return screen;
     }
 
     pub fn swap(a: &mut Self, b: &mut Self)
@@ -76,18 +77,18 @@ impl Screen
         mem::swap(&mut a.bitmap, &mut b.bitmap);
         mem::swap(&mut a.draw, &mut b.draw);
         mem::swap(&mut a.gc, &mut b.gc);
-        mem::swap(&mut a.last_foreground_color, &mut b.last_foreground_color);
     }
 
     pub fn resize(&mut self, width: i32, height: i32)
     {
         self.free();
-
-        let window = self.window.borrow();
-        self.bitmap = unsafe { xlib::XCreatePixmap(window.display, window.window, 
-            width as u32, height as u32, 24) };
-        self.draw = unsafe { xft::XftDrawCreate(window.display, self.bitmap, 
-            window.visual, window.cmap) };
+        {
+            let window = self.window.borrow();
+            self.bitmap = unsafe { xlib::XCreatePixmap(window.display, window.window, 
+                width as u32, height as u32, 24) };
+            self.draw = unsafe { xft::XftDrawCreate(window.display, self.bitmap, 
+                window.visual, window.cmap) };
+        }
 
         // TODO: Better error handling
         assert!(self.bitmap != 0);
@@ -95,6 +96,7 @@ impl Screen
 
         self.width = width;
         self.height = height;
+        self.clear();
     }
 
     pub fn free(&mut self)
@@ -115,10 +117,6 @@ impl Screen
             let window = self.window.borrow();
             xlib::XCopyArea(window.display, self.bitmap, window.window, self.gc, 
                 0, 0, self.width as u32, self.height as u32, 0, offset);
-
-            xlib::XSetForeground(window.display, self.gc, (0xFF0000) as u64);
-            xlib::XDrawRectangle(window.display, window.window, self.gc, 
-                0, offset, self.width as u32, self.height as u32);
         }
     }
 
@@ -128,11 +126,7 @@ impl Screen
 
         unsafe
         {
-            //if self.last_foreground_color != color 
-            //{
-                xlib::XSetForeground(window.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
-                //self.last_foreground_color = color;
-            //}
+            xlib::XSetForeground(window.display, self.gc, ((color & 0xFFFFFF00) >> 8) as u64);
             xlib::XFillRectangle(window.display, self.bitmap, self.gc,
                 x, y, width as u32, height as u32);
         }

@@ -8,8 +8,7 @@ pub enum UpdateResultType
 {
     Input,
     Resize,
-    Redraw,
-    RequestScrollack,
+    RedrawRange,
     MouseDown,
     MouseDrag,
     DoubleClickDown,
@@ -35,7 +34,7 @@ impl Default for UpdateResult
     {
         Self
         {
-            result_type: UpdateResultType::Redraw,
+            result_type: UpdateResultType::Input,
             input: Vec::new(),
             amount: 0,
             start: 0,
@@ -80,24 +79,15 @@ impl UpdateResult
         };
     }
 
-    pub fn request_scrollback(start: i32, height: i32) -> Self
+    pub fn redraw_range(start: i32, height: i32) -> Self
     {
         Self
         {
-            result_type: UpdateResultType::RequestScrollack,
+            result_type: UpdateResultType::RedrawRange,
             start: start,
             height: height,
             ..Self::default()
         }
-    }
-
-    pub fn redraw() -> Self
-    {
-        return Self
-        {
-            result_type: UpdateResultType::Redraw,
-            ..Self::default()
-        };
     }
 
     pub fn mouse_down(row: i32, column: i32) -> Self
@@ -139,6 +129,7 @@ pub trait Display
     fn update(&mut self) -> Vec<UpdateResult>;
     fn should_close(&self) -> bool;
     fn get_fd(&self) -> i32;
+    fn reset_viewport(&mut self);
 
     // Draw routines
     fn clear_screen(&mut self);

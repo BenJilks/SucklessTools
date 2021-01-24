@@ -277,7 +277,7 @@ impl<Display> Buffer<Display>
         }
     }
 
-    pub fn request_scrollback(&mut self, start: i32, end: i32)
+    pub fn redraw_range(&mut self, start: i32, end: i32)
     {
         for row in start..end {
             self.invalidate_row(row);
@@ -452,7 +452,6 @@ impl<Display> Buffer<Display>
         self.scroll_region_bottom = rows;
         self.rows = rows;
         self.columns = columns;
-        self.redraw();
     }
 
     fn set_scroll_region(&mut self, top: i32, bottom: i32)
@@ -526,7 +525,8 @@ impl<Display> Buffer<Display>
     pub fn reset_viewport(&mut self)
     {
         self.selection_end();
-        // TODO: This
+        self.display.reset_viewport();
+        self.redraw();
     }
 
     fn out_of_bounds(&self, pos: &CursorPos) -> bool
