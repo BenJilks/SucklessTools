@@ -1,0 +1,12 @@
+[package]
+name = "crond"
+version = "0.1.0"
+authors = ["BenJilks <benjyjilks@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+json = "0.12.4"
+chrono = "0.4"
+libc = "0.2.84"
+daemonize = "0.4.1"
+ini = "1.3.0"

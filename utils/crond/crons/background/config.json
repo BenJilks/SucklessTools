@@ -1,5 +1,0 @@
-{
-	"name": "update_background",
-	"script": "update_background.py",
-	"daily": [ "0h" ]
-}
