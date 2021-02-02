@@ -1,30 +1,25 @@
-//mod line;
+mod line;
+mod interpreter;
 mod parser;
-use parser::token_source::TokenSource;
+use line::Line;
 use parser::lexer::Lexer;
 
 fn main() 
 {
-    use std::fs::File;
-    let source = File::open("test.sh").unwrap();
-    
-    let mut lexer = Lexer::new(source);
     loop
     {
-        let curr = lexer.consume();
-        if curr.is_none() {
-            break;
+        let line = Line::get("shell> ");
+        let lexer = Lexer::new(line.as_bytes());
+        let script_or_error = parser::parse(lexer);
+        if script_or_error.is_err() 
+        {
+            let error = script_or_error.err().unwrap();
+            println!("Error: expected '{}', got '{}'", 
+                error.expected, error.got);
+            return;
         }
-        println!("Current: {}", curr.unwrap().data);
 
-        let next = lexer.peek(0);
-        if next.is_some() {
-            println!("Next: {}", next.unwrap().data);
-        }
-        let next2 = lexer.peek(1);
-        if next2.is_some() {
-            println!("Next: {}", next2.unwrap().data);
-        }
-        println!();
+        let script = script_or_error.ok().unwrap();
+        script.unwrap().execute();
     }
 }

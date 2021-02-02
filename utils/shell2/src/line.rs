@@ -78,14 +78,15 @@ pub struct Line
     state: State,
     arg_buffer: String,
     args: Vec<i32>,
-
+    
+    prompt: String,
     stdout: io::Stdout,
 }
 
 impl Line
 {
 
-    pub fn get() -> String
+    pub fn get(prompt: &str) -> String
     {
         let mut line = Self
         {
@@ -96,6 +97,7 @@ impl Line
             arg_buffer: String::new(),
             args: Vec::new(),
 
+            prompt: prompt.to_owned(),
             stdout: io::stdout(),
         };
 
@@ -173,7 +175,7 @@ impl Line
     {
         // Start of line
         self.cursor = 0;
-        print!("\x1b[G");
+        print!("\x1b[G\x1b[{}C", self.prompt.len());
         self.stdout.flush().unwrap();
     }
 
@@ -250,6 +252,9 @@ impl Line
 
     fn main_loop(&mut self)
     {
+        print!("{}", self.prompt);
+        self.stdout.flush().unwrap();
+
         loop
         {
             // Fetch next char

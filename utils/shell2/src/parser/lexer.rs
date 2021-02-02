@@ -1,21 +1,26 @@
 use std::io::Read;
 use std::collections::VecDeque;
-use crate::parser::token_source::{Token, TokenType, TokenSource};
+use crate::parser::token_source::
+{
+    Token, 
+    TokenType, 
+    TokenError, 
+    TokenSource
+};
 
 enum State
 {
     Initial,
     Name,
+    And,
 }
 
 pub struct Lexer<Source: Read>
 {
     source: Source,
     peek_queue: VecDeque<Token>,
-
-    c: u8,
     should_reconsume: bool,
-    state: State,
+    curr_byte: u8,
 }
 
 impl<Source: Read> Lexer<Source>
@@ -27,56 +32,75 @@ impl<Source: Read> Lexer<Source>
         {
             source: source,
             peek_queue: VecDeque::new(),
-
-            c: 0,
             should_reconsume: false,
-            state: State::Initial,
+            curr_byte: 0,
         }
+    }
+
+    fn is_name_char(c: char) -> bool
+    {
+        c.is_alphabetic() || ['-', '/', '.'].contains(&c)
     }
 
     fn read_next(&mut self) -> Option<Token>
     {
         let mut buffer = String::new();
-
+        let mut state = State::Initial;
+    
         loop
         {
             if !self.should_reconsume 
             {
                 let mut buffer: [u8; 1] = [0];
                 self.source.read(&mut buffer).unwrap();
-                self.c = buffer[0];
+                self.curr_byte = buffer[0];
             }
             self.should_reconsume = false;
 
-            let c = self.c as char;
-            match self.state
+            let c = self.curr_byte as char;
+            match state
             {
                 State::Initial =>
                 {
-                    if c.is_alphabetic() 
+                    if Self::is_name_char(c)
                     {
-                        self.state = State::Name;
                         self.should_reconsume = true;
+                        state = State::Name;
                     }
-                    else if self.c == 0
+                    else if self.curr_byte == 0
                     {
                         return None;
+                    }
+                    else
+                    {
+                        match c
+                        {
+                            '&' => state = State::And,
+                            ';' | '\n' => return Token::new(TokenType::SemiColon, ";"),
+                            ' ' | '\t' => {},
+                            _ => panic!(),
+                        }
                     }
                 },
 
                 State::Name =>
                 {
-                    if !c.is_alphanumeric() 
+                    if (!Self::is_name_char(c) && !c.is_digit(10)) || self.curr_byte == 0 
                     {
-                        self.state = State::Initial;
                         self.should_reconsume = true;
-                        return Some(Token 
-                        {
-                            token_type: TokenType::Identifier,
-                            data: buffer,
-                        });
+                        return Token::new(TokenType::Identifier, &buffer);
                     }
                     buffer.push(c);
+                },
+
+                State::And =>
+                {
+                    if c == '&' {
+                        return Token::new(TokenType::DoubleAnd, "&&");
+                    }
+                    
+                    self.should_reconsume = true;
+                    return Token::new(TokenType::And, "&");
                 },
             }
         }
@@ -111,6 +135,21 @@ impl<Source: Read> TokenSource for Lexer<Source>
 
         self.peek_queue.pop_front();
         return next;
+    }
+
+    fn assume(&mut self, token_type: TokenType, name: &str) -> Result<Token, TokenError>
+    {
+        let next_or_none = self.peek(0);
+        if next_or_none.is_none()  {
+            return Err(TokenError::new(name, "<end of file>"));
+        }
+        
+        let next = next_or_none.unwrap();
+        if next.token_type != token_type {
+            return Err(TokenError::new(name, &next.data));
+        }
+
+        return Ok(self.consume().unwrap());
     }
 
 }
