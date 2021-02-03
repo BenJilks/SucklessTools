@@ -2,11 +2,14 @@ mod line;
 mod interpreter;
 mod parser;
 use line::Line;
+use interpreter::Environment;
 use parser::lexer::Lexer;
 
 fn main() 
 {
-    loop
+    let mut environment = Environment::new();
+
+    while !environment.should_exit
     {
         let line = Line::get("shell> ");
         let lexer = Lexer::new(line.as_bytes());
@@ -20,6 +23,8 @@ fn main()
         }
 
         let script = script_or_error.ok().unwrap();
-        script.unwrap().execute();
+        if script.is_some() {
+            script.unwrap().execute(&mut environment);
+        }
     }
 }

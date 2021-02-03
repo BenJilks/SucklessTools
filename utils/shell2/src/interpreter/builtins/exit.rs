@@ -1,5 +1,6 @@
 use crate::interpreter::ast::{Node, NodeObject};
 use crate::interpreter::builtins::BuiltIn;
+use crate::interpreter::Environment;
 
 pub struct Exit;
 
@@ -18,10 +19,10 @@ impl BuiltIn for Exit
 impl NodeObject for Exit
 {
 
-    fn execute(&self, _: &Node) -> i32
+    fn execute(&self, environment: &mut Environment, _: &Node) -> i32
     {
-        println!("This is a exit command");
-        0
+        environment.should_exit = true;
+        return 0;
     }
 
 }

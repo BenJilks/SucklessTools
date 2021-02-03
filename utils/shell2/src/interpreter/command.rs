@@ -1,5 +1,7 @@
 extern crate libc;
 use crate::interpreter::ast::{Node, NodeObject};
+use crate::interpreter::Environment;
+use crate::interpreter::perror;
 use std::ffi::CString;
 use std::os::raw::c_char;
 
@@ -23,19 +25,10 @@ impl Command
 
 }
 
-fn perror(msg: &str)
-{
-    let cstr = CString::new(msg).unwrap();
-    unsafe
-    {
-        libc::perror(cstr.as_ptr());
-    }
-}
-
 impl NodeObject for Command 
 {
 
-    fn execute(&self, _: &Node) -> i32
+    fn execute(&self, _: &mut Environment, _: &Node) -> i32
     {
         unsafe
         {

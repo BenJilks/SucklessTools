@@ -1,7 +1,8 @@
+use crate::interpreter::Environment;
 
 pub trait NodeObject
 {
-    fn execute(&self, node: &Node) -> i32;
+    fn execute(&self, environment: &mut Environment, node: &Node) -> i32;
 }
 
 pub trait NodeBlockObject
@@ -42,9 +43,9 @@ impl Node
     pub fn left(&self) -> &Node { &self.left.as_ref().unwrap() }
     pub fn right(&self) -> &Node { self.right.as_ref().unwrap() }
 
-    pub fn execute(&self) -> i32
+    pub fn execute(&self, environment: &mut Environment) -> i32
     {
-        self.data.execute(self)
+        self.data.execute(environment, self)
     }
 
 }
