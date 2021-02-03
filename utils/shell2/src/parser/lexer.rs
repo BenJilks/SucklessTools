@@ -13,6 +13,7 @@ enum State
     Initial,
     Name,
     And,
+    String,
 }
 
 pub struct Lexer<Source: Read>
@@ -39,7 +40,7 @@ impl<Source: Read> Lexer<Source>
 
     fn is_name_char(c: char) -> bool
     {
-        c.is_alphabetic() || ['-', '/', '.'].contains(&c)
+        c.is_alphabetic() || ['-', '/', '.', '$'].contains(&c)
     }
 
     fn read_next(&mut self) -> Option<Token>
@@ -62,24 +63,28 @@ impl<Source: Read> Lexer<Source>
             {
                 State::Initial =>
                 {
-                    if Self::is_name_char(c)
-                    {
-                        self.should_reconsume = true;
-                        state = State::Name;
-                    }
-                    else if self.curr_byte == 0
-                    {
+                    if self.curr_byte == 0 {
                         return None;
                     }
-                    else
+
+                    match c
                     {
-                        match c
+                        '&' => state = State::And,
+                        '"' => state = State::String,
+                        ';' | '\n' => return Token::new(TokenType::SemiColon, ";"),
+                        ' ' | '\t' => {},
+                        _ =>
                         {
-                            '&' => state = State::And,
-                            ';' | '\n' => return Token::new(TokenType::SemiColon, ";"),
-                            ' ' | '\t' => {},
-                            _ => panic!(),
-                        }
+                            if Self::is_name_char(c)
+                            {
+                                self.should_reconsume = true;
+                                state = State::Name;
+                            }
+                            else
+                            { 
+                                panic!() 
+                            }
+                        },
                     }
                 },
 
@@ -90,6 +95,7 @@ impl<Source: Read> Lexer<Source>
                         self.should_reconsume = true;
                         return Token::new(TokenType::Identifier, &buffer);
                     }
+
                     buffer.push(c);
                 },
 
@@ -102,6 +108,15 @@ impl<Source: Read> Lexer<Source>
                     self.should_reconsume = true;
                     return Token::new(TokenType::And, "&");
                 },
+
+                State::String =>
+                {
+                    if c == '"' {
+                        return Token::new(TokenType::Identifier, &buffer);
+                    }
+
+                    buffer.push(c);
+                }
             }
         }
     }
