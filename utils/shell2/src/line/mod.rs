@@ -1,5 +1,7 @@
+extern crate libc;
+pub mod history;
+use history::{History, HistoryDirection};
 use std::{ mem, io::{ self, Write } };
-use libc;
 
 struct TerminalMode
 {
@@ -70,35 +72,39 @@ enum CursorDirection
     Right,
 }
 
-pub struct Line
+pub struct Line<'a>
 {
     buffer: Vec<char>,
     cursor: i32,
+    stdout: io::Stdout,
     
     state: State,
     arg_buffer: String,
     args: Vec<i32>,
+    back_buffer: String,
     
     prompt: String,
-    stdout: io::Stdout,
+    history: &'a mut History,
 }
 
-impl Line
+impl<'a> Line<'a>
 {
 
-    pub fn get(prompt: &str) -> String
+    pub fn get(prompt: &str, history: &'a mut History) -> String
     {
         let mut line = Self
         {
             buffer: Vec::new(),
             cursor: 0,
+            stdout: io::stdout(),
 
             state: State::Default,
             arg_buffer: String::new(),
             args: Vec::new(),
+            back_buffer: String::new(),
 
             prompt: prompt.to_owned(),
-            stdout: io::stdout(),
+            history: history,
         };
 
         // TODO: Make this a scope thing?
@@ -120,6 +126,13 @@ impl Line
         }
         print!("{}", c);
         self.stdout.flush().unwrap();
+    }
+
+    fn type_string(&mut self, string: &str)
+    {
+        for c in string.as_bytes() {
+            self.type_code_point(*c as i32);
+        }
     }
 
     fn type_backspace(&mut self)
@@ -187,6 +200,21 @@ impl Line
         self.stdout.flush().unwrap();
     }
 
+    fn change_history(&mut self, direction: HistoryDirection)
+    {
+        let line_or_none = self.history.get_history(direction);
+        if line_or_none.is_none() {
+            return;
+        }
+
+        let line = line_or_none.unwrap();
+        self.home();
+        self.buffer = line.chars().collect();
+        self.cursor = line.len() as i32;
+        print!("{}\x1b[K", line);
+        self.stdout.flush().unwrap();
+    }
+
     fn parse_code_point(&mut self, code_point: i32)
     {
         let c = code_point as u8 as char;
@@ -206,13 +234,18 @@ impl Line
             {
                 match c
                 {
-                    '[' => self.state = State::Arg,
+                    '[' => 
+                    {
+                        self.back_buffer = "\x1b[".to_owned();
+                        self.state = State::Arg
+                    },
                     _ => self.type_code_point(code_point),
                 }
             },
 
             State::Arg =>
             {
+                self.back_buffer.push(c);
                 if !c.is_digit(10) 
                 {
                     // Add it to the list of agrument if it's a valid i32
@@ -229,11 +262,13 @@ impl Line
                     {
                         match c
                         {
+                            'A' => self.change_history(HistoryDirection::Back),
+                            'B' => self.change_history(HistoryDirection::Forward),
                             'C' => self.move_cursor(CursorDirection::Right),
                             'D' => self.move_cursor(CursorDirection::Left),
                             'H' => self.home(),
                             'F' => self.end(),
-                            _ => println!("Unkown escape {}", c),
+                            _ => self.type_string(&self.back_buffer.clone()),
                         }
 
                         // Set the state to default and clear the argument 
