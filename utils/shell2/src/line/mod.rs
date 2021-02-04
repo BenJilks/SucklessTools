@@ -1,7 +1,9 @@
 extern crate libc;
 pub mod history;
+mod autocomplete;
 use history::{History, HistoryDirection};
 use std::{ mem, io::{ self, Write } };
+use autocomplete::Completion;
 
 struct TerminalMode
 {
@@ -211,8 +213,62 @@ impl<'a> Line<'a>
         self.home();
         self.buffer = line.chars().collect();
         self.cursor = line.len() as i32;
+
         print!("{}\x1b[K", line);
         self.stdout.flush().unwrap();
+    }
+
+    fn replace_word(&mut self, start: usize, end: usize, with: &str)
+    {
+        for _ in start..end {
+            self.buffer.remove(start);
+        }
+        for c in with.chars().rev() {
+            self.buffer.insert(start, c);
+        }
+
+        self.cursor = (start + with.len()) as i32;
+        print!("\x1b[{0}D\x1b[{0}P", end - start);
+        print!("\x1b[{}@{}", with.len(), with);
+        self.stdout.flush().unwrap();
+    }
+
+    fn options(&mut self, words: Vec<String>)
+    {
+        println!();
+        for word in words {
+            print!("{} ", word);
+        }
+
+        print!("\n{}{}", self.prompt, self.buffer.iter().collect::<String>());
+        print!("\x1b[G\x1b[{}C", self.prompt.len() + self.cursor as usize);
+        self.stdout.flush().unwrap();
+    }
+
+    fn complete_current_word(&mut self)
+    {
+        let mut word_start = self.cursor as usize;
+        for i in (0..self.cursor).rev()
+        {
+            if self.buffer[i as usize].is_whitespace() {
+                break;
+            }
+
+            word_start -= 1;
+        }
+
+        let word = &self.buffer[word_start..self.cursor as usize]
+            .iter().collect::<String>();
+        let completion = autocomplete::complete(word);
+        if completion.is_none() {
+            return;
+        }
+
+        match completion.unwrap()
+        {
+            Completion::Single(word) => self.replace_word(word_start, self.cursor as usize, &word),
+            Completion::Multiple(words) => self.options(words),
+        }
     }
 
     fn parse_code_point(&mut self, code_point: i32)
@@ -224,6 +280,7 @@ impl<'a> Line<'a>
             {
                 match code_point
                 {
+                    0x09 => self.complete_current_word(),
                     0x7f => self.type_backspace(),
                     0x1b => self.state = State::Escape,
                     _ => self.type_code_point(code_point),
