@@ -1,4 +1,4 @@
-use crate::parser::token_source::{Token, TokenType};
+use crate::parser::token::{Token, TokenType};
 use std::env;
 
 fn resolve_variable(variable: &str) -> String

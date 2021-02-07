@@ -1,203 +1,178 @@
-use std::io::Read;
-use std::collections::VecDeque;
-use crate::parser::token_source::
-{
-    Token, 
-    TokenType, 
-    TokenError, 
-    TokenSource
-};
+use crate::parser::token::{Token, TokenType, UnexpectedError, Error};
+use std::io::{Read, Bytes};
+use std::iter::Peekable;
 
 enum State
 {
     Initial,
     Name,
     And,
-    String,
     Variable,
     Assignement,
 }
 
-pub struct Lexer<Source: Read>
+pub struct Lexer<S: Read>
 {
-    source: Source,
-    peek_queue: VecDeque<Token>,
-    should_reconsume: bool,
-    curr_byte: u8,
+    source: Peekable<Bytes<S>>,
+
+    state: State,
+    buffer: String,
+    value_buffer: String,
 }
 
-impl<Source: Read> Lexer<Source>
+fn is_name_char(c: char) -> bool
 {
+    c.is_alphanumeric() || ['_', '-', '/'].contains(&c)
+}
 
-    pub fn new(source: Source) -> Self
+impl<S: Read> Lexer<S>
+{
+    
+    pub fn new(source: S) -> Self
     {
-        Self
+        Self 
         {
-            source: source,
-            peek_queue: VecDeque::new(),
-            should_reconsume: false,
-            curr_byte: 0,
+            source: source.bytes().peekable(),
+
+            state: State::Initial,
+            buffer: String::new(),
+            value_buffer: String::new(),
         }
     }
 
-    fn is_name_char(c: char) -> bool
+    fn single_char(&mut self, token_type: TokenType, name: &str) -> Option<Result<Token, Error>>
     {
-        c.is_alphabetic() || ['-', '/', '.', '$'].contains(&c)
+        self.source.next();
+        Token::new(token_type, name)
     }
 
-    fn read_next(&mut self) -> Option<Token>
+    fn handle_char(&mut self, c: char) -> Option<Result<Token, Error>>
     {
-        let mut buffer = String::new();
-        let mut value_buffer = String::new();
-        let mut state = State::Initial;
-    
-        loop
+        match self.state
         {
-            if !self.should_reconsume 
+            State::Initial =>
             {
-                let mut buffer: [u8; 1] = [0];
-                self.source.read(&mut buffer).unwrap();
-                self.curr_byte = buffer[0];
-            }
-            self.should_reconsume = false;
+                match c
+                {
+                    x if x.is_whitespace() => { self.source.next(); },
+                    x if is_name_char(x) => self.state = State::Name,
 
-            let c = self.curr_byte as char;
-            let eof = self.curr_byte == 0;
-            match state
+                    ';' | '\n' => return self.single_char(TokenType::SemiColon, ";"),
+                    '&' => { self.source.next(); self.state = State::And },
+                    '$' => { self.source.next(); self.state = State::Variable },
+                    '\0' => return None,
+
+                    _ => 
+                    {
+                        self.source.next();
+                        return Some(Err(UnexpectedError::new_char(c)))
+                    },
+                }
+            },
+
+            State::Name =>
             {
-                State::Initial =>
+                if !is_name_char(c)
                 {
-                    if eof {
-                        return None;
-                    }
-
-                    match c
-                    {
-                        '&' => state = State::And,
-                        '"' => state = State::String,
-                        '$' => state = State::Variable,
-                        ';' | '\n' => return Token::new(TokenType::SemiColon, ";"),
-                        ' ' | '\t' => {},
-                        _ =>
-                        {
-                            if Self::is_name_char(c)
-                            {
-                                self.should_reconsume = true;
-                                state = State::Name;
-                            }
-                            else
-                            { 
-                                println!("{}", c);
-                                panic!()
-                            }
-                        },
-                    }
-                },
-
-                State::Name =>
-                {
-                    if (!Self::is_name_char(c) && !c.is_digit(10)) || eof 
-                    {
-                        if c == '=' {
-                            state = State::Assignement;
-                            continue;
-                        }
-
-                        self.should_reconsume = true;
-                        return Token::new(TokenType::Identifier, &buffer);
-                    }
-
-                    buffer.push(c);
-                },
-
-                State::And =>
-                {
-                    if c == '&' {
-                        return Token::new(TokenType::DoubleAnd, "&&");
+                    if c != '=' {
+                        return Token::new(TokenType::Identifier, &self.buffer)
                     }
                     
-                    self.should_reconsume = true;
-                    return Token::new(TokenType::And, "&");
-                },
-
-                State::String =>
-                {
-                    if c == '"' || eof {
-                        return Token::new(TokenType::Identifier, &buffer);
-                    }
-                    buffer.push(c);
+                    self.source.next();
+                    self.state = State::Assignement;
                 }
-
-                State::Variable =>
+                else
                 {
-                    if c.is_whitespace() || eof {
-                        return Token::new(TokenType::Variable, &buffer);
-                    }
-                    buffer.push(c);
-                },
+                    self.buffer.push(c);
+                    self.source.next();
+                }
+            },
 
-                State::Assignement =>
+            State::And => 
+            {
+                self.source.next();
+                if c != '&' {
+                    return Token::new(TokenType::And, "&")
+                }
+                self.source.next();
+                return Token::new(TokenType::DoubleAnd, "&&")
+            },
+
+            State::Variable =>
+            {
+                if !is_name_char(c) {
+                    return Token::new(TokenType::Variable, &self.buffer)
+                }
+                self.buffer.push(c);
+                self.source.next();
+            },
+
+            State::Assignement => 
+            {
+                if !is_name_char(c) 
                 {
-                    if c.is_whitespace() || eof 
+                    return Some(Ok(Token
                     {
-                        return Some(Token
-                        {
-                            token_type: TokenType::Assignement,
-                            data: buffer,
-                            value: Some(value_buffer),
-                        });
-                    }
+                        token_type: TokenType::Assignement,
+                        data: self.buffer.clone(),
+                        value: Some(self.value_buffer.clone()),
+                    }));
+                }
+                self.value_buffer.push(c);
+                self.source.next();
+            },
+        }
 
-                    value_buffer.push(c);
-                },
-            }
+        None
+    }
+
+    fn get_next_char(&mut self) -> Result<Option<u8>, String>
+    {
+        let next_or_none = self.source.peek();
+        if next_or_none.is_none() {
+            return Ok(None);
+        }
+
+        let next_or_error = next_or_none.unwrap().as_ref();
+        if next_or_error.is_err() {
+            Err(next_or_error.unwrap_err().to_string())
+        } else {
+            Ok(Some(*next_or_error.ok().unwrap()))
         }
     }
 
 }
 
-impl<Source: Read> TokenSource for Lexer<Source>
+impl<S: Read> Iterator for Lexer<S>
 {
+    type Item = Result<Token, Error>;
 
-    fn peek(&mut self, count: usize) -> Option<Token>
+    fn next(&mut self) -> Option<Result<Token, Error>>
     {
-        while self.peek_queue.len() <= count
+        // Reset state
+        self.state = State::Initial;
+        self.buffer = String::new();
+
+        loop
         {
-            let next = self.read_next();
-            if next.is_none() {
-                return None;
+            let next_or_error = self.get_next_char();
+            if next_or_error.is_err() {
+                return Some(Err(Error::IO(next_or_error.unwrap_err())));
             }
 
-            self.peek_queue.push_back(next?);
+            let next_or_none = next_or_error.unwrap();
+            let next = next_or_none.unwrap_or(0);
+            let token = self.handle_char(next as char);
+            if token.is_none() 
+            {
+                if next_or_none.is_none() {
+                    return None;
+                }
+                continue;
+            }
+
+            return token;
         }
-
-        return Some( self.peek_queue[count].clone() );
-    }
-
-    fn consume(&mut self) -> Option<Token>
-    {
-        let next = self.peek(0);
-        if next.is_none() {
-            return None;
-        }
-
-        self.peek_queue.pop_front();
-        return next;
-    }
-
-    fn assume(&mut self, token_type: TokenType, name: &str) -> Result<Token, TokenError>
-    {
-        let next_or_none = self.peek(0);
-        if next_or_none.is_none()  {
-            return Err(TokenError::new(name, "<end of file>"));
-        }
-        
-        let next = next_or_none.unwrap();
-        if next.token_type != token_type {
-            return Err(TokenError::new(name, &next.data));
-        }
-
-        return Ok(self.consume().unwrap());
     }
 
 }

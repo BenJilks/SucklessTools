@@ -1,7 +1,7 @@
 use crate::interpreter::ast::{Node, NodeObject};
 use crate::interpreter::builtins::BuiltIn;
 use crate::interpreter::Environment;
-use crate::parser::token_source::Token;
+use crate::parser::token::Token;
 
 pub struct Exit;
 

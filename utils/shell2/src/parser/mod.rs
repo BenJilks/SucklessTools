@@ -1,125 +1,117 @@
 pub mod lexer;
-pub mod token_source;
-use crate::interpreter::ast::{Node, NodeObject, NodeBlockObject};
+pub mod token;
+pub mod assume;
+
+pub use assume::Assume;
+pub use lexer::Lexer;
+use crate::interpreter::ast::{Node, NodeBlockObject};
 use crate::interpreter::builtins;
 use crate::interpreter::Block;
 use crate::interpreter::And;
 use crate::interpreter::Assignmnet;
-use token_source::{Token, TokenSource, TokenType, TokenError};
+use token::{Token, TokenType, Error, UnexpectedError};
+use std::io::Read;
+use std::iter::Peekable;
 
-type ParserResult = Result<Option<Node>, TokenError>;
-
-fn parse_command<S: TokenSource>(src: &mut S) -> ParserResult
+fn parse_command<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Node, Error>
 {
-    let program = src.assume(TokenType::Identifier, "program").ok().unwrap();
+    let program = src.next().unwrap()?;
     let mut args = Vec::<Token>::new();
+
     loop
     {
-        let arg_or_none = src.peek(0);
+        let arg_or_none = src.peek();
         if arg_or_none.is_none() {
-            break
-        }
-
-        let arg = arg_or_none.unwrap();
-        if !arg.is_command_token() {
             break;
         }
-        args.push(arg);
-        src.consume();
+        
+        let arg = arg_or_none.unwrap().clone();
+        if !arg?.is_command_token() {
+            break;
+        }
+        
+        args.push(src.next().unwrap()?);
     }
 
     let command = builtins::node_object_for_program(program.data, args);
-    return Ok(Some(Node::leaf(command)));
+    Ok(Node::leaf(command))
 }
 
-fn parse_assignmnet<S: TokenSource>(src: &mut S) -> ParserResult
+fn parse_assignment<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Node, Error>
 {
-    let token = src.assume(TokenType::Assignement, "assignment").ok().unwrap();
-    let assignment = Assignmnet::new(token.data, token.value.unwrap());
-    Ok(Some(Node::leaf(assignment)))
+    let token = src.next().unwrap()?;
+    Ok(Node::leaf(Assignmnet::new(token.data, token.value.unwrap())))
 }
 
-fn parse_statement<S: TokenSource>(src: &mut S) -> ParserResult
+fn parse_statement<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
-    let next_or_none = src.peek(0);
+    let next_or_none = src.peek();
     if next_or_none.is_none() {
         return Ok(None);
     }
 
-    let next = next_or_none.unwrap();
+    let next = next_or_none.unwrap().clone()?;
     match next.token_type
     {
-        TokenType::Identifier => parse_command(src),
-        TokenType::Assignement => parse_assignmnet(src),
-        _ => Err(TokenError::new("statement", &next.data)),
+        TokenType::Identifier => Ok(Some(parse_command(src)?)),
+        TokenType::Assignement => Ok(Some(parse_assignment(src)?)),
+        TokenType::SemiColon => { src.next(); Ok(None) },
+        _ => Err(UnexpectedError::new("statement", &next.data)),
     }
 }
 
-fn parse_operation<Op, S, Func>(src: &mut S, func: Func, token: TokenType) -> ParserResult
-    where S: TokenSource,
-          Func: Fn(&mut S) -> ParserResult,
-          Op: NodeObject + NodeBlockObject + 'static
+fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
-    let lhs_or_error = func(src);
-    if lhs_or_error.is_err() {
-        return Err(lhs_or_error.err().unwrap());
-    }
-
-    let lhs = lhs_or_error?;
-    if lhs.is_none() {
+    let mut left = parse_statement(src)?;
+    if left.is_none() {
         return Ok(None);
     }
 
-    let next = src.peek(0);
-    if next.is_none() {
-        return Ok(lhs);
-    }
-
-    if next.unwrap().token_type == token
+    while src.peek().is_some()
     {
-        src.consume();
+        let next = src.peek().unwrap().clone()?;
+        if next.token_type != TokenType::DoubleAnd {
+            break;
+        }
+        src.next();
 
-        let rhs_or_error = parse_operation::<Op, S, Func>(src, func, token);
-        if rhs_or_error.is_err() {
-            return Err(rhs_or_error.err().unwrap());
+        let right = parse_statement(src)?;
+        if right.is_none() {
+            return Err(UnexpectedError::new("statement", "nothing"));
         }
 
-        let rhs = rhs_or_error?;
-        if rhs.is_some() {
-            return Ok(Some(Node::operation(lhs.unwrap(), rhs.unwrap(), Op::new())));
-        }
+        left = Some(Node::operation(left.unwrap(), right.unwrap(), And::new()));
     }
 
-    return Ok(lhs);
+    Ok(left)
 }
 
-fn parse_and<S: TokenSource>(src: &mut S) -> ParserResult
+fn parse_block<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Node, Error>
 {
-    return parse_operation::<And, _, _>(src, parse_statement, TokenType::DoubleAnd);
-}
-
-fn parse_block<S: TokenSource>(src: &mut S) -> ParserResult
-{
-    return parse_operation::<Block, _, _>(src, parse_and, TokenType::SemiColon);
-}
-
-fn skip_whitespace<S: TokenSource>(src: &mut S)
-{
+    let mut block = Vec::<Node>::new();
     loop
     {
-        let next = src.peek(0);
-        if next.is_none() {
-            return;
+        let statement_or_none = parse_term(src)?;
+        if statement_or_none.is_some() {
+            block.push(statement_or_none.unwrap());
         }
-        if next.unwrap().token_type != TokenType::SemiColon {
-            return;
+
+        let next_or_none = src.peek();
+        if next_or_none.is_none() {
+            break;
+        } 
+
+        let next = next_or_none.unwrap().clone();
+        if next?.token_type != TokenType::SemiColon {
+            break;
         }
-        src.consume();
+        src.next();
     }
+
+    Ok(Node::block(block, Block::new()))
 }
 
-pub fn parse<S: TokenSource>(mut src: S) -> ParserResult
+pub fn parse<S: Read>(lexer: Lexer<S>) -> Result<Node, Error>
 {
-    skip_whitespace(&mut src);
-    return parse_block(&mut src);
+    parse_block(&mut lexer.peekable())
 }

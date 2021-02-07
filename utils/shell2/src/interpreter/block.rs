@@ -18,8 +18,9 @@ impl NodeObject for Block
     
     fn execute(&self, environment: &mut Environment, node: &Node) -> i32
     {
-        node.left().execute(environment);
-        node.right().execute(environment);
+        for child in node.children() {
+            child.execute(environment);
+        }
         return 0;
     }
 

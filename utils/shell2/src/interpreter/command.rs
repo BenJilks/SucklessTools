@@ -3,7 +3,7 @@ use crate::interpreter::ast::{Node, NodeObject};
 use crate::interpreter::Environment;
 use crate::interpreter::perror;
 use crate::interpreter::resolve_args;
-use crate::parser::token_source::Token;
+use crate::parser::token::Token;
 use std::ffi::CString;
 use std::os::raw::c_char;
 

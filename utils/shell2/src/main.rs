@@ -4,7 +4,7 @@ mod parser;
 use line::Line;
 use line::history::History;
 use interpreter::Environment;
-use parser::lexer::Lexer;
+use parser::Lexer;
 use std::fs::File;
 
 fn cli()
@@ -20,17 +20,13 @@ fn cli()
         if script_or_error.is_err() 
         {
             let error = script_or_error.err().unwrap();
-            println!("Error: expected '{}', got '{}'", 
-                error.expected, error.got);
+            println!("{:?}", error);
             return;
         }
 
         let script = script_or_error.ok().unwrap();
-        if script.is_some() 
-        {
-            script.unwrap().execute(&mut environment);
-            history.push(line);
-        }
+        script.execute(&mut environment);
+        history.push(line);
     }
 }
 
@@ -48,18 +44,14 @@ fn run_script(path: &str)
     if script_or_error.is_err() 
     {
         let error = script_or_error.err().unwrap();
-        println!("Error: expected '{}', got '{}'", 
-            error.expected, error.got);
+        println!("{:?}", error);
         return;
     }
 
     let mut environment = Environment::new();
     let script = script_or_error.ok().unwrap();
-    if script.is_some() 
-    {
-        script.as_ref().unwrap().dump(0);
-        script.unwrap().execute(&mut environment);
-    }
+    script.dump(0);
+    script.execute(&mut environment);
 }
 
 fn main()

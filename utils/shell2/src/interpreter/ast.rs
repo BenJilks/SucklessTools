@@ -15,6 +15,7 @@ pub struct Node
 {
     left: Option<Box<Node>>,
     right: Option<Box<Node>>,
+    children: Vec<Node>,
     data: Box<dyn NodeObject>,
 }
 
@@ -27,6 +28,7 @@ impl Node
         {
             left: None,
             right: None,
+            children: Vec::new(),
             data: data,
         }
     }
@@ -37,12 +39,25 @@ impl Node
         {
             left: Some(Box::from(left)),
             right: Some(Box::from(right)),
+            children: Vec::new(),
             data: data,
         }
     }
 
-    pub fn left(&self) -> &Node { &self.left.as_ref().unwrap() }
+    pub fn block(children: Vec<Node>, data: Box<dyn NodeObject>) -> Node
+    {
+        Self
+        {
+            left: None,
+            right: None,
+            children: children,
+            data: data,
+        }
+    }
+
+    pub fn left(&self) -> &Node { self.left.as_ref().unwrap() }
     pub fn right(&self) -> &Node { self.right.as_ref().unwrap() }
+    pub fn children(&self) -> &Vec<Node> { &self.children }
 
     pub fn execute(&self, environment: &mut Environment) -> i32
     {
@@ -63,6 +78,11 @@ impl Node
         {
             for _ in 0..indent { print!(" ") }
             self.right.as_ref().unwrap().dump(indent + 1);
+        }
+        for child in self.children() 
+        {
+            for _ in 0..indent { print!(" ") }
+            child.dump(indent + 1);
         }
     }
 

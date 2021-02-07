@@ -21,14 +21,14 @@ pub struct Token
 impl Token
 {
 
-    pub fn new(token_type: TokenType, data: &str) -> Option<Self>
+    pub fn new(token_type: TokenType, data: &str) -> Option<Result<Self, Error>>
     {
-        Some(Self
+        Some(Ok(Self
         {
             token_type: token_type,
             data: data.to_owned(),
             value: None,
-        })
+        }))
     }
 
     pub fn is_command_token(&self) -> bool
@@ -42,29 +42,39 @@ impl Token
 
 }
 
-pub struct TokenError
+#[derive(Clone, Debug)]
+pub struct UnexpectedError
 {
-    pub expected: String,
+    pub expected: Option<String>,
     pub got: String,
 }
 
-impl TokenError
+impl UnexpectedError
 {
 
-    pub fn new(expected: &str, got: &str) -> Self
+    pub fn new(expected: &str, got: &str) -> Error
     {
-        Self
+        Error::Unexpected(Self
         {
-            expected: expected.to_owned(),
+            expected: Some( expected.to_owned() ),
             got: got.to_owned(),
-        }
+        })
+    }
+
+    pub fn new_char(got: char) -> Error
+    {
+        Error::Unexpected(Self
+        {
+            expected: None,
+            got: String::from(got),
+        })
     }
 
 }
 
-pub trait TokenSource
+#[derive(Clone, Debug)]
+pub enum Error
 {
-    fn peek(&mut self, count: usize) -> Option<Token>;
-    fn consume(&mut self) -> Option<Token>;
-    fn assume(&mut self, token_type: TokenType, name: &str) -> Result<Token, TokenError>;
+    Unexpected(UnexpectedError),
+    IO(String),
 }

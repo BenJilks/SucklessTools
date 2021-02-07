@@ -2,7 +2,7 @@ pub mod cd;
 pub mod exit;
 use crate::interpreter::ast::NodeObject;
 use crate::interpreter::command::Command;
-use crate::parser::token_source::Token;
+use crate::parser::token::Token;
 use exit::Exit;
 use cd::Cd;
 

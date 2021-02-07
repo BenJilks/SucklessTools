@@ -3,7 +3,7 @@ use crate::interpreter::ast::{Node, NodeObject};
 use crate::interpreter::builtins::BuiltIn;
 use crate::interpreter::Environment;
 use crate::interpreter::perror;
-use crate::parser::token_source::Token;
+use crate::parser::token::Token;
 use std::ffi::CString;
 
 pub struct Cd
