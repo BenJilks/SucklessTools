@@ -23,4 +23,9 @@ impl NodeObject for Block
         return 0;
     }
 
+    fn dump(&self)
+    {
+        println!("Block");
+    }
+
 }

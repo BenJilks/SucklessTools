@@ -7,13 +7,20 @@ pub enum Completion
     Multiple(Vec<String>),
 }
 
-fn make_completion(dir: &Path, word: String, is_end: bool) -> Completion
+fn make_completion(dir: &Path, word: String) -> Completion
 {
     let full = dir.join(word);
     let full_name = full.to_str().unwrap().to_owned();
-    if is_end && full.is_file() {
+    Completion::Single(full_name)
+}
+
+fn make_full_completion(dir: &Path, word: String) -> Completion
+{
+    let full = dir.join(word);
+    let full_name = full.to_str().unwrap().to_owned();
+    if full.is_file() {
         Completion::Single(full_name + " ")
-    } else if is_end && full.is_dir() {
+    } else if full.is_dir() {
         Completion::Single(full_name + "/")
     } else {
         Completion::Single(full_name)
@@ -48,7 +55,7 @@ fn from_dir(dir: &Path, is_current_dir: bool, start: &str) -> Option<Completion>
     }
 
     if matches.len() == 1 {
-        return Some(make_completion(dir, matches[0].clone(), true));
+        return Some(make_full_completion(dir, matches[0].clone()));
     }
 
     if matches.len() > 1 
@@ -70,7 +77,7 @@ fn from_dir(dir: &Path, is_current_dir: bool, start: &str) -> Option<Completion>
         if max_common == start {
             return Some(Completion::Multiple(matches));
         }
-        return Some(make_completion(dir, max_common, false));
+        return Some(make_completion(dir, max_common));
     }
 
     return None;

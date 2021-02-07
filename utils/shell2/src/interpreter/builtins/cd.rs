@@ -3,11 +3,12 @@ use crate::interpreter::ast::{Node, NodeObject};
 use crate::interpreter::builtins::BuiltIn;
 use crate::interpreter::Environment;
 use crate::interpreter::perror;
+use crate::parser::token_source::Token;
 use std::ffi::CString;
 
 pub struct Cd
 {
-    args: Vec<String>,
+    args: Vec<Token>,
 }
 
 impl BuiltIn for Cd
@@ -15,7 +16,7 @@ impl BuiltIn for Cd
 
     fn program() -> &'static str { "cd" }
 
-    fn new(args: Vec<String>) -> Box<Self>
+    fn new(args: Vec<Token>) -> Box<Self>
     {
         Box::from(Self
         {
@@ -41,7 +42,7 @@ impl NodeObject for Cd
             if self.args.len() == 0 { 
                 std::env::home_dir().unwrap().to_str().unwrap().to_owned()
             } else {
-                self.args[0].clone() 
+                self.args[0].clone().data
             };
 
         let path_cstr = CString::new(path).unwrap();
@@ -52,6 +53,11 @@ impl NodeObject for Cd
         }
 
         return 0;
+    }
+
+    fn dump(&self)
+    {
+        println!("cd");
     }
 
 }

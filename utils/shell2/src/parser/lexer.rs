@@ -14,6 +14,8 @@ enum State
     Name,
     And,
     String,
+    Variable,
+    Assignement,
 }
 
 pub struct Lexer<Source: Read>
@@ -46,6 +48,7 @@ impl<Source: Read> Lexer<Source>
     fn read_next(&mut self) -> Option<Token>
     {
         let mut buffer = String::new();
+        let mut value_buffer = String::new();
         let mut state = State::Initial;
     
         loop
@@ -59,11 +62,12 @@ impl<Source: Read> Lexer<Source>
             self.should_reconsume = false;
 
             let c = self.curr_byte as char;
+            let eof = self.curr_byte == 0;
             match state
             {
                 State::Initial =>
                 {
-                    if self.curr_byte == 0 {
+                    if eof {
                         return None;
                     }
 
@@ -71,6 +75,7 @@ impl<Source: Read> Lexer<Source>
                     {
                         '&' => state = State::And,
                         '"' => state = State::String,
+                        '$' => state = State::Variable,
                         ';' | '\n' => return Token::new(TokenType::SemiColon, ";"),
                         ' ' | '\t' => {},
                         _ =>
@@ -82,7 +87,8 @@ impl<Source: Read> Lexer<Source>
                             }
                             else
                             { 
-                                panic!() 
+                                println!("{}", c);
+                                panic!()
                             }
                         },
                     }
@@ -90,8 +96,13 @@ impl<Source: Read> Lexer<Source>
 
                 State::Name =>
                 {
-                    if (!Self::is_name_char(c) && !c.is_digit(10)) || self.curr_byte == 0 
+                    if (!Self::is_name_char(c) && !c.is_digit(10)) || eof 
                     {
+                        if c == '=' {
+                            state = State::Assignement;
+                            continue;
+                        }
+
                         self.should_reconsume = true;
                         return Token::new(TokenType::Identifier, &buffer);
                     }
@@ -111,12 +122,34 @@ impl<Source: Read> Lexer<Source>
 
                 State::String =>
                 {
-                    if c == '"' {
+                    if c == '"' || eof {
                         return Token::new(TokenType::Identifier, &buffer);
                     }
-
                     buffer.push(c);
                 }
+
+                State::Variable =>
+                {
+                    if c.is_whitespace() || eof {
+                        return Token::new(TokenType::Variable, &buffer);
+                    }
+                    buffer.push(c);
+                },
+
+                State::Assignement =>
+                {
+                    if c.is_whitespace() || eof 
+                    {
+                        return Some(Token
+                        {
+                            token_type: TokenType::Assignement,
+                            data: buffer,
+                            value: Some(value_buffer),
+                        });
+                    }
+
+                    value_buffer.push(c);
+                },
             }
         }
     }

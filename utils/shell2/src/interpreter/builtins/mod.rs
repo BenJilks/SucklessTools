@@ -2,13 +2,14 @@ pub mod cd;
 pub mod exit;
 use crate::interpreter::ast::NodeObject;
 use crate::interpreter::command::Command;
+use crate::parser::token_source::Token;
 use exit::Exit;
 use cd::Cd;
 
 pub trait BuiltIn
 {
     fn program() -> &'static str;
-    fn new(args: Vec<String>) -> Box<Self>;
+    fn new(args: Vec<Token>) -> Box<Self>;
 }
 
 macro_rules! check_each_type
@@ -24,7 +25,7 @@ macro_rules! check_each_type
     }
 }
 
-pub fn node_object_for_program(program: String, args: Vec<String>) -> Box<dyn NodeObject>
+pub fn node_object_for_program(program: String, args: Vec<Token>) -> Box<dyn NodeObject>
 {
     check_each_type!(program, args
         ,Cd

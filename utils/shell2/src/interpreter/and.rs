@@ -26,4 +26,9 @@ impl NodeObject for And
         return node.right().execute(environment);
     }
 
+    fn dump(&self)
+    {
+        println!("And");
+    }
+
 }
