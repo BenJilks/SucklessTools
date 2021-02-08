@@ -10,6 +10,7 @@ pub enum TokenType
     DoublePipe,
     Variable,
     Assignement,
+    SubCommand,
 }
 
 #[derive(Clone, Debug)]
@@ -38,6 +39,7 @@ impl Token
         [
             TokenType::Identifier, 
             TokenType::Variable,
+            TokenType::SubCommand,
         ]
         .contains(&self.token_type)
     }

@@ -1,5 +1,8 @@
 extern crate nix;
 use crate::interpreter::Environment;
+use nix::unistd::{fork, pipe, dup2, close, read, ForkResult};
+use nix::sys::wait::{waitpid, WaitStatus, WaitPidFlag};
+use std::process::exit;
 
 pub trait NodeObject
 {
@@ -63,6 +66,51 @@ impl Node
     pub fn execute(&self, environment: &mut Environment) -> i32
     {
         self.data.execute(environment, self)
+    }
+
+    pub fn execute_capture_output(&self) -> String
+    {
+        let (read_fd, write_fd) = pipe().unwrap();
+        match unsafe { fork() }
+        {
+            Ok(ForkResult::Child) =>
+            {
+                dup2(write_fd, 1).unwrap();
+                close(write_fd).unwrap();
+                close(read_fd).unwrap();
+
+                let mut environment = Environment::new();
+                self.execute(&mut environment);
+                exit(0)
+            },
+
+            Ok(ForkResult::Parent{child}) =>
+            {
+                close(write_fd).unwrap();
+
+                let mut output = String::new();
+                loop
+                {
+                    let status = waitpid(child, Some(WaitPidFlag::WNOHANG)).unwrap();
+                    if status.pid().is_some() {
+                        break;
+                    }
+
+                    let mut buffer = [0u8; 80];
+                    let read = read(read_fd, &mut buffer).unwrap();
+                    if read == 0 {
+                        break;
+                    }
+
+                    output.push_str(&String::from_utf8(buffer[0..read].to_vec()).unwrap());
+                }
+                close(read_fd).unwrap();
+                
+                output
+            },
+
+            _ => String::new()
+        }
     }
 
     pub fn dump(&self, indent: usize)

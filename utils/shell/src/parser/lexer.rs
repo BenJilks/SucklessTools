@@ -42,6 +42,37 @@ impl<S: Read> Lexer<S>
         }
     }
 
+    fn parse_sub_command(&mut self) -> Result<Token, Error>
+    {
+        self.source.next();
+        
+        let mut buffer = String::new();
+        let mut depth = 1;
+        loop
+        {
+            let next_or_none = self.source.next();
+            if next_or_none.is_none() {
+                return Err(UnexpectedError::new(")", "<end of file>"));
+            }
+
+            // TODO: Handle IO errors
+            let next = next_or_none.unwrap().unwrap() as char;
+            match next
+            {
+                '(' => depth += 1,
+                ')' => depth -= 1,
+                _ => (),
+            }
+
+            if depth <= 0 {
+                break;
+            }
+            buffer.push(next)
+        }
+
+        Token::new(TokenType::SubCommand, &buffer).unwrap()
+    }
+
     fn single_char(&mut self, token_type: TokenType, name: &str) -> Option<Result<Token, Error>>
     {
         self.source.next();
@@ -114,11 +145,19 @@ impl<S: Read> Lexer<S>
 
             State::Variable =>
             {
-                if !is_name_char(c) {
-                    return Token::new(TokenType::Variable, &self.buffer)
+                if !is_name_char(c) 
+                {
+                    if c == '(' {
+                        return Some(self.parse_sub_command());
+                    } else {
+                        return Token::new(TokenType::Variable, &self.buffer)
+                    }
                 }
-                self.buffer.push(c);
-                self.source.next();
+                else
+                {
+                    self.buffer.push(c);
+                    self.source.next();
+                }
             },
 
             State::Assignement => 
