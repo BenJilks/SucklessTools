@@ -10,6 +10,7 @@ use crate::interpreter::Block;
 use crate::interpreter::And;
 use crate::interpreter::Or;
 use crate::interpreter::Pipe;
+use crate::interpreter::With;
 use crate::interpreter::Assignmnet;
 use token::{Token, TokenType, Error, UnexpectedError};
 use std::io::Read;
@@ -69,6 +70,7 @@ fn operation_from_type(token_type: TokenType) -> Box<dyn NodeObject>
         TokenType::DoubleAnd => And::new(),
         TokenType::DoublePipe => Or::new(),
         TokenType::Pipe => Pipe::new(),
+        TokenType::And => With::new(),
         _ => panic!(),
     }
 }
@@ -105,7 +107,7 @@ fn parse_operation<S, F>(src: &mut Peekable<Lexer<S>>, func: F, tokens: &[TokenT
 
 fn parse_factor<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
-    parse_operation(src, parse_statement, &[TokenType::Pipe])
+    parse_operation(src, parse_statement, &[TokenType::Pipe, TokenType::And])
 }
 
 fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>

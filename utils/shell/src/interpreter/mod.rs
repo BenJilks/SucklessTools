@@ -3,6 +3,7 @@ pub mod block;
 pub mod and;
 pub mod or;
 pub mod pipe;
+pub mod with;
 pub mod command;
 pub mod assignment;
 pub mod builtins;
@@ -12,6 +13,7 @@ pub use block::Block;
 pub use and::And;
 pub use or::Or;
 pub use pipe::Pipe;
+pub use with::With;
 pub use command::Command;
 pub use assignment::Assignmnet;
 
