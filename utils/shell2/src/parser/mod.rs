@@ -9,6 +9,7 @@ use crate::interpreter::builtins;
 use crate::interpreter::Block;
 use crate::interpreter::And;
 use crate::interpreter::Or;
+use crate::interpreter::Pipe;
 use crate::interpreter::Assignmnet;
 use token::{Token, TokenType, Error, UnexpectedError};
 use std::io::Read;
@@ -67,13 +68,15 @@ fn operation_from_type(token_type: TokenType) -> Box<dyn NodeObject>
     {
         TokenType::DoubleAnd => And::new(),
         TokenType::DoublePipe => Or::new(),
+        TokenType::Pipe => Pipe::new(),
         _ => panic!(),
     }
 }
 
-fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
+fn parse_operation<S, F>(src: &mut Peekable<Lexer<S>>, func: F, tokens: &[TokenType]) -> Result<Option<Node>, Error>
+    where S: Read, F: Fn(&mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
-    let mut left = parse_statement(src)?;
+    let mut left = func(src)?;
     if left.is_none() {
         return Ok(None);
     }
@@ -81,12 +84,12 @@ fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Err
     while src.peek().is_some()
     {
         let next = src.peek().unwrap().clone()?;
-        if ![TokenType::DoubleAnd, TokenType::DoublePipe].contains(&next.token_type) {
+        if !tokens.contains(&next.token_type) {
             break;
         }
         src.next();
 
-        let right = parse_statement(src)?;
+        let right = func(src)?;
         if right.is_none() {
             return Err(UnexpectedError::new("statement", "nothing"));
         }
@@ -98,6 +101,16 @@ fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Err
     }
 
     Ok(left)
+}
+
+fn parse_factor<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
+{
+    parse_operation(src, parse_statement, &[TokenType::Pipe])
+}
+
+fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
+{
+    parse_operation(src, parse_factor, &[TokenType::DoubleAnd, TokenType::DoublePipe])
 }
 
 fn parse_block<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Node, Error>

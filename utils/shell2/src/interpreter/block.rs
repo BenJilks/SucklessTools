@@ -21,7 +21,8 @@ impl NodeObject for Block
         for child in node.children() {
             child.execute(environment);
         }
-        return 0;
+        
+        0
     }
 
     fn dump(&self)

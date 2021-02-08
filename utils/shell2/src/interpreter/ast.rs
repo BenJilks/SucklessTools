@@ -1,3 +1,4 @@
+extern crate nix;
 use crate::interpreter::Environment;
 
 pub trait NodeObject

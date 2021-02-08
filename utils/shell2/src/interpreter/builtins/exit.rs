@@ -23,7 +23,7 @@ impl NodeObject for Exit
     fn execute(&self, environment: &mut Environment, _: &Node) -> i32
     {
         environment.should_exit = true;
-        return 0;
+        0
     }
 
     fn dump(&self)

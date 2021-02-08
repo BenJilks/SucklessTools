@@ -20,10 +20,10 @@ impl NodeObject for Or
     {
         let result = node.left().execute(environment);
         if result == 0 {
-            return result;
+            result
+        } else {
+            node.right().execute(environment)
         }
-
-        return node.right().execute(environment);
     }
 
     fn dump(&self)
