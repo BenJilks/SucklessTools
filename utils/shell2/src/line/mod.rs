@@ -1,11 +1,12 @@
-extern crate libc;
+extern crate nix;
 pub mod history;
 mod autocomplete;
+
 use history::{History, HistoryDirection};
 use autocomplete::Completion;
+use nix::sys::termios;
+use std::io::{Read, Write};
 use std::io;
-use std::mem;
-use std::io::Write;
 
 struct TerminalMode
 {
@@ -42,23 +43,10 @@ impl TerminalMode
 
     fn activate(&self)
     {
-        unsafe
-        {
-            let mut term: libc::termios = mem::zeroed();
-            libc::tcgetattr(0, &mut term);
-
-            let mut set_bit = |bit: u32, value| {
-                if value {
-                    term.c_lflag |= bit;
-                } else {
-                    term.c_lflag &= !bit;
-                }
-            };
-            
-            set_bit(libc::ICANON, self.buffered_io);
-            set_bit(libc::ECHO, self.echo);
-            libc::tcsetattr(0, libc::TCSANOW, &term);
-        }
+        let mut term = termios::tcgetattr(0).unwrap();
+        term.local_flags.set(termios::LocalFlags::ICANON, self.buffered_io);
+        term.local_flags.set(termios::LocalFlags::ECHO, self.echo);
+        termios::tcsetattr(0, termios::SetArg::TCSANOW, &term).unwrap();
     }
 
 }
@@ -349,17 +337,21 @@ impl<'a> Line<'a>
         print!("{}", self.prompt);
         self.stdout.flush().unwrap();
 
-        loop
+        let input = io::stdin().bytes();
+        for next_or_error in input
         {
-            // Fetch next char
-            let c = unsafe { libc::getchar() };
-            if c == '\n' as i32
+            if next_or_error.is_err() {
+                break;
+            }
+
+            let next = next_or_error.unwrap();
+            if next == '\n' as u8
             {
                 println!();
                 return;
             }
             
-            self.parse_code_point(c);
+            self.parse_code_point(next as i32);
         }
     }
 

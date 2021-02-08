@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use nix::unistd::{User, geteuid};
 
 pub trait ShellPath
 {
@@ -16,7 +17,8 @@ impl ShellPath for PathBuf
         }
 
         let path = self.strip_prefix("~").unwrap();
-        std::env::home_dir().unwrap().join(path)
+        let home = User::from_uid(geteuid()).unwrap().unwrap().dir;
+        home.join(path)
     }
 
     fn get_dir(&self) -> Self

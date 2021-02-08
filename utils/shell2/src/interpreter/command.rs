@@ -3,7 +3,7 @@ use crate::interpreter::ast::{Node, NodeObject};
 use crate::interpreter::Environment;
 use crate::interpreter::resolve_args;
 use crate::parser::token::Token;
-use nix::unistd::{fork, execvp, ForkResult, Pid};
+use nix::unistd::{fork, execvp, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
 use std::process::exit;
 use std::ffi::CString;
