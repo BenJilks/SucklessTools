@@ -1,2 +1,4 @@
-build
-CMakeLists.txt.user*
+target/
+Cargo.lock
+test.sh
+
