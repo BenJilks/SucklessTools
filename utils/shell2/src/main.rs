@@ -1,6 +1,7 @@
 mod line;
 mod interpreter;
 mod parser;
+mod path;
 use line::Line;
 use line::history::History;
 use interpreter::Environment;

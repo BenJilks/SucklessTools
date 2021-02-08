@@ -28,16 +28,3 @@ impl Environment
     }
 
 }
-
-/* Command utils */
-
-use std::ffi::CString;
-
-fn perror(msg: &str)
-{
-    let cstr = CString::new(msg).unwrap();
-    unsafe
-    {
-        libc::perror(cstr.as_ptr());
-    }
-}

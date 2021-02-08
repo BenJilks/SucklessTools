@@ -1,3 +1,4 @@
+use crate::path::ShellPath;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -14,10 +15,14 @@ fn make_completion(dir: &Path, word: String) -> Completion
     Completion::Single(full_name)
 }
 
-fn make_full_completion(dir: &Path, word: String) -> Completion
+fn make_full_completion(original_dir: &Path, dir: &Path, word: String) -> Completion
 {
-    let full = dir.join(word);
-    let full_name = full.to_str().unwrap().to_owned();
+    let full = dir.join(&word);
+    let full_name = original_dir
+        .join(&word)
+        .to_str().unwrap()
+        .to_owned();
+    
     if full.is_file() {
         Completion::Single(full_name + " ")
     } else if full.is_dir() {
@@ -27,13 +32,13 @@ fn make_full_completion(dir: &Path, word: String) -> Completion
     }
 }
 
-fn from_dir(dir: &Path, is_current_dir: bool, start: &str) -> Option<Completion>
+fn from_dir(original_dir: &Path, dir: &Path, start: &str) -> Option<Completion>
 {
     let read_dir = 
-        if is_current_dir { 
-            std::env::current_dir().unwrap().read_dir() 
-        } else { 
-            dir.read_dir() 
+        if dir.exists() {
+            dir.read_dir()
+        } else {
+            std::env::current_dir().unwrap().read_dir()
         };
     if read_dir.is_err() {
         return None;
@@ -55,7 +60,7 @@ fn from_dir(dir: &Path, is_current_dir: bool, start: &str) -> Option<Completion>
     }
 
     if matches.len() == 1 {
-        return Some(make_full_completion(dir, matches[0].clone()));
+        return Some(make_full_completion(original_dir, dir, matches[0].clone()));
     }
 
     if matches.len() > 1 
@@ -77,7 +82,7 @@ fn from_dir(dir: &Path, is_current_dir: bool, start: &str) -> Option<Completion>
         if max_common == start {
             return Some(Completion::Multiple(matches));
         }
-        return Some(make_completion(dir, max_common));
+        return Some(make_completion(original_dir, max_common));
     }
 
     return None;
@@ -92,25 +97,16 @@ pub fn complete(partial: &str) -> Option<Completion>
     
     // Directory this file is in
     let path = path_or_error.unwrap();
-    let dir = 
-        if (path.is_file() || !path.exists()) && path.parent().is_some() {
-            path.parent().unwrap().to_path_buf()
-        } else {
-            path.clone()
-        };
-
-    // Verifiy it's a directory
-    let is_current_dir = !dir.exists();
-    if !is_current_dir && !dir.is_dir() {
-        return None;
-    }
+    let dir = path.get_dir();
+    let resolved_path = path.resolve();
+    let resolved_dir = resolved_path.get_dir();
 
     // Fetch the options
     let mut start = "";
-    if path.is_file() || !path.exists()
+    if resolved_path.is_file() || !resolved_path.exists()
     {
-        let start_os_str = path.file_name().unwrap_or(std::ffi::OsStr::new(""));
+        let start_os_str = resolved_path.file_name().unwrap_or(std::ffi::OsStr::new(""));
         start = start_os_str.to_str().unwrap();
     }
-    from_dir(&dir, is_current_dir, &start)
+    from_dir(&dir, &resolved_dir, &start)
 }

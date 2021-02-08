@@ -2,8 +2,10 @@ extern crate libc;
 pub mod history;
 mod autocomplete;
 use history::{History, HistoryDirection};
-use std::{ mem, io::{ self, Write } };
 use autocomplete::Completion;
+use std::io;
+use std::mem;
+use std::io::Write;
 
 struct TerminalMode
 {

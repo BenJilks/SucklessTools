@@ -22,7 +22,7 @@ pub struct Lexer<S: Read>
 
 fn is_name_char(c: char) -> bool
 {
-    c.is_alphanumeric() || ['_', '-', '/'].contains(&c)
+    c.is_alphanumeric() || ['_', '-', '/', '~'].contains(&c)
 }
 
 impl<S: Read> Lexer<S>
