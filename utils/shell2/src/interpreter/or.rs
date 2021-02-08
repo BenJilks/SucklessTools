@@ -1,9 +1,9 @@
 use crate::interpreter::ast::{Node, NodeObject, NodeBlockObject};
 use crate::interpreter::Environment;
 
-pub struct And;
+pub struct Or;
 
-impl NodeBlockObject for And
+impl NodeBlockObject for Or
 {
 
     fn new() -> Box<dyn NodeObject>
@@ -13,13 +13,13 @@ impl NodeBlockObject for And
 
 }
 
-impl NodeObject for And
+impl NodeObject for Or
 {
     
     fn execute(&self, environment: &mut Environment, node: &Node) -> i32
     {
         let result = node.left().execute(environment);
-        if result != 0 {
+        if result == 0 {
             return result;
         }
 
@@ -28,7 +28,7 @@ impl NodeObject for And
 
     fn dump(&self)
     {
-        println!("And");
+        println!("Or");
     }
 
 }

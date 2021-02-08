@@ -6,6 +6,8 @@ pub enum TokenType
     SemiColon,
     And,
     DoubleAnd,
+    Pipe,
+    DoublePipe,
     Variable,
     Assignement,
 }

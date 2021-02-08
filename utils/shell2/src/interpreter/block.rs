@@ -6,7 +6,7 @@ pub struct Block;
 impl NodeBlockObject for Block
 {
 
-    fn new() -> Box<Self>
+    fn new() -> Box<dyn NodeObject>
     {
         Box::from(Self{})
     }

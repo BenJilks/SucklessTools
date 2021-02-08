@@ -8,7 +8,7 @@ pub trait NodeObject
 
 pub trait NodeBlockObject
 {
-    fn new() -> Box<Self>;
+    fn new() -> Box<dyn NodeObject>;
 }
 
 pub struct Node

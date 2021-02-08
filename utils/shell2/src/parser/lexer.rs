@@ -7,8 +7,10 @@ enum State
     Initial,
     Name,
     And,
+    Pipe,
     Variable,
     Assignement,
+    String,
 }
 
 pub struct Lexer<S: Read>
@@ -22,7 +24,7 @@ pub struct Lexer<S: Read>
 
 fn is_name_char(c: char) -> bool
 {
-    c.is_alphanumeric() || ['_', '-', '/', '~'].contains(&c)
+    c.is_alphanumeric() || ['_', '-', '/', '.', '~'].contains(&c)
 }
 
 impl<S: Read> Lexer<S>
@@ -59,7 +61,9 @@ impl<S: Read> Lexer<S>
 
                     ';' | '\n' => return self.single_char(TokenType::SemiColon, ";"),
                     '&' => { self.source.next(); self.state = State::And },
+                    '|' => { self.source.next(); self.state = State::Pipe },
                     '$' => { self.source.next(); self.state = State::Variable },
+                    '"' => { self.source.next(); self.state = State::String },
                     '\0' => return None,
 
                     _ => 
@@ -98,6 +102,16 @@ impl<S: Read> Lexer<S>
                 return Token::new(TokenType::DoubleAnd, "&&")
             },
 
+            State::Pipe =>
+            {
+                self.source.next();
+                if c != '|' {
+                    return Token::new(TokenType::Pipe, "|")
+                }
+                self.source.next();
+                return Token::new(TokenType::DoublePipe, "||")
+            }
+
             State::Variable =>
             {
                 if !is_name_char(c) {
@@ -109,7 +123,7 @@ impl<S: Read> Lexer<S>
 
             State::Assignement => 
             {
-                if !is_name_char(c) 
+                if !is_name_char(c)
                 {
                     return Some(Ok(Token
                     {
@@ -120,6 +134,15 @@ impl<S: Read> Lexer<S>
                 }
                 self.value_buffer.push(c);
                 self.source.next();
+            },
+
+            State::String => 
+            {
+                self.source.next();
+                if c == '"' || c == '\0' {
+                    return Token::new(TokenType::Identifier, &self.buffer);
+                }
+                self.buffer.push(c);
             },
         }
 

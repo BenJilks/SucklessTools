@@ -4,10 +4,11 @@ pub mod assume;
 
 pub use assume::Assume;
 pub use lexer::Lexer;
-use crate::interpreter::ast::{Node, NodeBlockObject};
+use crate::interpreter::ast::{Node, NodeObject, NodeBlockObject};
 use crate::interpreter::builtins;
 use crate::interpreter::Block;
 use crate::interpreter::And;
+use crate::interpreter::Or;
 use crate::interpreter::Assignmnet;
 use token::{Token, TokenType, Error, UnexpectedError};
 use std::io::Read;
@@ -60,6 +61,16 @@ fn parse_statement<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>
     }
 }
 
+fn operation_from_type(token_type: TokenType) -> Box<dyn NodeObject>
+{
+    match token_type
+    {
+        TokenType::DoubleAnd => And::new(),
+        TokenType::DoublePipe => Or::new(),
+        _ => panic!(),
+    }
+}
+
 fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
     let mut left = parse_statement(src)?;
@@ -70,7 +81,7 @@ fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Err
     while src.peek().is_some()
     {
         let next = src.peek().unwrap().clone()?;
-        if next.token_type != TokenType::DoubleAnd {
+        if ![TokenType::DoubleAnd, TokenType::DoublePipe].contains(&next.token_type) {
             break;
         }
         src.next();
@@ -80,7 +91,10 @@ fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Err
             return Err(UnexpectedError::new("statement", "nothing"));
         }
 
-        left = Some(Node::operation(left.unwrap(), right.unwrap(), And::new()));
+        left = Some(Node::operation(
+            left.unwrap(), right.unwrap(), 
+            operation_from_type(next.token_type),
+        ));
     }
 
     Ok(left)
