@@ -43,7 +43,8 @@ fn parse_command<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Node, Error>
 fn parse_assignment<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Node, Error>
 {
     let token = src.next().unwrap()?;
-    Ok(Node::leaf(Assignmnet::new(token.data, token.value.unwrap())))
+    let value = src.next().unwrap()?;
+    Ok(Node::leaf(Assignmnet::new(token.data, value.data)))
 }
 
 fn parse_statement<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>

@@ -3,6 +3,7 @@
 pub enum TokenType
 {
     Identifier,
+    String,
     SemiColon,
     And,
     DoubleAnd,
@@ -18,7 +19,6 @@ pub struct Token
 {
     pub token_type: TokenType,
     pub data: String,
-    pub value: Option<String>,
 }
 
 impl Token
@@ -30,14 +30,14 @@ impl Token
         {
             token_type: token_type,
             data: data.to_owned(),
-            value: None,
         }))
     }
 
     pub fn is_command_token(&self) -> bool
     {
         [
-            TokenType::Identifier, 
+            TokenType::Identifier,
+            TokenType::String,
             TokenType::Variable,
             TokenType::SubCommand,
         ]

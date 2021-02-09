@@ -5,7 +5,7 @@ use crate::path::ShellPath;
 use std::env;
 use std::path::PathBuf;
 
-fn resolve_variable(variable: &str) -> String
+fn variable(variable: &str) -> String
 {
     let value_or_error = env::var(variable);
     if value_or_error.is_err() {
@@ -15,7 +15,7 @@ fn resolve_variable(variable: &str) -> String
     return value_or_error.unwrap();
 }
 
-fn resolve_possible_path(possible_path: &str) -> String
+fn possible_path(possible_path: &str) -> String
 {
     if !possible_path.starts_with("~") {
         return possible_path.to_owned();
@@ -25,13 +25,104 @@ fn resolve_possible_path(possible_path: &str) -> String
     return path.to_str().unwrap().to_owned();
 }
 
-fn resolve_sub_command(command: &str, output: &mut Vec<String>)
+fn sub_command(command: &str, output: &mut Vec<String>)
 {
-    let lexer = Lexer::new(command.as_bytes());
-    let root = parser::parse(lexer).unwrap();
+    let root = parser::parse(Lexer::new(command.as_bytes())).unwrap();
+    let command_output = root.execute_capture_output();
+    
+    let lexer = Lexer::new(command_output.as_bytes());
+    for token_or_error in lexer
+    {
+        if token_or_error.is_err() {
+            panic!(); // TODO
+        }
 
-    // TODO: This should produce multiple tokens
-    output.push(root.execute_capture_output())
+        let token = token_or_error.unwrap();
+        output.push(token.data);
+    }
+}
+
+enum State
+{
+    String,
+    Variable,
+    SubCommand,
+}
+
+pub fn resolve_string_variables(string: &str) -> String
+{
+    let mut output = String::new();
+    let mut buffer = String::new();
+    let mut state = State::String;
+    let mut depth = 0;
+
+    for c in string.chars()
+    {
+        match state
+        {
+            State::String =>
+            {
+                match c
+                {
+                    '$' => state = State::Variable,
+                    _ => output.push(c),
+                }
+            },
+
+            State::Variable => 
+            {
+                match c
+                {
+                    x if x.is_whitespace() =>
+                    {
+                        if buffer.is_empty() {
+                            output.push('$');
+                        } else {
+                            output.push_str(&variable(&buffer));
+                        }
+
+                        output.push(c);
+                        state = State::String;
+                        buffer = String::new();
+                    },
+
+                    '(' => state = State::SubCommand,
+                    _ => buffer.push(c),
+                }
+            },
+
+            State::SubCommand =>
+            {
+                match c
+                {
+                    ')' =>
+                    {
+                        depth -= 1;
+                        if depth < 0 
+                        {
+                            let mut tokens = Vec::<String>::new();
+                            sub_command(&buffer, &mut tokens);
+                            output.push_str(&tokens.join(" "));
+
+                            state = State::String;
+                            buffer = String::new();
+                            depth = 0;
+                        }
+                    },
+
+                    '(' => 
+                    {
+                        depth += 1;
+                        buffer.push(c)
+                    },
+
+                    _ => buffer.push(c),
+                }
+            }
+        }
+    }
+
+    output
 }
 
 pub fn resolve(args: &[Token]) -> Vec<String>
@@ -41,9 +132,10 @@ pub fn resolve(args: &[Token]) -> Vec<String>
     {
         match arg.token_type
         {
-            TokenType::Identifier => output.push(resolve_possible_path(&arg.data)),
-            TokenType::Variable => output.push(resolve_variable(&arg.data)),
-            TokenType::SubCommand => resolve_sub_command(&arg.data, &mut output),
+            TokenType::Identifier => output.push(possible_path(&arg.data)),
+            TokenType::String => output.push(resolve_string_variables(&arg.data)),
+            TokenType::Variable => output.push(variable(&arg.data)),
+            TokenType::SubCommand => sub_command(&arg.data, &mut output),
             _ => panic!(),
         }
     }

@@ -9,7 +9,6 @@ enum State
     And,
     Pipe,
     Variable,
-    Assignement,
     String,
 }
 
@@ -19,7 +18,6 @@ pub struct Lexer<S: Read>
 
     state: State,
     buffer: String,
-    value_buffer: String,
 }
 
 fn is_name_char(c: char) -> bool
@@ -38,7 +36,6 @@ impl<S: Read> Lexer<S>
 
             state: State::Initial,
             buffer: String::new(),
-            value_buffer: String::new(),
         }
     }
 
@@ -114,7 +111,7 @@ impl<S: Read> Lexer<S>
                     }
                     
                     self.source.next();
-                    self.state = State::Assignement;
+                    return Token::new(TokenType::Assignement, &self.buffer)
                 }
                 else
                 {
@@ -148,7 +145,7 @@ impl<S: Read> Lexer<S>
                 if !is_name_char(c) 
                 {
                     if c == '(' {
-                        return Some(self.parse_sub_command());
+                        return Some(self.parse_sub_command())
                     } else {
                         return Token::new(TokenType::Variable, &self.buffer)
                     }
@@ -160,26 +157,11 @@ impl<S: Read> Lexer<S>
                 }
             },
 
-            State::Assignement => 
-            {
-                if !is_name_char(c)
-                {
-                    return Some(Ok(Token
-                    {
-                        token_type: TokenType::Assignement,
-                        data: self.buffer.clone(),
-                        value: Some(self.value_buffer.clone()),
-                    }));
-                }
-                self.value_buffer.push(c);
-                self.source.next();
-            },
-
             State::String => 
             {
                 self.source.next();
                 if c == '"' || c == '\0' {
-                    return Token::new(TokenType::Identifier, &self.buffer);
+                    return Token::new(TokenType::String, &self.buffer);
                 }
                 self.buffer.push(c);
             },

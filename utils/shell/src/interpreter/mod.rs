@@ -7,7 +7,7 @@ pub mod with;
 pub mod command;
 pub mod assignment;
 pub mod builtins;
-mod resolve_args;
+pub mod resolve_args;
 
 pub use block::Block;
 pub use and::And;

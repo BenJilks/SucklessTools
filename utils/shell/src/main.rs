@@ -5,8 +5,19 @@ mod path;
 use line::Line;
 use line::history::History;
 use interpreter::Environment;
+use interpreter::resolve_args;
 use parser::Lexer;
 use std::fs::File;
+
+fn prompt() -> String
+{
+    let ps1 = std::env::var("PS1");
+    if ps1.is_err() {
+        "shell$ ".to_owned()
+    } else {
+        resolve_args::resolve_string_variables(&ps1.unwrap())
+    }
+}
 
 fn cli()
 {
@@ -15,7 +26,7 @@ fn cli()
 
     while !environment.should_exit
     {
-        let line = Line::get("shell> ", &mut history);
+        let line = Line::get(&prompt(), &mut history);
         let lexer = Lexer::new(line.as_bytes());
         let script_or_error = parser::parse(lexer);
         if script_or_error.is_err() 

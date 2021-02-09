@@ -1,7 +1,7 @@
 extern crate nix;
 use crate::interpreter::Environment;
 use nix::unistd::{fork, pipe, dup2, close, read, ForkResult};
-use nix::sys::wait::{waitpid, WaitStatus, WaitPidFlag};
+use nix::sys::wait::{waitpid, WaitPidFlag};
 use std::process::exit;
 
 pub trait NodeObject
