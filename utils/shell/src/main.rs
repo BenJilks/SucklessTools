@@ -7,7 +7,9 @@ use line::history::History;
 use interpreter::Environment;
 use interpreter::resolve_args;
 use parser::Lexer;
+use path::ShellPath;
 use std::fs::File;
+use std::path::PathBuf;
 
 fn prompt() -> String
 {
@@ -23,6 +25,8 @@ fn cli()
 {
     let mut environment = Environment::new();
     let mut history = History::new();
+    let shellrc = PathBuf::from("~/.shellrc").resolve();
+    run_script(shellrc.to_str().unwrap(), &mut environment);
 
     while !environment.should_exit
     {
@@ -42,7 +46,7 @@ fn cli()
     }
 }
 
-fn run_script(path: &str)
+fn run_script(path: &str, environment: &mut Environment)
 {
     let source_or_error = File::open(path);
     if source_or_error.is_err() 
@@ -60,10 +64,8 @@ fn run_script(path: &str)
         return;
     }
 
-    let mut environment = Environment::new();
     let script = script_or_error.ok().unwrap();
-    script.dump(0);
-    script.execute(&mut environment);
+    script.execute(environment);
 }
 
 fn main()
@@ -76,5 +78,6 @@ fn main()
 
     assert!(args.len() >= 2);
     let script_path = args.nth(1).unwrap();
-    run_script(&script_path);
+    let mut environment = Environment::new();
+    run_script(&script_path, &mut environment);
 }

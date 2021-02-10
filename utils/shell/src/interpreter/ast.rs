@@ -113,6 +113,7 @@ impl Node
         }
     }
 
+    #[allow(dead_code)]
     pub fn dump(&self, indent: usize)
     {
         for _ in 0..indent { print!(" ") }
