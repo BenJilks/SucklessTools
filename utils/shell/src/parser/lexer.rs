@@ -87,7 +87,8 @@ impl<S: Read> Lexer<S>
                     x if x.is_whitespace() => { self.source.next(); },
                     x if is_name_char(x) => self.state = State::Name,
 
-                    ';' | '\n' => return self.single_char(TokenType::SemiColon, ";"),
+                    ';' => return self.single_char(TokenType::SemiColon, ";"),
+                    '\n' => return self.single_char(TokenType::SemiColon, ""),
                     '&' => { self.source.next(); self.state = State::And },
                     '|' => { self.source.next(); self.state = State::Pipe },
                     '$' => { self.source.next(); self.state = State::Variable },

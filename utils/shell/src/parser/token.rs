@@ -39,6 +39,7 @@ impl Token
             TokenType::Identifier,
             TokenType::String,
             TokenType::Variable,
+            TokenType::Assignement,
             TokenType::SubCommand,
         ]
         .contains(&self.token_type)

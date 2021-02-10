@@ -36,15 +36,24 @@ fn make_c_string<'a>(string: &String) -> CString
 impl NodeObject for Command 
 {
 
-    fn execute(&self, _: &mut Environment, _: &Node) -> i32
+    fn execute(&self, environment: &mut Environment, _: &Node) -> i32
     {
-        let args = resolve_args::resolve(&self.args);
+        let mut program = &self.program;
+        let mut token_args = self.args.clone();
+        if environment.aliases.contains_key(program)
+        {
+            let alias = &environment.aliases[program];
+            program = &alias[0].data;
+            token_args = alias[1..alias.len()].to_vec();
+            token_args.extend(self.args.clone().into_iter());
+        }
 
+        let args = resolve_args::resolve(&token_args);
         match unsafe { fork() }
         {
             Ok(ForkResult::Child) =>
             {
-                let c_program = make_c_string(&self.program);
+                let c_program = make_c_string(program);
                 let mut c_args = args.iter().map(|x| { make_c_string(x) }).collect::<Vec<_>>();
                 c_args.insert(0, c_program.clone());
                 
