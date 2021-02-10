@@ -1,10 +1,12 @@
 pub mod cd;
 pub mod exit;
+pub mod source;
 use crate::interpreter::ast::NodeObject;
 use crate::interpreter::command::Command;
 use crate::parser::token::Token;
 use exit::Exit;
 use cd::Cd;
+use source::Source;
 
 pub trait BuiltIn
 {
@@ -30,5 +32,6 @@ pub fn node_object_for_program(program: String, args: Vec<Token>) -> Box<dyn Nod
     check_each_type!(program, args
         ,Cd
         ,Exit
+        ,Source
     );
 }
