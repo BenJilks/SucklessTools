@@ -18,11 +18,12 @@ pub struct Lexer<S: Read>
 
     state: State,
     buffer: String,
+    is_glob: bool,
 }
 
 fn is_name_char(c: char) -> bool
 {
-    c.is_alphanumeric() || ['_', '-', '/', '.', '~'].contains(&c)
+    c.is_alphanumeric() || ['_', '-', '/', '.', '~', '*', '?'].contains(&c)
 }
 
 impl<S: Read> Lexer<S>
@@ -36,6 +37,7 @@ impl<S: Read> Lexer<S>
 
             state: State::Initial,
             buffer: String::new(),
+            is_glob: false,
         }
     }
 
@@ -107,8 +109,15 @@ impl<S: Read> Lexer<S>
             {
                 if !is_name_char(c)
                 {
-                    if c != '=' {
-                        return Token::new(TokenType::Identifier, &self.buffer)
+                    if c != '=' 
+                    {
+                        return Token::new(
+                            if self.is_glob {
+                                TokenType::Glob
+                            } else {
+                                TokenType::Identifier
+                            }, 
+                            &self.buffer)
                     }
                     
                     self.source.next();
@@ -116,6 +125,9 @@ impl<S: Read> Lexer<S>
                 }
                 else
                 {
+                    if ['*', '?'].contains(&c) {
+                        self.is_glob = true;
+                    }
                     self.buffer.push(c);
                     self.source.next();
                 }
@@ -197,6 +209,7 @@ impl<S: Read> Iterator for Lexer<S>
         // Reset state
         self.state = State::Initial;
         self.buffer = String::new();
+        self.is_glob = false;
 
         loop
         {

@@ -12,6 +12,10 @@ impl ShellPath for PathBuf
 
     fn resolve(&self) -> Self
     {
+        if self.components().count() == 0 {
+            return std::env::current_dir().unwrap();
+        }
+
         if !self.starts_with("~") {
             return self.clone();
         }

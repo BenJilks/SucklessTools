@@ -3,6 +3,7 @@
 pub enum TokenType
 {
     Identifier,
+    Glob,
     String,
     SemiColon,
     And,
@@ -37,6 +38,7 @@ impl Token
     {
         [
             TokenType::Identifier,
+            TokenType::Glob,
             TokenType::String,
             TokenType::Variable,
             TokenType::Assignement,

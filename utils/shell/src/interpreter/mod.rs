@@ -8,6 +8,7 @@ pub mod command;
 pub mod assignment;
 pub mod builtins;
 pub mod resolve_args;
+mod glob;
 
 pub use block::Block;
 pub use and::And;

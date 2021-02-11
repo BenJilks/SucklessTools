@@ -1,6 +1,7 @@
 use crate::parser::token::{Token, TokenType};
 use crate::parser::Lexer;
 use crate::parser;
+use crate::interpreter::glob;
 use crate::path::ShellPath;
 use std::env;
 use std::path::PathBuf;
@@ -125,6 +126,59 @@ pub fn resolve_string_variables(string: &str) -> String
     output
 }
 
+fn resolve_glob(glob_str: &str, output: &mut Vec<String>)
+{
+    // Split the glob path into parts
+    let mut parts = glob_str.split("/").peekable();
+
+    // Get the starting path, if it starts with an empty 
+    // part, pop it and start at the root
+    let mut current_paths = vec![
+        if parts.clone().count() > 0 && parts.peek().unwrap().is_empty() {
+            parts.next(); PathBuf::from("/")
+        } else {
+            PathBuf::from("")
+        }];
+
+    for part in parts
+    {
+        // If it ends in a '/', we're done
+        if part.is_empty() {
+            break;
+        }
+
+        let mut next_paths = Vec::<PathBuf>::new();
+        for path in &mut current_paths
+        {
+            // If this isn't a directory, it's not a match
+            if !path.resolve().is_dir() {
+                continue;
+            }
+
+            let read_dir = path.resolve().read_dir().unwrap();
+            for entry_or_error in read_dir 
+            {
+                // Get the filename of this entry
+                let entry = entry_or_error.unwrap();
+                let filename = entry.file_name().to_str().unwrap().to_owned();
+
+                // If it matches the glob, add it as a match
+                if glob::string_matches(&filename, part) {
+                    next_paths.push(path.join(filename));
+                }
+            }
+        }
+
+        // Set the current matches to the new ones
+        current_paths = next_paths;
+    }
+
+    // Return all the possible matches
+    for path in current_paths {
+        output.push(path.to_str().unwrap().to_owned());
+    }
+}
+
 pub fn resolve(args: &[Token]) -> Vec<String>
 {
     let mut output = Vec::<String>::new();
@@ -136,6 +190,7 @@ pub fn resolve(args: &[Token]) -> Vec<String>
             TokenType::String => output.push(resolve_string_variables(&arg.data)),
             TokenType::Variable => output.push(variable(&arg.data)),
             TokenType::SubCommand => sub_command(&arg.data, &mut output),
+            TokenType::Glob => resolve_glob(&arg.data, &mut output),
             _ => panic!(),
         }
     }
