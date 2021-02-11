@@ -39,7 +39,9 @@ fn sub_command(command: &str, output: &mut Vec<String>)
         }
 
         let token = token_or_error.unwrap();
-        output.push(token.data);
+        if !token.data.is_empty() {
+            output.push(token.data);
+        }
     }
 }
 

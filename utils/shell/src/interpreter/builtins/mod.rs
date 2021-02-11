@@ -1,6 +1,7 @@
 pub mod cd;
 pub mod exit;
 pub mod source;
+pub mod dump;
 pub mod alias;
 use crate::interpreter::ast::NodeObject;
 use crate::interpreter::command::Command;
@@ -8,6 +9,7 @@ use crate::parser::token::Token;
 use exit::Exit;
 use cd::Cd;
 use source::Source;
+use dump::Dump;
 use alias::Alias;
 
 pub trait BuiltIn
@@ -35,6 +37,7 @@ pub fn node_object_for_program(program: String, args: Vec<Token>) -> Box<dyn Nod
         ,Cd
         ,Exit
         ,Source
+        ,Dump
         ,Alias
     );
 }
