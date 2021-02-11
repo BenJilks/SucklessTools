@@ -86,9 +86,9 @@ impl<S: Read> Lexer<S>
             {
                 match c
                 {
-                    x if x.is_whitespace() => { self.source.next(); },
+                    ' ' | '\t' => { self.source.next(); },
                     x if is_name_char(x) => self.state = State::Name,
-
+                    
                     ';' => return self.single_char(TokenType::SemiColon, ";"),
                     '\n' => return self.single_char(TokenType::SemiColon, ""),
                     '&' => { self.source.next(); self.state = State::And },

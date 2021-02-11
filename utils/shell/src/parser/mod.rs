@@ -59,7 +59,7 @@ fn parse_statement<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>
     {
         TokenType::Identifier => Ok(Some(parse_command(src)?)),
         TokenType::Assignement => Ok(Some(parse_assignment(src)?)),
-        TokenType::SemiColon => { src.next(); Ok(None) },
+        TokenType::SemiColon => Ok(None),
         _ => Err(UnexpectedError::new("statement", &next.data)),
     }
 }

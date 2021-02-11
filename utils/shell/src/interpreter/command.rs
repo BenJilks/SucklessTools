@@ -59,7 +59,7 @@ impl NodeObject for Command
                 
                 let result = execvp(c_program.as_c_str(), &c_args);
                 if result.is_err() {
-                    println!("{}", result.unwrap_err());
+                    println!("shell: {}", result.unwrap_err());
                 }
                 exit(1);
             },
