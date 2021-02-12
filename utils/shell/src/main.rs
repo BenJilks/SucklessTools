@@ -14,6 +14,7 @@ use std::path::PathBuf;
 fn prompt() -> String
 {
     let ps1 = std::env::var("PS1");
+
     if ps1.is_err() {
         "shell$ ".to_owned()
     } else {
@@ -43,6 +44,7 @@ fn cli()
         let script = script_or_error.ok().unwrap();
         script.execute(&mut environment);
         history.push(line);
+        environment.check_jobs();
     }
 }
 
@@ -81,3 +83,4 @@ fn main()
     let mut environment = Environment::new();
     run_script(&script_path, &mut environment);
 }
+

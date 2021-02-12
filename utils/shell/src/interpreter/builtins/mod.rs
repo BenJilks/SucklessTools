@@ -3,6 +3,7 @@ pub mod exit;
 pub mod source;
 pub mod dump;
 pub mod alias;
+pub mod jobs;
 use crate::interpreter::ast::NodeObject;
 use crate::interpreter::command::Command;
 use crate::parser::token::Token;
@@ -11,6 +12,7 @@ use cd::Cd;
 use source::Source;
 use dump::Dump;
 use alias::Alias;
+use jobs::Jobs;
 
 pub trait BuiltIn
 {
@@ -39,5 +41,6 @@ pub fn node_object_for_program(program: String, args: Vec<Token>) -> Box<dyn Nod
         ,Source
         ,Dump
         ,Alias
+        ,Jobs
     );
 }

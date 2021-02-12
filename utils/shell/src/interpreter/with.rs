@@ -1,6 +1,6 @@
 extern crate nix;
 use crate::interpreter::ast::{Node, NodeObject, NodeBlockObject};
-use crate::interpreter::Environment;
+use crate::interpreter::{Environment, Job};
 use nix::unistd::{fork, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
 use std::process::exit;
@@ -31,11 +31,19 @@ impl NodeObject for With
 
             Ok(ForkResult::Parent { child }) =>
             {
-                node.right().execute(environment);
-                match waitpid(child, None)
+                if node.is_unary()
                 {
-                    Ok(WaitStatus::Exited(_, _)) => 0,
-                    _ => 1,
+                    environment.add_job(Job::new(child, "test"));
+                    0
+                }
+                else
+                {
+                    node.right().execute(environment);
+                    match waitpid(child, None)
+                    {
+                        Ok(WaitStatus::Exited(_, _)) => 0,
+                        _ => 1,
+                    }
                 }
             }
 

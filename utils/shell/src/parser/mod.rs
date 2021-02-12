@@ -76,6 +76,33 @@ fn operation_from_type(token_type: TokenType) -> Box<dyn NodeObject>
     }
 }
 
+fn parse_with_operation<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
+{
+    let mut left = parse_statement(src)?;
+    if left.is_none() {
+        return Ok(None);
+    }
+
+    while src.peek().is_some()
+    {
+        let next = src.peek().unwrap().clone()?;
+        if next.token_type != TokenType::And {
+            break;
+        }
+        src.next();
+
+        let right = parse_statement(src)?;
+        if right.is_none() {
+            return Ok(Some(Node::unary_operation(left.unwrap(), With::new())));
+        }
+
+        left = Some(Node::operation(left.unwrap(), right.unwrap(), 
+            With::new()));
+    }
+
+    Ok(left)
+}
+
 fn parse_operation<S, F>(src: &mut Peekable<Lexer<S>>, func: F, tokens: &[TokenType]) -> Result<Option<Node>, Error>
     where S: Read, F: Fn(&mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
@@ -108,7 +135,7 @@ fn parse_operation<S, F>(src: &mut Peekable<Lexer<S>>, func: F, tokens: &[TokenT
 
 fn parse_factor<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>
 {
-    parse_operation(src, parse_statement, &[TokenType::Pipe, TokenType::And])
+    parse_operation(src, parse_with_operation, &[TokenType::Pipe, TokenType::And])
 }
 
 fn parse_term<S: Read>(src: &mut Peekable<Lexer<S>>) -> Result<Option<Node>, Error>

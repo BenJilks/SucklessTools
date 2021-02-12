@@ -48,6 +48,17 @@ impl Node
         }
     }
 
+    pub fn unary_operation(left: Node, data: Box<dyn NodeObject>) -> Node
+    {
+        Self
+        {
+            left: Some(Box::from(left)),
+            right: None,
+            children: Vec::new(),
+            data: data,
+        }
+    }
+
     pub fn block(children: Vec<Node>, data: Box<dyn NodeObject>) -> Node
     {
         Self
@@ -62,6 +73,7 @@ impl Node
     pub fn left(&self) -> &Node { self.left.as_ref().unwrap() }
     pub fn right(&self) -> &Node { self.right.as_ref().unwrap() }
     pub fn children(&self) -> &Vec<Node> { &self.children }
+    pub fn is_unary(&self) -> bool { self.right.is_none() }
 
     pub fn execute(&self, environment: &mut Environment) -> i32
     {
