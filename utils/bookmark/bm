@@ -1,0 +1,4 @@
+#!/bin/sh
+
+cd ~/bookmarks/$1
+
