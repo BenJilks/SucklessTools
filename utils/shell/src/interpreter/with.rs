@@ -3,7 +3,6 @@ use crate::interpreter::ast::{Node, NodeObject, NodeBlockObject};
 use crate::interpreter::{Environment, Job};
 use nix::unistd::{fork, ForkResult};
 use nix::sys::wait::{waitpid, WaitStatus};
-use std::process::exit;
 
 pub struct With;
 
@@ -26,7 +25,7 @@ impl NodeObject for With
         {
             Ok(ForkResult::Child) =>
             {
-                exit(node.left().execute(environment))
+                node.left().execute_and_exit(environment)
             },
 
             Ok(ForkResult::Parent { child }) =>

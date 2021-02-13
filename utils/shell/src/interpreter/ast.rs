@@ -7,6 +7,11 @@ use std::process::exit;
 pub trait NodeObject
 {
     fn execute(&self, environment: &mut Environment, node: &Node) -> i32;
+    fn execute_and_exit(&self, environment: &mut Environment, node: &Node) -> ! 
+    { 
+        exit(self.execute(environment, node))
+    }
+
     fn dump(&self);
 }
 
@@ -80,6 +85,11 @@ impl Node
         self.data.execute(environment, self)
     }
 
+    pub fn execute_and_exit(&self, environment: &mut Environment) -> !
+    {
+        self.data.execute_and_exit(environment, self)
+    }
+
     pub fn execute_capture_output(&self) -> String
     {
         let (read_fd, write_fd) = pipe().unwrap();
@@ -92,8 +102,7 @@ impl Node
                 close(read_fd).unwrap();
 
                 let mut environment = Environment::new();
-                self.execute(&mut environment);
-                exit(0)
+                self.execute_and_exit(&mut environment)
             },
 
             Ok(ForkResult::Parent{child}) =>
@@ -116,8 +125,9 @@ impl Node
 
                     output.push_str(&String::from_utf8(buffer[0..read].to_vec()).unwrap());
                 }
+
                 close(read_fd).unwrap();
-                
+                let _ = waitpid(child, None);
                 output
             },
 

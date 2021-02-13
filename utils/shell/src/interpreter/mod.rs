@@ -28,6 +28,7 @@ pub struct Job
 {
     pub pid: Pid,
     pub name: String,
+    pub status: String,
 }
 
 impl Job
@@ -39,6 +40,7 @@ impl Job
         {
             pid: pid,
             name: name.to_owned(),
+            status: "Running".to_owned(),
         }
     }
 
@@ -73,12 +75,16 @@ impl Environment
     pub fn check_jobs(&mut self)
     {
         let mut jobs_done = Vec::<Pid>::new();
-        for job in &self.jobs
+        for job in &mut self.jobs
         {
             match waitpid(job.pid, Some(WaitPidFlag::WNOHANG))
             {
                 Ok(WaitStatus::Exited(_, _)) => jobs_done.push(job.pid),
-                _ => {},
+                Ok(WaitStatus::Signaled(_, _, _)) => jobs_done.push(job.pid),
+                Ok(WaitStatus::Stopped(_, _)) => job.status = "Stopped".to_owned(),
+                Ok(WaitStatus::Continued(_)) => job.status = "Running".to_owned(),
+                Ok(test) => println!("{:?}", test),
+                Err(err) => job.status = format!("{}", err),
             }
         }
 

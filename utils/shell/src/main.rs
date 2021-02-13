@@ -43,8 +43,11 @@ fn cli()
 
         let script = script_or_error.ok().unwrap();
         script.execute(&mut environment);
-        history.push(line);
         environment.check_jobs();
+        
+        if !line.is_empty() {
+            history.push(line);
+        }
     }
 }
 

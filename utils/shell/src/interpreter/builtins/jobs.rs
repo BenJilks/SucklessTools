@@ -31,7 +31,7 @@ impl NodeObject for Jobs
         let mut id = 1;
         for job in &environment.jobs
         {
-            println!("[{}] {} {}", id, "Running", job.name);
+            println!("[{}] {} {}", id, job.status, job.name);
             id += 1;
         }
 
