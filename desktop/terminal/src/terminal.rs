@@ -241,7 +241,7 @@ fn buffer_thread(
                 if !result.is_empty() {
                     handle_input(master, &result);
                 }
-            },
+            }
         }
     }
 

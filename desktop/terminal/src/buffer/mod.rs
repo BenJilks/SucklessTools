@@ -242,7 +242,8 @@ impl Buffer {
 
             let _ = self.draw_action_sender.send(DrawAction::Runes(runes));
             let _ = self.draw_action_sender.send(DrawAction::Flush);
-            let _ = self.draw_action_sender
+            let _ = self
+                .draw_action_sender
                 .send(DrawAction::Runes(vec![(rune, cursor)]));
         } else {
             let _ = self.draw_action_sender.send(DrawAction::Runes(runes));
@@ -465,7 +466,11 @@ impl Buffer {
         if top == self.scroll_region_top && bottom == self.scroll_region_bottom {
             self.scroll_buffer += amount;
         } else {
-            let _ = self.draw_action_sender.send(DrawAction::Scroll { amount, top, bottom });
+            let _ = self.draw_action_sender.send(DrawAction::Scroll {
+                amount,
+                top,
+                bottom,
+            });
         }
 
         self.cursor_move(amount, 0);
@@ -630,7 +635,7 @@ impl Buffer {
             line.set(column, self.rune_from_code_point(' ' as u32));
         }
 
-        let _= self.draw_action_sender.send(DrawAction::Clear {
+        let _ = self.draw_action_sender.send(DrawAction::Clear {
             attribute: self.attribute.clone(),
             row,
             column: start,

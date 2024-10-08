@@ -1,7 +1,6 @@
 use crate::buffer::rune::ColorType;
 
-pub enum ActionType
-{
+pub enum ActionType {
     None,
 
     TypeCodePoint,
@@ -31,16 +30,14 @@ pub enum ActionType
     ColorInvert,
 }
 
-pub enum CursorDirection
-{
+pub enum CursorDirection {
     Left,
     Right,
     Up,
     Down,
 }
 
-pub struct Action
-{
+pub struct Action {
     pub action_type: ActionType,
     pub code_point: Option<u32>,
 
@@ -58,12 +55,9 @@ pub struct Action
     pub color: Option<u32>,
 }
 
-impl Default for Action
-{
-    fn default() -> Self
-    {
-        Self
-        {
+impl Default for Action {
+    fn default() -> Self {
+        Self {
             action_type: ActionType::None,
             code_point: None,
             cursor_direction: None,
@@ -79,192 +73,151 @@ impl Default for Action
     }
 }
 
-impl Action
-{
-    pub fn type_code_point(code_point: u32) -> Self
-    {
-        Self
-        {
+impl Action {
+    pub fn type_code_point(code_point: u32) -> Self {
+        Self {
             action_type: ActionType::TypeCodePoint,
-            code_point: Some( code_point ),
+            code_point: Some(code_point),
             ..Self::default()
         }
     }
-    pub fn insert(amount: i32) -> Self
-    {
-        Self
-        {
+    pub fn insert(amount: i32) -> Self {
+        Self {
             action_type: ActionType::Insert,
-            amount: Some( amount ),
+            amount: Some(amount),
             ..Self::default()
         }
     }
-    pub fn delete(amount: i32) -> Self
-    {
-        Self
-        {
+    pub fn delete(amount: i32) -> Self {
+        Self {
             action_type: ActionType::Delete,
-            amount: Some( amount ),
+            amount: Some(amount),
             ..Self::default()
         }
     }
-    pub fn erase(amount: i32) -> Self
-    {
-        Self
-        {
+    pub fn erase(amount: i32) -> Self {
+        Self {
             action_type: ActionType::Erase,
-            amount: Some( amount ),
+            amount: Some(amount),
             ..Self::default()
         }
     }
 
-    pub fn new_line() -> Self
-    {
-        Self
-        {
+    pub fn new_line() -> Self {
+        Self {
             action_type: ActionType::NewLine,
             ..Self::default()
         }
     }
-    pub fn carriage_return() -> Self
-    {
-        Self
-        {
+    pub fn carriage_return() -> Self {
+        Self {
             action_type: ActionType::CarriageReturn,
             ..Self::default()
         }
     }
-    pub fn insert_lines(amount: i32) -> Self
-    {
-        Self
-        {
+    pub fn insert_lines(amount: i32) -> Self {
+        Self {
             action_type: ActionType::InsetLines,
-            amount: Some( amount ),
+            amount: Some(amount),
             ..Self::default()
         }
     }
-    pub fn delete_lines(amount: i32) -> Self
-    {
-        Self
-        {
+    pub fn delete_lines(amount: i32) -> Self {
+        Self {
             action_type: ActionType::DeleteLines,
-            amount: Some( amount ),
+            amount: Some(amount),
             ..Self::default()
         }
     }
 
-    pub fn cursor_movement(direction: CursorDirection, amount: i32) -> Self
-    {
-        Self
-        {
+    pub fn cursor_movement(direction: CursorDirection, amount: i32) -> Self {
+        Self {
             action_type: ActionType::CursorMovement,
-            cursor_direction: Some( direction ),
-            amount: Some( amount ),
+            cursor_direction: Some(direction),
+            amount: Some(amount),
             ..Self::default()
         }
     }
 
-    pub fn cursor_set(row: i32, column: i32) -> Self
-    {
-        Self
-        {
+    pub fn cursor_set(row: i32, column: i32) -> Self {
+        Self {
             action_type: ActionType::CursorSet,
-            row: Some( row ),
-            column: Some( column ),
+            row: Some(row),
+            column: Some(column),
             ..Self::default()
         }
     }
 
-    pub fn cursor_set_row(row: i32) -> Self
-    {
-        Self
-        {
+    pub fn cursor_set_row(row: i32) -> Self {
+        Self {
             action_type: ActionType::CursorSetRow,
-            row: Some( row ),
+            row: Some(row),
             ..Self::default()
         }
     }
-    pub fn cursor_set_column(column: i32) -> Self
-    {
-        Self
-        {
+    pub fn cursor_set_column(column: i32) -> Self {
+        Self {
             action_type: ActionType::CursorSetColumn,
-            column: Some( column ),
+            column: Some(column),
             ..Self::default()
         }
     }
 
-    pub fn clear_from_cursor(direction: CursorDirection) -> Self
-    {
-        Self
-        {
+    pub fn clear_from_cursor(direction: CursorDirection) -> Self {
+        Self {
             action_type: ActionType::ClearFromCursor,
-            cursor_direction: Some( direction ),
+            cursor_direction: Some(direction),
             ..Self::default()
         }
     }
 
-    pub fn clear_line() -> Self
-    {
-        Self
-        {
+    pub fn clear_line() -> Self {
+        Self {
             action_type: ActionType::ClearLine,
             ..Self::default()
         }
     }
 
-    pub fn clear_screen() -> Self
-    {
-        Self
-        {
+    pub fn clear_screen() -> Self {
+        Self {
             action_type: ActionType::ClearScreen,
             ..Self::default()
         }
     }
 
-    pub fn set_scroll_region(top: Option<i32>, bottom: Option<i32>) -> Self
-    {
-        Self
-        {
+    pub fn set_scroll_region(top: Option<i32>, bottom: Option<i32>) -> Self {
+        Self {
             action_type: ActionType::SetScrollRegion,
             top: top,
             bottom: bottom,
             ..Self::default()
         }
     }
-    pub fn response(message: Vec<u8>) -> Self
-    {
-        Self
-        {
+    pub fn response(message: Vec<u8>) -> Self {
+        Self {
             action_type: ActionType::Response,
-            message: Some( message ),
+            message: Some(message),
             ..Self::default()
         }
     }
-    pub fn fill(code_point: u32) -> Self
-    {
-        Self
-        {
+    pub fn fill(code_point: u32) -> Self {
+        Self {
             action_type: ActionType::Fill,
-            code_point: Some( code_point ),
+            code_point: Some(code_point),
             ..Self::default()
         }
     }
 
-    pub fn set_color(color_type: ColorType, color: u32) -> Self
-    {
-        Self
-        {
+    pub fn set_color(color_type: ColorType, color: u32) -> Self {
+        Self {
             action_type: ActionType::SetColor,
-            color_type: Some( color_type ),
-            color: Some( color ),
+            color_type: Some(color_type),
+            color: Some(color),
             ..Self::default()
         }
     }
-    pub fn color_invert() -> Self
-    {
-        Self
-        {
+    pub fn color_invert() -> Self {
+        Self {
             action_type: ActionType::ColorInvert,
             ..Self::default()
         }

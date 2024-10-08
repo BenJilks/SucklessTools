@@ -1,13 +1,12 @@
 use std::sync::mpsc;
 
-mod terminal;
-mod display;
-mod decoder;
 mod buffer;
+mod decoder;
+mod display;
+mod terminal;
 use display::xlib::XLibDisplay;
 
-fn main() 
-{
+fn main() {
     let (event_sender, event_receiver) = mpsc::channel();
     let (draw_action_sender, draw_action_receiver) = mpsc::channel();
     terminal::run(event_receiver, draw_action_sender);
