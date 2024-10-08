@@ -1,4 +1,4 @@
-use crate::display::rune::ColorType;
+use crate::buffer::rune::ColorType;
 
 pub enum ActionType
 {

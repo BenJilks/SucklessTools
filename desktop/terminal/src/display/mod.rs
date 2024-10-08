@@ -1,8 +1,6 @@
 pub mod xlib;
-pub mod cursor;
-pub mod rune;
-use rune::Rune;
-use cursor::CursorPos;
+use crate::buffer::rune::{self, Rune};
+use crate::buffer::cursor::CursorPos;
 
 pub enum UpdateResultType
 {
@@ -138,5 +136,4 @@ pub trait Display
     fn draw_clear(&mut self, attribute: &rune::Attribute, 
         row: i32, column: i32, width: i32, height: i32);
     fn flush(&mut self);
-    
 }

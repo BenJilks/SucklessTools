@@ -1,11 +1,14 @@
 use crate::decoder::action::{Action, ActionType, CursorDirection};
-use crate::display::cursor::CursorPos;
-use crate::display::rune::{Rune, Attribute};
 use crate::display;
+use cursor::CursorPos;
+use rune::{Rune, Attribute};
 use std::cmp::min;
 use std::mem::swap;
 use std::rc::Rc;
 use std::cell::RefCell;
+
+pub mod cursor;
+pub mod rune;
 
 #[derive(Clone)]
 struct LineElement

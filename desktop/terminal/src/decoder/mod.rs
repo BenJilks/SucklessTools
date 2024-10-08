@@ -1,7 +1,8 @@
-pub mod action;
-use crate::display::rune::{ColorType, StandardColor};
+use crate::buffer::rune::{ColorType, StandardColor};
 use std::io::Write;
 use action::Action;
+
+pub mod action;
 
 const SHOW_STREAM_LOG: bool = false;
 const SHOW_UNKOWN_ESCAPES: bool = false;
