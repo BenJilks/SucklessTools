@@ -1,6 +1,6 @@
 extern crate x11;
 use crate::buffer::cursor::CursorPos;
-use crate::display::rune::{Rune, StandardColor};
+use crate::buffer::rune::{Rune, StandardColor};
 use crate::display::xlib::window::Window;
 use crate::display::xlib::font::Font;
 use x11::{xlib, xft};

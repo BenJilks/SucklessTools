@@ -1,5 +1,5 @@
 extern crate x11;
-use crate::display::rune::StandardColor;
+use crate::buffer::rune::StandardColor;
 use x11::xlib;
 use std::ptr;
 use std::mem;
@@ -15,7 +15,6 @@ pub struct Window
     pub visual: *mut xlib::Visual,
     pub window: c_ulong,
     pub cmap: c_ulong,
-    pub fd: i32,
 
     pub width: i32,
     pub height: i32,
@@ -79,14 +78,13 @@ impl Window
 
         Rc::from(RefCell::from(Self
         {
-            display: display,
-            visual: visual,
-            window: window,
-            cmap: cmap,
-            fd: unsafe { xlib::XConnectionNumber(display) },
+            display,
+            visual,
+            window,
+            cmap,
 
-            width: width,
-            height: height,
+            width,
+            height,
         }))
     }
 

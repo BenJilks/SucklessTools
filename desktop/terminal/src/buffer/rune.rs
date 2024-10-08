@@ -35,14 +35,14 @@ impl StandardColor
 
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Attribute
 {
     pub background: u32,
     pub foreground: u32,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ColorType
 {
     Foreground,
@@ -61,7 +61,7 @@ impl Default for Attribute
     }
 }
 
-#[derive(Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Rune
 {
     pub code_point: u32,
