@@ -6,6 +6,11 @@ use std::sync::mpsc;
 
 const FONT_SIZE: i32 = 30;
 
+struct ScreenBuffer {
+    front: RenderTexture2D,
+    back: RenderTexture2D,
+}
+
 fn handle_input(rl: &mut RaylibHandle, event_sender: &mpsc::Sender<Event>) {
     if let Some(char) = rl.get_char_pressed() {
         let mut buffer = vec![0u8; 10];
@@ -65,10 +70,19 @@ fn perform_draw_action(
     action: &DrawAction,
     font: &WeakFont,
     font_size: Vector2,
-    draw: &mut impl RaylibDraw,
+    display: &mut ScreenBuffer,
+    draw: &mut RaylibDrawHandle,
+    thread: &RaylibThread,
 ) {
     match action {
-        DrawAction::ClearScreen => draw.clear_background(Color::BLACK),
+        DrawAction::ClearScreen => {
+            let mut screen_draw = draw.begin_texture_mode(&thread, &mut display.back);
+            screen_draw.clear_background(Color::BLACK);
+        },
+
+        DrawAction::Flush => {
+            std::mem::swap(&mut display.back, &mut display.front);
+        },
 
         DrawAction::Clear {
             attribute,
@@ -77,7 +91,8 @@ fn perform_draw_action(
             width,
             height,
         } => {
-            draw.draw_rectangle_v(
+            let mut screen_draw = draw.begin_texture_mode(&thread, &mut display.back);
+            screen_draw.draw_rectangle_v(
                 Vector2 {
                     x: *column as f32 * font_size.x,
                     y: *row as f32 * font_size.y,
@@ -91,20 +106,21 @@ fn perform_draw_action(
         }
 
         DrawAction::Runes(runes) => {
+            let mut screen_draw = draw.begin_texture_mode(&thread, &mut display.back);
             for (rune, cursor_pos) in runes {
                 let position = Vector2 {
                     x: cursor_pos.get_column() as f32 * font_size.x,
                     y: cursor_pos.get_row() as f32 * font_size.y,
                 };
 
-                draw.draw_rectangle_v(
+                screen_draw.draw_rectangle_v(
                     position,
                     font_size,
                     Color::get_color(rune.attribute.background),
                 );
 
                 if rune.code_point != 0 {
-                    draw.draw_text_codepoint(
+                    screen_draw.draw_text_codepoint(
                         font,
                         rune.code_point as i32,
                         position,
@@ -130,7 +146,12 @@ fn create_resize_event(rl: &RaylibHandle, font_size: Vector2) -> ResizeEvent {
 
 fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread) -> (WeakFont, Vector2) {
     let font = rl
-        .load_font_ex(&thread, "/usr/share/fonts/TTF/DejaVuSansMono.ttf", FONT_SIZE, None)
+        .load_font_ex(
+            &thread,
+            "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+            FONT_SIZE,
+            None,
+        )
         .map(|x| x.make_weak())
         .unwrap_or(rl.get_font_default());
 
@@ -138,21 +159,26 @@ fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread) -> (WeakFont, Vector2
     (font, font_size)
 }
 
-pub fn handle_resize(
+fn handle_resize(
     rl: &mut RaylibHandle,
     thread: &RaylibThread,
-    screen: &mut RenderTexture2D,
+    display: &mut ScreenBuffer,
     font_size: Vector2,
     event_sender: &mpsc::Sender<Event>,
 ) {
     let event = create_resize_event(&rl, font_size);
+
     let screen_width = event.columns * font_size.x as i32;
     let screen_height = event.rows * font_size.y as i32;
-    if screen.width() != screen_width || screen.height() != screen_height {
-        *screen = rl
+    if display.front.width() != screen_width || display.front.height() != screen_height {
+        display.front = rl
+            .load_render_texture(&thread, screen_width as u32, screen_height as u32)
+            .expect("Can create screen render target");
+        display.back = rl
             .load_render_texture(&thread, screen_width as u32, screen_height as u32)
             .expect("Can create screen render target");
     }
+
     let _ = event_sender.send(Event::Resize(event));
 }
 
@@ -170,43 +196,50 @@ pub fn start_raylib_display(
     rl.set_exit_key(None);
 
     let (font, font_size) = load_font(&mut rl, &thread);
+    let mut display = ScreenBuffer {
+        front: rl
+            .load_render_texture(
+                &thread,
+                rl.get_screen_width() as u32,
+                rl.get_screen_height() as u32,
+            )
+            .expect("Can create screen render target"),
+        back: rl
+            .load_render_texture(
+                &thread,
+                rl.get_screen_width() as u32,
+                rl.get_screen_height() as u32,
+            )
+            .expect("Can create screen render target"),
+    };
 
-    let mut screen = rl
-        .load_render_texture(
-            &thread,
-            rl.get_screen_width() as u32,
-            rl.get_screen_height() as u32,
-        )
-        .expect("Can create screen render target");
-    handle_resize(&mut rl, &thread, &mut screen, font_size, &event_sender);
+    // NOTE: Set initial size.
+    handle_resize(&mut rl, &thread, &mut display, font_size, &event_sender);
 
     while !rl.window_should_close() {
         handle_input(&mut rl, &event_sender);
         if rl.is_window_resized() {
-            handle_resize(&mut rl, &thread, &mut screen, font_size, &event_sender);
+            handle_resize(&mut rl, &thread, &mut display, font_size, &event_sender);
         }
 
         let mut draw = rl.begin_drawing(&thread);
         draw.clear_background(Color::get_color(StandardColor::DefaultBackground.color()));
 
-        {
-            let mut screen_draw = draw.begin_texture_mode(&thread, &mut screen);
-            while let Ok(action) = draw_action_receiver.try_recv() {
-                if let DrawAction::Close = action {
-                    return;
-                }
-
-                perform_draw_action(&action, &font, font_size, &mut screen_draw);
+        while let Ok(action) = draw_action_receiver.try_recv() {
+            if let DrawAction::Close = action {
+                return;
             }
+
+            perform_draw_action(&action, &font, font_size, &mut display, &mut draw, &thread);
         }
 
         draw.draw_texture_rec(
-            &screen,
+            &display.front,
             Rectangle {
                 x: 0.0,
                 y: 0.0,
-                width: screen.width() as f32,
-                height: -screen.height() as f32,
+                width: display.front.width() as f32,
+                height: -display.front.height() as f32,
             },
             Vector2 { x: 0.0, y: 0.0 },
             Color::WHITE,
