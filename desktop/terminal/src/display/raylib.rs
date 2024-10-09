@@ -130,7 +130,7 @@ fn create_resize_event(rl: &RaylibHandle, font_size: Vector2) -> ResizeEvent {
 
 fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread) -> (WeakFont, Vector2) {
     let font = rl
-        .load_font(&thread, "/usr/share/fonts/TTF/DejaVuSansMono.ttf")
+        .load_font_ex(&thread, "/usr/share/fonts/TTF/DejaVuSansMono.ttf", FONT_SIZE, None)
         .map(|x| x.make_weak())
         .unwrap_or(rl.get_font_default());
 
