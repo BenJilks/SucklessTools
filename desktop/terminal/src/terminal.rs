@@ -216,9 +216,9 @@ fn handle_event(buffer: &mut Buffer, event: &display::Event, master: i32) {
 
 fn display_thread(event_receiver: Receiver<display::Event>, message_sender: Sender<Message>) {
     for event in event_receiver {
-        message_sender
-            .send(Message::Event(event))
-            .expect("Could send event message");
+        if let Err(_) = message_sender.send(Message::Event(event)) {
+            break;
+        }
     }
 }
 

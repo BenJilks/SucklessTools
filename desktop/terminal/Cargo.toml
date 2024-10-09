@@ -7,7 +7,8 @@ links = "xlib"
 build = "build.rs"
 
 [dependencies]
-x11 = "2.18.2"
+x11 = { version = "2.18.2", optional = true }
+raylib = { version = "5.0.2", optional = true }
 libc = "0.2"
 
 [profile.release]
@@ -16,3 +17,8 @@ debug = false
 debug-assertions = false
 overflow-checks = false
 rpath = false
+
+[features]
+default = ["raylib"]
+x11 = ["dep:x11"]
+raylib = ["dep:raylib"]

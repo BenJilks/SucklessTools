@@ -1,4 +1,8 @@
+#[cfg(feature = "x11")]
 pub mod xlib;
+
+#[cfg(feature = "raylib")]
+pub mod raylib;
 
 #[derive(Debug)]
 pub enum Event {
