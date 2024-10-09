@@ -78,11 +78,11 @@ fn perform_draw_action(
         DrawAction::ClearScreen => {
             let mut screen_draw = draw.begin_texture_mode(&thread, &mut display.back);
             screen_draw.clear_background(Color::BLACK);
-        },
+        }
 
         DrawAction::Flush => {
             std::mem::swap(&mut display.back, &mut display.front);
-        },
+        }
 
         DrawAction::Clear {
             attribute,
@@ -129,6 +129,26 @@ fn perform_draw_action(
                     );
                 }
             }
+        }
+
+        DrawAction::Scroll {
+            amount,
+            top,
+            bottom,
+        } => {
+            let buffer_copy = display.back.texture().clone();
+            let mut screen_draw = draw.begin_texture_mode(&thread, &mut display.back);
+            screen_draw.draw_texture_rec(
+                &buffer_copy,
+                Rectangle {
+                    x: 0.0,
+                    y: *top as f32 * font_size.y,
+                    width: buffer_copy.width as f32,
+                    height: -(*bottom - *top) as f32 * font_size.y,
+                },
+                Vector2 { x: 0.0, y: (*top + *amount) as f32 * font_size.y },
+                Color::WHITE,
+            );
         }
 
         _ => {}
