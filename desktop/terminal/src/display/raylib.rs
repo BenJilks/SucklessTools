@@ -1,3 +1,4 @@
+use crate::buffer::rune::StandardColor;
 use crate::buffer::DrawAction;
 use crate::display::{Event, ResizeEvent};
 use raylib::prelude::*;
@@ -137,6 +138,24 @@ fn load_font(rl: &mut RaylibHandle, thread: &RaylibThread) -> (WeakFont, Vector2
     (font, font_size)
 }
 
+pub fn handle_resize(
+    rl: &mut RaylibHandle,
+    thread: &RaylibThread,
+    screen: &mut RenderTexture2D,
+    font_size: Vector2,
+    event_sender: &mpsc::Sender<Event>,
+) {
+    let event = create_resize_event(&rl, font_size);
+    let screen_width = event.columns * font_size.x as i32;
+    let screen_height = event.rows * font_size.y as i32;
+    if screen.width() != screen_width || screen.height() != screen_height {
+        *screen = rl
+            .load_render_texture(&thread, screen_width as u32, screen_height as u32)
+            .expect("Can create screen render target");
+    }
+    let _ = event_sender.send(Event::Resize(event));
+}
+
 pub fn start_raylib_display(
     title: &str,
     event_sender: mpsc::Sender<Event>,
@@ -152,7 +171,6 @@ pub fn start_raylib_display(
 
     let (font, font_size) = load_font(&mut rl, &thread);
 
-    let _ = event_sender.send(Event::Resize(create_resize_event(&rl, font_size)));
     let mut screen = rl
         .load_render_texture(
             &thread,
@@ -160,22 +178,17 @@ pub fn start_raylib_display(
             rl.get_screen_height() as u32,
         )
         .expect("Can create screen render target");
+    handle_resize(&mut rl, &thread, &mut screen, font_size, &event_sender);
 
     while !rl.window_should_close() {
         handle_input(&mut rl, &event_sender);
-
         if rl.is_window_resized() {
-            let _ = event_sender.send(Event::Resize(create_resize_event(&rl, font_size)));
-            screen = rl
-                .load_render_texture(
-                    &thread,
-                    rl.get_screen_width() as u32,
-                    rl.get_screen_height() as u32,
-                )
-                .expect("Can create screen render target");
+            handle_resize(&mut rl, &thread, &mut screen, font_size, &event_sender);
         }
 
         let mut draw = rl.begin_drawing(&thread);
+        draw.clear_background(Color::get_color(StandardColor::DefaultBackground.color()));
+
         {
             let mut screen_draw = draw.begin_texture_mode(&thread, &mut screen);
             while let Ok(action) = draw_action_receiver.try_recv() {
